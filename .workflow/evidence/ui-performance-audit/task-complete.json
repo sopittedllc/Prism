@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "task_id": "ui-performance-audit",
+  "title": "UI audit fixes and fast first inventory",
+  "risk_tier": 2,
+  "state": "complete",
+  "base_revision": "content:e2744b65b627ba2bd2e085a99d29d10b7ee07b6f46ece909ba288443c6ea38ad",
+  "domains": [
+    "ui-ux"
+  ],
+  "product_decisions_needed": [],
+  "acceptance_criteria": [
+    {
+      "id": "AC1",
+      "statement": "Shared text spacing and visual states",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/ui-performance-audit/native-runtime-report.json",
+        ".workflow/evidence/ui-performance-audit/performance-report.json",
+        ".workflow/evidence/ui-performance-audit/final-review-report.json"
+      ]
+    },
+    {
+      "id": "AC2",
+      "statement": "Keyboard and accessibility",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/ui-performance-audit/native-runtime-report.json",
+        ".workflow/evidence/ui-performance-audit/performance-report.json",
+        ".workflow/evidence/ui-performance-audit/final-review-report.json"
+      ]
+    },
+    {
+      "id": "AC3",
+      "statement": "Streaming inventory before details",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/ui-performance-audit/native-runtime-report.json",
+        ".workflow/evidence/ui-performance-audit/performance-report.json",
+        ".workflow/evidence/ui-performance-audit/final-review-report.json"
+      ]
+    },
+    {
+      "id": "AC4",
+      "statement": "Measured first result and total performance",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/ui-performance-audit/native-runtime-report.json",
+        ".workflow/evidence/ui-performance-audit/performance-report.json",
+        ".workflow/evidence/ui-performance-audit/final-review-report.json"
+      ]
+    },
+    {
+      "id": "AC5",
+      "statement": "Regression and independent review",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/ui-performance-audit/native-runtime-report.json",
+        ".workflow/evidence/ui-performance-audit/performance-report.json",
+        ".workflow/evidence/ui-performance-audit/final-review-report.json"
+      ]
+    }
+  ],
+  "gates": {
+    "research": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/ui-performance-audit/research.json"
+      ],
+      "revision": "content:dad13ac1c80f24edee0e0ce38b676708799aacb9d2e034276f13f6cfcee1acce",
+      "agent": "researcher"
+    },
+    "plan_review": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/ui-performance-audit/plan_review.json"
+      ],
+      "revision": "content:dad13ac1c80f24edee0e0ce38b676708799aacb9d2e034276f13f6cfcee1acce",
+      "agent": "critic"
+    },
+    "implementation": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/ui-performance-audit/implementation.json"
+      ],
+      "revision": "content:dad13ac1c80f24edee0e0ce38b676708799aacb9d2e034276f13f6cfcee1acce",
+      "agent": "implementer"
+    },
+    "automated_tests": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/ui-performance-audit/automated_tests.json"
+      ],
+      "revision": "content:dad13ac1c80f24edee0e0ce38b676708799aacb9d2e034276f13f6cfcee1acce",
+      "agent": "scripts/run_check.py"
+    },
+    "code_review": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/ui-performance-audit/code_review.json"
+      ],
+      "revision": "content:dad13ac1c80f24edee0e0ce38b676708799aacb9d2e034276f13f6cfcee1acce",
+      "agent": "independent-reviewer"
+    },
+    "runtime_tests": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/ui-performance-audit/runtime_tests.json"
+      ],
+      "revision": "content:dad13ac1c80f24edee0e0ce38b676708799aacb9d2e034276f13f6cfcee1acce",
+      "agent": "native-runtime"
+    },
+    "ui_research": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/ui-performance-audit/ui_research.json"
+      ],
+      "revision": "content:dad13ac1c80f24edee0e0ce38b676708799aacb9d2e034276f13f6cfcee1acce",
+      "agent": "ux-researcher"
+    },
+    "design_system_audit": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/ui-performance-audit/design_system_audit.json"
+      ],
+      "revision": "content:dad13ac1c80f24edee0e0ce38b676708799aacb9d2e034276f13f6cfcee1acce",
+      "agent": "design-system-reviewer"
+    },
+    "accessibility": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/ui-performance-audit/accessibility.json"
+      ],
+      "revision": "content:dad13ac1c80f24edee0e0ce38b676708799aacb9d2e034276f13f6cfcee1acce",
+      "agent": "accessibility-reviewer"
+    },
+    "visual_regression": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/ui-performance-audit/visual_regression.json"
+      ],
+      "revision": "content:dad13ac1c80f24edee0e0ce38b676708799aacb9d2e034276f13f6cfcee1acce",
+      "agent": "visual-reviewer"
+    },
+    "ux_review": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/ui-performance-audit/ux_review.json"
+      ],
+      "revision": "content:dad13ac1c80f24edee0e0ce38b676708799aacb9d2e034276f13f6cfcee1acce",
+      "agent": "ux-reviewer"
+    }
+  },
+  "current_revision": "content:dad13ac1c80f24edee0e0ce38b676708799aacb9d2e034276f13f6cfcee1acce"
+}

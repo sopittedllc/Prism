@@ -1,0 +1,198 @@
+{
+  "schema_version": 1,
+  "task_id": "catalog-browser",
+  "title": "Native catalog browser and project reference validation",
+  "risk_tier": 2,
+  "state": "complete",
+  "base_revision": "content:4fc26851b238ac0e0d8f422cc931e9b2be798122bde1020c2871641b814f62cb",
+  "domains": [
+    "ui-ux",
+    "stateful-feature"
+  ],
+  "product_decisions_needed": [],
+  "acceptance_criteria": [
+    {
+      "id": "AC1",
+      "statement": "Builds and core/model tests pass",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/catalog-browser/delivery-report.json",
+        ".workflow/evidence/catalog-browser/automated_tests.json",
+        ".workflow/evidence/catalog-browser/native-runtime-report.json"
+      ]
+    },
+    {
+      "id": "AC2",
+      "statement": "Filter sort selection root/default behavior verified",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/catalog-browser/delivery-report.json",
+        ".workflow/evidence/catalog-browser/automated_tests.json",
+        ".workflow/evidence/catalog-browser/native-runtime-report.json"
+      ]
+    },
+    {
+      "id": "AC3",
+      "statement": "Native runtime interaction and screenshot matrix verified",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/catalog-browser/delivery-report.json",
+        ".workflow/evidence/catalog-browser/automated_tests.json",
+        ".workflow/evidence/catalog-browser/native-runtime-report.json"
+      ]
+    },
+    {
+      "id": "AC4",
+      "statement": "Accessible controls and independent visual review",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/catalog-browser/delivery-report.json",
+        ".workflow/evidence/catalog-browser/automated_tests.json",
+        ".workflow/evidence/catalog-browser/native-runtime-report.json"
+      ]
+    },
+    {
+      "id": "AC5",
+      "statement": "User-authorized project-root coverage recorded without private content",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/catalog-browser/delivery-report.json",
+        ".workflow/evidence/catalog-browser/automated_tests.json",
+        ".workflow/evidence/catalog-browser/native-runtime-report.json"
+      ]
+    },
+    {
+      "id": "AC6",
+      "statement": "Native registry and cross-cutting policies verified",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/catalog-browser/delivery-report.json",
+        ".workflow/evidence/catalog-browser/automated_tests.json",
+        ".workflow/evidence/catalog-browser/native-runtime-report.json"
+      ]
+    }
+  ],
+  "gates": {
+    "research": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/catalog-browser/research.json"
+      ],
+      "revision": "content:f3fab40a433cd4a4284cc4224ada9c099450c72c36dfa78997020903271efbca",
+      "agent": "codex-report-backed-validation"
+    },
+    "plan_review": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/catalog-browser/plan_review.json"
+      ],
+      "revision": "content:f3fab40a433cd4a4284cc4224ada9c099450c72c36dfa78997020903271efbca",
+      "agent": "independent-codex-critic"
+    },
+    "implementation": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/catalog-browser/implementation.json"
+      ],
+      "revision": "content:f3fab40a433cd4a4284cc4224ada9c099450c72c36dfa78997020903271efbca",
+      "agent": "codex-report-backed-validation"
+    },
+    "automated_tests": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/catalog-browser/automated_tests.json"
+      ],
+      "revision": "content:f3fab40a433cd4a4284cc4224ada9c099450c72c36dfa78997020903271efbca",
+      "agent": "scripts/run_check.py"
+    },
+    "code_review": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/catalog-browser/code_review.json"
+      ],
+      "revision": "content:f3fab40a433cd4a4284cc4224ada9c099450c72c36dfa78997020903271efbca",
+      "agent": "codex-report-backed-validation"
+    },
+    "runtime_tests": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/catalog-browser/runtime_tests.json"
+      ],
+      "revision": "content:f3fab40a433cd4a4284cc4224ada9c099450c72c36dfa78997020903271efbca",
+      "agent": "codex-report-backed-validation"
+    },
+    "ui_research": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/catalog-browser/ui_research.json"
+      ],
+      "revision": "content:f3fab40a433cd4a4284cc4224ada9c099450c72c36dfa78997020903271efbca",
+      "agent": "codex-report-backed-validation"
+    },
+    "design_system_audit": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/catalog-browser/design_system_audit.json"
+      ],
+      "revision": "content:f3fab40a433cd4a4284cc4224ada9c099450c72c36dfa78997020903271efbca",
+      "agent": "codex-report-backed-validation"
+    },
+    "accessibility": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/catalog-browser/accessibility.json"
+      ],
+      "revision": "content:f3fab40a433cd4a4284cc4224ada9c099450c72c36dfa78997020903271efbca",
+      "agent": "codex-report-backed-validation"
+    },
+    "visual_regression": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/catalog-browser/visual_regression.json"
+      ],
+      "revision": "content:f3fab40a433cd4a4284cc4224ada9c099450c72c36dfa78997020903271efbca",
+      "agent": "codex-report-backed-validation"
+    },
+    "ux_review": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/catalog-browser/ux_review.json"
+      ],
+      "revision": "content:f3fab40a433cd4a4284cc4224ada9c099450c72c36dfa78997020903271efbca",
+      "agent": "codex-report-backed-validation"
+    },
+    "state_coverage": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/catalog-browser/state_coverage.json"
+      ],
+      "revision": "content:f3fab40a433cd4a4284cc4224ada9c099450c72c36dfa78997020903271efbca",
+      "agent": "codex-report-backed-validation"
+    },
+    "preset_roundtrip": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/catalog-browser/preset_roundtrip.json"
+      ],
+      "revision": "content:f3fab40a433cd4a4284cc4224ada9c099450c72c36dfa78997020903271efbca",
+      "agent": "codex-report-backed-validation"
+    },
+    "state_migration": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/catalog-browser/state_migration.json"
+      ],
+      "revision": "content:f3fab40a433cd4a4284cc4224ada9c099450c72c36dfa78997020903271efbca",
+      "agent": "codex-report-backed-validation"
+    },
+    "state_integration": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/catalog-browser/state_integration.json"
+      ],
+      "revision": "content:f3fab40a433cd4a4284cc4224ada9c099450c72c36dfa78997020903271efbca",
+      "agent": "codex-report-backed-validation"
+    }
+  },
+  "current_revision": "content:f3fab40a433cd4a4284cc4224ada9c099450c72c36dfa78997020903271efbca"
+}

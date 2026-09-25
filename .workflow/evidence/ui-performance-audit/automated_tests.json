@@ -1,0 +1,41 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "ui-performance-audit",
+  "gate": "automated_tests",
+  "status": "passed",
+  "revision": "content:dad13ac1c80f24edee0e0ce38b676708799aacb9d2e034276f13f6cfcee1acce",
+  "timestamp": "2026-09-25T18:37:10.290159+00:00",
+  "producer": "scripts/run_check.py",
+  "client": "automation",
+  "checks": [
+    {
+      "name": "integration-tests",
+      "status": "passed",
+      "command": "[\"python3\", \"scripts/probe_smoke.py\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/ui-performance-audit/logs/integration-tests.log"
+    },
+    {
+      "name": "template-integrity",
+      "status": "passed",
+      "command": "[\"python3\", \"scripts/template_self_test.py\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/ui-performance-audit/logs/template-integrity.log"
+    },
+    {
+      "name": "adapter-integrity",
+      "status": "passed",
+      "command": "[\"python3\", \"scripts/sync_agent_adapters.py\", \"--check\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/ui-performance-audit/logs/adapter-integrity.log"
+    },
+    {
+      "name": "catalog-state",
+      "status": "passed",
+      "command": "[\"python3\", \"scripts/catalog_state_check.py\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/ui-performance-audit/logs/catalog-state.log"
+    }
+  ]
+}

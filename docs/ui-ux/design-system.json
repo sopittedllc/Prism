@@ -1,0 +1,201 @@
+{
+  "$schema": "../../.workflow/schemas/design-system.schema.json",
+  "version": 1,
+  "status": "proposed",
+  "foundations": {
+    "typography": {
+      "collection_title": "26 semibold",
+      "setup_title": "28 bold",
+      "inspector_title": "17 semibold",
+      "body": "12\u201313 system",
+      "eyebrow": "10 semibold",
+      "caption": "11 system"
+    },
+    "color_material": {
+      "sidebar": "native sidebar material",
+      "content": "semantic window/control background",
+      "accent": "Projector pink RGB 1,0.2,0.55; selection uses 14% tint",
+      "text": "labelColor / secondaryLabelColor"
+    },
+    "spacing_grid": {
+      "base": 4,
+      "content_inset": 24,
+      "sidebar_inset": 16,
+      "inspector_inset": 22,
+      "setup_inset": 30,
+      "table_cell_horizontal": 8,
+      "navigation_content_horizontal": 10
+    },
+    "shape_border": {
+      "panels": 8,
+      "selection": 8
+    },
+    "motion": {
+      "navigation": "immediate; native sheets only"
+    },
+    "iconography": {
+      "brand": "Exact supplied JPG retained as Resources/AppIcon.jpg; deterministic PNG and ICNS conversion; original PNG retained for provenance",
+      "controls": "SF Symbols with text names"
+    },
+    "layering": {
+      "structure": "sidebar / collection / contextual inspector",
+      "setup": "native sheet"
+    },
+    "control_target_size": {
+      "sidebar_row": 38,
+      "table_row": 38,
+      "actions": "native controls"
+    },
+    "numeric_unit_formatting": {
+      "counts": "localized formatted integers",
+      "size": "ByteCountFormatter; unknown shown as dash / not measured",
+      "recency": "project modification date proxy; samples only"
+    }
+  },
+  "components": [
+    {
+      "semantic_role": "collection shell",
+      "authority": "CatalogWindow.swift / SetupWindow.swift / CatalogTheme.swift",
+      "states": [
+        "empty",
+        "loading",
+        "populated",
+        "no match",
+        "issues"
+      ],
+      "examples": [
+        "Plugins",
+        "Samples",
+        "Libraries"
+      ],
+      "tests": [
+        "catalog-runtime",
+        "unit-tests",
+        "catalog-state"
+      ]
+    },
+    {
+      "semantic_role": "inspector",
+      "authority": "CatalogWindow.swift / SetupWindow.swift / CatalogTheme.swift",
+      "states": [
+        "no selection",
+        "sample provenance",
+        "unavailable references"
+      ],
+      "examples": [
+        "sample-reference-light",
+        "libraries-dark"
+      ],
+      "tests": [
+        "catalog-runtime",
+        "unit-tests",
+        "catalog-state"
+      ]
+    },
+    {
+      "semantic_role": "setup",
+      "authority": "CatalogWindow.swift / SetupWindow.swift / CatalogTheme.swift",
+      "states": [
+        "first launch",
+        "back",
+        "skip",
+        "draft edit",
+        "accepted",
+        "save failure"
+      ],
+      "examples": [
+        "setup-welcome",
+        "setup-sounds",
+        "setup-projects",
+        "setup-ready"
+      ],
+      "tests": [
+        "catalog-runtime",
+        "unit-tests",
+        "catalog-state"
+      ]
+    },
+    {
+      "semantic_role": "identity",
+      "authority": "CatalogWindow.swift / SetupWindow.swift / CatalogTheme.swift",
+      "states": [
+        "light",
+        "dark",
+        "Dock"
+      ],
+      "examples": [
+        "sidebar",
+        "welcome",
+        "packaged ICNS"
+      ],
+      "tests": [
+        "catalog-runtime",
+        "unit-tests",
+        "catalog-state"
+      ]
+    },
+    {
+      "semantic_role": "scan progress",
+      "authority": "ScanProgress / CatalogWindow.refreshProgress",
+      "states": [
+        "discovering indeterminate",
+        "reading determinate",
+        "matching determinate",
+        "finished with retained issues"
+      ],
+      "examples": [
+        "loading-light",
+        "reading-progress"
+      ],
+      "tests": [
+        "progressHasRealPhaseTotalsAndPreservesResults",
+        "progressCompletesEmptyUnavailableAndTruncatedScansHonestly",
+        "native smoke"
+      ]
+    },
+    {
+      "semantic_role": "plugin format management",
+      "authority": "PluginFormatsWindow / PluginProduct / PluginRemoval",
+      "states": [
+        "keep by default",
+        "selected review",
+        "all review",
+        "cancel",
+        "partial failure",
+        "success",
+        "long paths"
+      ],
+      "examples": [
+        "plugin-formats-dark",
+        "plugin-removal-review",
+        "plugin-removal-result"
+      ],
+      "tests": [
+        "core identity and grouping",
+        "native synthetic Trash",
+        "catalog stale review rejection"
+      ]
+    }
+  ],
+  "patterns": [
+    "Persistent category navigation; collection-specific evidence columns",
+    "Local interactive setup with draft/cancel semantics and explicit first scan",
+    "Long selectable location text stays inside scrollable inspector",
+    "No numeric cleanup/savings claims from incomplete evidence",
+    "Table text is centered vertically inside 38pt rows with 8pt horizontal inset.",
+    "Folder lists use a flipped document with top-anchored rows; edits focus the same category folder chooser.",
+    "Stream inventory before project analysis; pending references remain explicit. Determinate progress has no animation lag."
+  ],
+  "exceptions": [
+    {
+      "exception": "macOS13 and Intel not exercised",
+      "reason": "Only current Apple Silicon host available",
+      "removal_condition": "Run representative target matrix"
+    },
+    {
+      "exception": "VoiceOver human navigation not certified",
+      "reason": "Structural labels and keyboard tested only",
+      "removal_condition": "VoiceOver user validation"
+    }
+  ]
+}

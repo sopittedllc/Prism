@@ -1,0 +1,318 @@
+{
+  "registry_version": 1,
+  "preset_schema_version": 1,
+  "unknown_field_policy": "reject",
+  "settings": [
+    {
+      "default": "plugin",
+      "id": "category",
+      "value_type": "enumeration",
+      "introduced_in": 1,
+      "policies": {
+        "preset": {
+          "decision": "excluded",
+          "reason": "Collection browsing is not an audio preset. No serializer exists."
+        },
+        "project_persistence": {
+          "decision": "excluded",
+          "reason": "Browsing filters, selection and ordering are session-only; setup alone persists."
+        },
+        "default_reset": "included",
+        "migration": {
+          "decision": "excluded",
+          "reason": "No persisted schema or prior released state exists."
+        },
+        "undo": {
+          "decision": "excluded",
+          "reason": "View navigation/filter changes can be directly reversed; no document mutation."
+        },
+        "automation": {
+          "decision": "excluded",
+          "reason": "No DAW automation surface for browser state."
+        },
+        "copy_paste": {
+          "decision": "excluded",
+          "reason": "Native search/path text controls handle text; no structured state clipboard."
+        },
+        "sync": {
+          "decision": "excluded",
+          "reason": "Local session only; no account or sync."
+        },
+        "accessibility": "included",
+        "privacy": "included",
+        "analytics": {
+          "decision": "excluded",
+          "reason": "No telemetry is collected."
+        },
+        "export_import": {
+          "decision": "excluded",
+          "reason": "No GUI state export/import; CLI reports are separate immutable observations."
+        }
+      }
+    },
+    {
+      "default": "",
+      "id": "query",
+      "value_type": "string",
+      "introduced_in": 1,
+      "policies": {
+        "preset": {
+          "decision": "excluded",
+          "reason": "Collection browsing is not an audio preset. No serializer exists."
+        },
+        "project_persistence": {
+          "decision": "excluded",
+          "reason": "Browsing filters, selection and ordering are session-only; setup alone persists."
+        },
+        "default_reset": "included",
+        "migration": {
+          "decision": "excluded",
+          "reason": "No persisted schema or prior released state exists."
+        },
+        "undo": {
+          "decision": "excluded",
+          "reason": "View navigation/filter changes can be directly reversed; no document mutation."
+        },
+        "automation": {
+          "decision": "excluded",
+          "reason": "No DAW automation surface for browser state."
+        },
+        "copy_paste": {
+          "decision": "excluded",
+          "reason": "Native search/path text controls handle text; no structured state clipboard."
+        },
+        "sync": {
+          "decision": "excluded",
+          "reason": "Local session only; no account or sync."
+        },
+        "accessibility": "included",
+        "privacy": "included",
+        "analytics": {
+          "decision": "excluded",
+          "reason": "No telemetry is collected."
+        },
+        "export_import": {
+          "decision": "excluded",
+          "reason": "No GUI state export/import; CLI reports are separate immutable observations."
+        }
+      }
+    },
+    {
+      "default": "Name",
+      "id": "sort",
+      "value_type": "enumeration",
+      "introduced_in": 1,
+      "policies": {
+        "preset": {
+          "decision": "excluded",
+          "reason": "Collection browsing is not an audio preset. No serializer exists."
+        },
+        "project_persistence": {
+          "decision": "excluded",
+          "reason": "Browsing filters, selection and ordering are session-only; setup alone persists."
+        },
+        "default_reset": "included",
+        "migration": {
+          "decision": "excluded",
+          "reason": "No persisted schema or prior released state exists."
+        },
+        "undo": {
+          "decision": "excluded",
+          "reason": "View navigation/filter changes can be directly reversed; no document mutation."
+        },
+        "automation": {
+          "decision": "excluded",
+          "reason": "No DAW automation surface for browser state."
+        },
+        "copy_paste": {
+          "decision": "excluded",
+          "reason": "Native search/path text controls handle text; no structured state clipboard."
+        },
+        "sync": {
+          "decision": "excluded",
+          "reason": "Local session only; no account or sync."
+        },
+        "accessibility": "included",
+        "privacy": "included",
+        "analytics": {
+          "decision": "excluded",
+          "reason": "No telemetry is collected."
+        },
+        "export_import": {
+          "decision": "excluded",
+          "reason": "No GUI state export/import; CLI reports are separate immutable observations."
+        }
+      }
+    },
+    {
+      "default": true,
+      "id": "standard_plugins",
+      "value_type": "boolean",
+      "introduced_in": 1,
+      "policies": {
+        "preset": {
+          "decision": "excluded",
+          "reason": "Collection browsing is not an audio preset. No serializer exists."
+        },
+        "project_persistence": "included",
+        "default_reset": "included",
+        "migration": "included",
+        "undo": {
+          "decision": "excluded",
+          "reason": "View navigation/filter changes can be directly reversed; no document mutation."
+        },
+        "automation": {
+          "decision": "excluded",
+          "reason": "No DAW automation surface for browser state."
+        },
+        "copy_paste": {
+          "decision": "excluded",
+          "reason": "Native search/path text controls handle text; no structured state clipboard."
+        },
+        "sync": {
+          "decision": "excluded",
+          "reason": "Local session only; no account or sync."
+        },
+        "accessibility": "included",
+        "privacy": "included",
+        "analytics": {
+          "decision": "excluded",
+          "reason": "No telemetry is collected."
+        },
+        "export_import": {
+          "decision": "excluded",
+          "reason": "No GUI state export/import; CLI reports are separate immutable observations."
+        }
+      }
+    },
+    {
+      "default": {},
+      "id": "roots",
+      "value_type": "object",
+      "introduced_in": 1,
+      "policies": {
+        "preset": {
+          "decision": "excluded",
+          "reason": "Collection browsing is not an audio preset. No serializer exists."
+        },
+        "project_persistence": "included",
+        "default_reset": "included",
+        "migration": "included",
+        "undo": {
+          "decision": "excluded",
+          "reason": "View navigation/filter changes can be directly reversed; no document mutation."
+        },
+        "automation": {
+          "decision": "excluded",
+          "reason": "No DAW automation surface for browser state."
+        },
+        "copy_paste": {
+          "decision": "excluded",
+          "reason": "Native search/path text controls handle text; no structured state clipboard."
+        },
+        "sync": {
+          "decision": "excluded",
+          "reason": "Local session only; no account or sync."
+        },
+        "accessibility": "included",
+        "privacy": "included",
+        "analytics": {
+          "decision": "excluded",
+          "reason": "No telemetry is collected."
+        },
+        "export_import": {
+          "decision": "excluded",
+          "reason": "No GUI state export/import; CLI reports are separate immutable observations."
+        }
+      }
+    },
+    {
+      "default": null,
+      "id": "selection",
+      "value_type": "string",
+      "introduced_in": 1,
+      "policies": {
+        "preset": {
+          "decision": "excluded",
+          "reason": "Collection browsing is not an audio preset. No serializer exists."
+        },
+        "project_persistence": {
+          "decision": "excluded",
+          "reason": "Browsing filters, selection and ordering are session-only; setup alone persists."
+        },
+        "default_reset": "included",
+        "migration": {
+          "decision": "excluded",
+          "reason": "No persisted schema or prior released state exists."
+        },
+        "undo": {
+          "decision": "excluded",
+          "reason": "View navigation/filter changes can be directly reversed; no document mutation."
+        },
+        "automation": {
+          "decision": "excluded",
+          "reason": "No DAW automation surface for browser state."
+        },
+        "copy_paste": {
+          "decision": "excluded",
+          "reason": "Native search/path text controls handle text; no structured state clipboard."
+        },
+        "sync": {
+          "decision": "excluded",
+          "reason": "Local session only; no account or sync."
+        },
+        "accessibility": "included",
+        "privacy": "included",
+        "analytics": {
+          "decision": "excluded",
+          "reason": "No telemetry is collected."
+        },
+        "export_import": {
+          "decision": "excluded",
+          "reason": "No GUI state export/import; CLI reports are separate immutable observations."
+        }
+      }
+    },
+    {
+      "default": false,
+      "id": "onboarding_completed",
+      "value_type": "boolean",
+      "introduced_in": 1,
+      "policies": {
+        "preset": {
+          "decision": "excluded",
+          "reason": "Collection browsing is not an audio preset. No serializer exists."
+        },
+        "project_persistence": "included",
+        "default_reset": "included",
+        "migration": "included",
+        "undo": {
+          "decision": "excluded",
+          "reason": "View navigation/filter changes can be directly reversed; no document mutation."
+        },
+        "automation": {
+          "decision": "excluded",
+          "reason": "No DAW automation surface for browser state."
+        },
+        "copy_paste": {
+          "decision": "excluded",
+          "reason": "Native search/path text controls handle text; no structured state clipboard."
+        },
+        "sync": {
+          "decision": "excluded",
+          "reason": "Local session only; no account or sync."
+        },
+        "accessibility": "included",
+        "privacy": "included",
+        "analytics": {
+          "decision": "excluded",
+          "reason": "No telemetry is collected."
+        },
+        "export_import": {
+          "decision": "excluded",
+          "reason": "No GUI state export/import; CLI reports are separate immutable observations."
+        }
+      }
+    }
+  ]
+}

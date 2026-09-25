@@ -1,0 +1,40 @@
+{
+  "symptom": "Crowded stacked browser and invisible supplied icon; no first-run setup",
+  "semantic_role": "Collection navigation, inspection, setup and identity",
+  "authority": "docs/ui-ux/COLLECTION_AND_SETUP.md and design-system.json",
+  "searches": [
+    "CatalogWindow actions/status/table/inspector",
+    "CatalogModel state and feature registry",
+    "Projector theme tokens",
+    "Source PNG alpha versus visible RGB and generated ICNS"
+  ],
+  "included_consumers": [
+    "Plugins",
+    "Samples",
+    "Libraries",
+    "first launch and manage locations",
+    "Dock/sidebar/welcome icon"
+  ],
+  "excluded_consumers": [
+    "CLI output",
+    "audio scanner semantics",
+    "deletion and classification"
+  ],
+  "system_changes": [
+    "Three-pane shell with consistent list/inspector",
+    "Draft setup flow with registry-selected persistence",
+    "Derived opaque brand resource and explicit applicationIconImage"
+  ],
+  "representative_tests": [
+    "29 Swift tests",
+    "native four-stage setup back/cancel/reopen/finish",
+    "light/dark typical/minimum captures",
+    "actual running Dock capture reviewed independently"
+  ],
+  "regression_prevention": [
+    "Bounded settings reads and recovery tests",
+    "registry persistence ID equality",
+    "native setup and keyboard smoke",
+    "packaging preserves source artwork"
+  ]
+}

@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "client": "codex",
+  "role": "accessibility-tester",
+  "status": "passed",
+  "method": "Read-only source and supplied fresh runtime-evidence review",
+  "evidence": [
+    "captures/catalog/runtime.json",
+    "captures/catalog/no-match-dark.png",
+    "captures/catalog/setup-long-folders.png",
+    "captures/catalog/setup-save-error.png",
+    "captures/catalog/plugins-dark.png",
+    "captures/catalog/sample-reference-dark-compact.png"
+  ],
+  "verified_remediations": [
+    "CatalogCell centers text vertically and provides 8-point horizontal inset for all collection columns; selected sample/plugin captures agree.",
+    "Root rows now use TopAlignedDocument and appear at the top of their scroll region.",
+    "Setup rerenders after folder edits restore focus to the category Add action; smoke records long-folder removal focus.",
+    "Inspector title is bounded and has full-name tooltip; long plugin capture keeps Show in Finder visible.",
+    "Save failure remains visible alongside session-only recovery and Back/Save actions.",
+    "Progress track exposes native accessibility progress role, minimum, maximum and updated numeric value.",
+    "Runtime evidence records browsing inventory while reference analysis continues; source copy explains background work.",
+    "Long-folder sheet remains 740 points wide; path labels truncate within the viewport, Remove buttons stay visible, and native smoke asserts width <= 741. Fresh setup-long-folders capture confirms repair.",
+    "Sidebar controls explicitly remain enabled with semantic labelColor content tint; native smoke asserts navigation enabled."
+  ],
+  "nonblocking_observations": [
+    "No Stop action remains, although incremental inventory resolves the original all-results-held-until-finish problem.",
+    "Remove accessibility labels still use basename only, so equal basenames should receive path context in accessibility help.",
+    "Current native checks still do not establish complete tab traversal or screen-reader announcements."
+  ],
+  "limits": [
+    "This reviewer did not rerun the app or operate VoiceOver",
+    "Native open-panel interaction remains unautomated",
+    "No quantitative contrast measurement",
+    "Do not interpret source review and supplied smoke as complete assistive-technology certification"
+  ],
+  "resolved_findings": [
+    {
+      "id": "A11Y-FINAL-01",
+      "severity": "high",
+      "finding": "Long folder names force the setup sheet to expand far beyond its intended width and parent window instead of truncating within the viewport.",
+      "evidence": "setup-long-folders.png shows a sheet about twice the designed 740-point width, extending beyond both sides of the main window; the full synthetic path dominates the row.",
+      "source": "Sources/SimplifyCatalog/SetupWindow.swift:100-119",
+      "root_mechanism": "Path labels participate in intrinsic-width layout without explicit low horizontal compression resistance; parent constraints allow the sheet fitting size to expand.",
+      "required_fix": "Give path labels a low horizontal compression resistance, preserve Remove button width, and constrain the sheet content/root viewport to its intended width so byTruncatingMiddle takes effect.",
+      "validation": "Assert setup content width stays 740 points after adding 10 near-limit folder names. Capture at minimum parent width and verify every Remove button stays within the visible viewport, including after scrolling.",
+      "status": "resolved"
+    }
+  ],
+  "findings": []
+}

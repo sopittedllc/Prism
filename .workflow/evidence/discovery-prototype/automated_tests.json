@@ -1,0 +1,55 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "discovery-prototype",
+  "gate": "automated_tests",
+  "status": "passed",
+  "revision": "content:4fc26851b238ac0e0d8f422cc931e9b2be798122bde1020c2871641b814f62cb",
+  "timestamp": "2026-09-24T23:16:13.330082+00:00",
+  "producer": "scripts/run_check.py",
+  "client": "automation",
+  "checks": [
+    {
+      "name": "build-debug",
+      "status": "passed",
+      "command": "[\"swift\", \"build\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/discovery-prototype/logs/build-debug.log"
+    },
+    {
+      "name": "build-release",
+      "status": "passed",
+      "command": "[\"swift\", \"build\", \"-c\", \"release\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/discovery-prototype/logs/build-release.log"
+    },
+    {
+      "name": "unit-tests",
+      "status": "passed",
+      "command": "[\"swift\", \"test\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/discovery-prototype/logs/unit-tests.log"
+    },
+    {
+      "name": "integration-tests",
+      "status": "passed",
+      "command": "[\"python3\", \"scripts/probe_smoke.py\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/discovery-prototype/logs/integration-tests.log"
+    },
+    {
+      "name": "template-integrity",
+      "status": "passed",
+      "command": "[\"python3\", \"scripts/template_self_test.py\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/discovery-prototype/logs/template-integrity.log"
+    },
+    {
+      "name": "adapter-integrity",
+      "status": "passed",
+      "command": "[\"python3\", \"scripts/sync_agent_adapters.py\", \"--check\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/discovery-prototype/logs/adapter-integrity.log"
+    }
+  ]
+}

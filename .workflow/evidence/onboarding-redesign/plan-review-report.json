@@ -1,0 +1,34 @@
+{
+  "status": "passed",
+  "acting_client": "codex",
+  "role": "independent-specification-critic",
+  "scope": [
+    "Reversible native collection UI and four-stage optional onboarding",
+    "Registry-defined local setup persistence, draft lifecycle, and failure recovery",
+    "Supplied artwork in branding and actual running packaged app Dock identity",
+    "Research synthesis, semantic peer inventory, native runtime and visual validation"
+  ],
+  "reviewed_documents": [
+    ".work/active/onboarding-redesign.md",
+    ".workflow/evidence/onboarding-redesign/ui-research-report.json"
+  ],
+  "findings": [],
+  "resolved_findings": [
+    {
+      "finding": "Window screenshots and application-icon properties alone would not validate the explicitly requested Dock appearance.",
+      "resolution": "Verification now requires capture and visual inspection of the actual Dock region with the packaged app running."
+    }
+  ],
+  "verdict": "PASS: no blocking specification issues for the bounded redesign.",
+  "rationale": [
+    "The plan makes setup optional and reopenable, preserves active configuration when drafts are dismissed, and starts scans only on explicit action.",
+    "Persisted field selection, defaults, version rejection, atomic saves, preservation of invalid settings, and session-only recovery have objective verification requirements.",
+    "The research provides official guidance and three concrete comparable workflows, with design inferences distinguished from usability evidence.",
+    "Runtime and independent visual review cover changed composition and state families, while actual Dock capture verifies supplied icon identity separately."
+  ],
+  "limitations": [
+    "Specification critique only; does not establish implementation or runtime correctness.",
+    "VoiceOver user validation, Intel, and older macOS compatibility remain explicit unverified limits.",
+    "No private projects or .qa-criteria accessed; no product code changed."
+  ]
+}

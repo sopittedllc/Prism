@@ -1,0 +1,69 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "catalog-browser",
+  "gate": "automated_tests",
+  "status": "passed",
+  "revision": "content:f3fab40a433cd4a4284cc4224ada9c099450c72c36dfa78997020903271efbca",
+  "timestamp": "2026-09-24T23:40:52.318472+00:00",
+  "producer": "scripts/run_check.py",
+  "client": "automation",
+  "checks": [
+    {
+      "name": "build-debug",
+      "status": "passed",
+      "command": "[\"swift\", \"build\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/catalog-browser/logs/build-debug.log"
+    },
+    {
+      "name": "build-release",
+      "status": "passed",
+      "command": "[\"swift\", \"build\", \"-c\", \"release\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/catalog-browser/logs/build-release.log"
+    },
+    {
+      "name": "unit-tests",
+      "status": "passed",
+      "command": "[\"swift\", \"test\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/catalog-browser/logs/unit-tests.log"
+    },
+    {
+      "name": "integration-tests",
+      "status": "passed",
+      "command": "[\"python3\", \"scripts/probe_smoke.py\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/catalog-browser/logs/integration-tests.log"
+    },
+    {
+      "name": "template-integrity",
+      "status": "passed",
+      "command": "[\"python3\", \"scripts/template_self_test.py\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/catalog-browser/logs/template-integrity.log"
+    },
+    {
+      "name": "adapter-integrity",
+      "status": "passed",
+      "command": "[\"python3\", \"scripts/sync_agent_adapters.py\", \"--check\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/catalog-browser/logs/adapter-integrity.log"
+    },
+    {
+      "name": "catalog-state",
+      "status": "passed",
+      "command": "[\"python3\", \"scripts/catalog_state_check.py\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/catalog-browser/logs/catalog-state.log"
+    },
+    {
+      "name": "app-package",
+      "status": "passed",
+      "command": "[\"python3\", \"scripts/build_app.py\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/catalog-browser/logs/app-package.log"
+    }
+  ]
+}

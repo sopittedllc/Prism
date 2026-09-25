@@ -1,0 +1,14 @@
+{
+  "$schema": "../../.workflow/schemas/systemic-impact.schema.json",
+  "task_id": "replace-me",
+  "symptom": "",
+  "semantic_role": "",
+  "authority": "",
+  "searches": [],
+  "included_consumers": [],
+  "excluded_consumers": [],
+  "system_changes": [],
+  "representative_tests": [],
+  "regression_prevention": [],
+  "knowledge_updates": []
+}

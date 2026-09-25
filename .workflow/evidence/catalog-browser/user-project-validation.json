@@ -1,0 +1,29 @@
+{
+  "changed_project_modification_times": 0,
+  "entries_considered": 100000,
+  "enumeration_errors": [],
+  "enumeration_truncated": true,
+  "formats_found": {
+    ".als": 140,
+    ".band": 1,
+    ".cpr": 2045,
+    ".logicx": 1439,
+    ".ptx": 627
+  },
+  "limitations": "Bounded convenience sample; no full-catalog or host-oracle validation. No project names, paths, or reference values retained.",
+  "reference_candidates": {
+    ".als": 1275,
+    ".band": 0,
+    ".cpr": 0,
+    ".logicx": 1,
+    ".ptx": 0
+  },
+  "sampled_project_coverage": {
+    ".als:partial": 5,
+    ".band:unsupported": 1,
+    ".cpr:unsupported": 5,
+    ".logicx:failed": 4,
+    ".logicx:partial": 1,
+    ".ptx:unsupported": 5
+  }
+}

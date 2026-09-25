@@ -1,0 +1,17 @@
+{
+  "Ableton": {
+    "files": 7,
+    "restore_attempts": 95,
+    "restore_failures": 95
+  },
+  "Pro Tools": {
+    "files": 4,
+    "host_plugin_instantiation_events": 22
+  },
+  "Cubase_usage_log_directory_present": false,
+  "limits": [
+    "Read-only aggregate inspection; no raw log, session, track, plugin or machine identifiers exported",
+    "Restore attempt is not proof of successful loading; failures require distinct labeling",
+    "Log availability and retention differ by DAW/version; no universal history claim"
+  ]
+}

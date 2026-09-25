@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "primary_client",
+    "cross_client_review",
+    "review_client",
+    "allow_simultaneous_writers",
+    "require_provenance"
+  ],
+  "properties": {
+    "$schema": {"type": "string"},
+    "schema_version": {"const": 1},
+    "primary_client": {"enum": ["claude", "codex", "balanced"]},
+    "cross_client_review": {"type": "boolean"},
+    "review_client": {"enum": ["claude", "codex", "alternate", "same"]},
+    "allow_simultaneous_writers": {"const": false},
+    "require_provenance": {"type": "boolean"}
+  }
+}

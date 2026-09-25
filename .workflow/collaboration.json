@@ -1,0 +1,9 @@
+{
+  "$schema": "./schemas/collaboration.schema.json",
+  "schema_version": 1,
+  "primary_client": "balanced",
+  "cross_client_review": true,
+  "review_client": "alternate",
+  "allow_simultaneous_writers": false,
+  "require_provenance": true
+}

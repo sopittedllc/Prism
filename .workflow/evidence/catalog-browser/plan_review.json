@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "catalog-browser",
+  "gate": "plan_review",
+  "status": "passed",
+  "revision": "content:f3fab40a433cd4a4284cc4224ada9c099450c72c36dfa78997020903271efbca",
+  "timestamp": "2026-09-24T23:42:24.212364+00:00",
+  "producer": "independent-codex-critic",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "plan_review-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/catalog-browser/plan-review-report.json",
+        "sha256": "9f251fc3ea425cd4b4a1a38b9a61d9618983a7164a4e7671ddb9262a56738162"
+      }
+    }
+  ]
+}

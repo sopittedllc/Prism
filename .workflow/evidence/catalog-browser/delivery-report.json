@@ -1,0 +1,27 @@
+{
+  "client": "codex",
+  "status": "passed",
+  "scope": "Read-only native catalog preview, not full product delivery",
+  "implementation": [
+    "Native AppKit browser and detached bounded scanning",
+    "Session-only filtering, sorting, roots and selection",
+    "Partial saved-project references with visible limits",
+    "Simplify rename and exact user supplied icon packaged"
+  ],
+  "objective_evidence": [
+    "automated_tests.json",
+    "native-runtime-report.json",
+    "user-project-validation.json",
+    "final-review-report.json"
+  ],
+  "state_validation": "catalog-state command compares native registry IDs/defaults to manifest; Swift model tests cover defaults, search/sort and roots. No persistent settings, presets or migrations exist; exclusion policies verified, not serializer round trips.",
+  "research": "docs/research/audio-ecosystems.md, ui-research.json, Projector local design constants and systemic-impact.json",
+  "visual_validation": "Independent review of light and compact dark layouts; renamed light capture inspected again by coordinator. Native screenshot matrix regenerated successfully after rename.",
+  "accessibility": "Named native controls and Command-F key-equivalent test passed. VoiceOver user validation remains untested.",
+  "limits": [
+    "Experimental project readers; unsupported DAWs remain explicit",
+    "No deletion, tags, persistence or recurring scans in preview",
+    "Claude client not authenticated; independent Codex reviewers used",
+    "Native hooks not claimed; deterministic checks run directly"
+  ]
+}

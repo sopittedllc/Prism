@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "scan-progress",
+  "gate": "runtime_tests",
+  "status": "passed",
+  "revision": "content:e2744b65b627ba2bd2e085a99d29d10b7ee07b6f46ece909ba288443c6ea38ad",
+  "timestamp": "2026-09-25T18:05:39.199357+00:00",
+  "producer": "codex-report-backed-validation",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "runtime_tests-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/scan-progress/native-runtime-report.json",
+        "sha256": "0bf6e88a57c9c427a85e51839331f8bcdc73ee785160880930d23e0e7dfd849d"
+      }
+    }
+  ]
+}

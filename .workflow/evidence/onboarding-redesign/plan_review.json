@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "onboarding-redesign",
+  "gate": "plan_review",
+  "status": "passed",
+  "revision": "content:50eb72739507be76b3d1dadcc15a70ac1511338c156f9e90acb9d62601e09a35",
+  "timestamp": "2026-09-25T00:04:10.023806+00:00",
+  "producer": "codex-report-backed-validation",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "plan_review-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/onboarding-redesign/plan-review-report.json",
+        "sha256": "ebe5868ac5df03a99990b87058c15aa83db2d019568c2a32391ba7327ef294bf"
+      }
+    }
+  ]
+}

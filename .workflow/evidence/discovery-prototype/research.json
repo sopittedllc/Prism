@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "discovery-prototype",
+  "gate": "research",
+  "status": "passed",
+  "revision": "content:4fc26851b238ac0e0d8f422cc931e9b2be798122bde1020c2871641b814f62cb",
+  "timestamp": "2026-09-24T23:16:40.359471+00:00",
+  "producer": "researcher",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "research-report",
+      "status": "passed",
+      "measurement": {
+        "report": "docs/research/project-references.md",
+        "sha256": "6dbde024a7893deaccde9b4e06c74943ffd30cdb6fd5ab198fefb17e9cb10463"
+      }
+    }
+  ]
+}

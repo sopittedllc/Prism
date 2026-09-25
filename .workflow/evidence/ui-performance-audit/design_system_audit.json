@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "ui-performance-audit",
+  "gate": "design_system_audit",
+  "status": "passed",
+  "revision": "content:dad13ac1c80f24edee0e0ce38b676708799aacb9d2e034276f13f6cfcee1acce",
+  "timestamp": "2026-09-25T18:38:18.777649+00:00",
+  "producer": "design-system-reviewer",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "design_system_audit-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/ui-performance-audit/systemic-impact-report.json",
+        "sha256": "7318eb3a425d60358789653d6d218e66dd7e7b4116ecfcab1e9ad104060197ab"
+      }
+    }
+  ]
+}

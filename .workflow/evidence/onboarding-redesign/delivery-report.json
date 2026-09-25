@@ -1,0 +1,42 @@
+{
+  "status": "passed",
+  "client": "codex",
+  "scope": "Read-only functional native prototype with durable setup; not finished full audio manager",
+  "research": "ui-research-report.json and docs/ui-ux/COLLECTION_AND_SETUP.md",
+  "objective_checks": {
+    "release_build": {
+      "argv": [
+        "swift",
+        "build",
+        "-c",
+        "release"
+      ],
+      "exit_code": 0,
+      "log": "release-build.log"
+    },
+    "unit_tests": {
+      "argv": [
+        "swift",
+        "test"
+      ],
+      "exit_code": 0,
+      "test_count": 29,
+      "log": "unit-tests.log"
+    },
+    "integration_and_registry": "automated_tests.json",
+    "native_runtime": "native-runtime-report.json"
+  },
+  "review": "code-review-report.json",
+  "icon": "Original RGB visible artwork preserved, mismatched source alpha repaired only in derived packaged resource. Actual running Dock icon and welcome/sidebar inspected by coordinator and independent reviewer.",
+  "persistence": "Local version1 setup uses native registry-selected roots, standard_plugins and onboarding_completed. Roundtrip, missing defaults, unknown keys, corrupt/wrong-type/future-version rejection, FIFO/oversize rejection and save failure preservation tested. Other browser state remains transient.",
+  "preset_roundtrip": "No preset participation; exact exclusion and empty serializer ID contract verified. Setup persistence roundtrip is implemented and tested.",
+  "migration": "First stored schema; unsupported versions rejected intact. Missing field defaults and unknown-field policy tested; no invented historical migration.",
+  "limits": [
+    "Read-only collection; deletion/tagging/recurring scans not implemented",
+    "DAW reference readers partial; plugins/libraries have no established usage matching",
+    "Only current Apple Silicon Mac exercised",
+    "VoiceOver human and native folder picker interaction not automated",
+    "Claude unauthenticated; independent Codex critic/reviewer used",
+    "Native hooks not claimed; direct deterministic checks used"
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "status": "passed",
+  "client": "codex",
+  "role": "independent native UX/accessibility/visual reviewer",
+  "method": "Fresh read-only source inspection and review of supplied release native-smoke captures",
+  "runtime_evidence": "captures/catalog/runtime.json",
+  "captures_reviewed": ["captures/catalog/plugins-dark.png", "captures/catalog/libraries-dark.png", "captures/catalog/library-instrument-search.png", "captures/catalog/setup-projects.png", "captures/catalog/setup-welcome.png", "build/Simplify.app/Contents/Resources/IconMaster.png", "Resources/AppIcon.jpg"],
+  "checks": [
+    {"check": "Simplified plugin rows", "result": "passed", "evidence": "plugins-dark shows only Name and Last used; format installations are retained in the scrollable inspector and Manage formats remains available. main.swift asserts the two visible column identifiers. Long product name truncates inside a centered padded cell without colliding with Unknown."},
+    {"check": "Honest usage gaps", "result": "passed", "evidence": "CatalogModel.referenceText returns Checking during scanning and Unknown for plugin usage. Candidate project name matches are explicitly not specific-format evidence; missing matches do not mean unused. No unsupported last-used timestamp is fabricated."},
+    {"check": "Library identity and instrument search", "result": "passed", "evidence": "Library capture shows Kontakt identity, Unknown maker, discovered Accordion instrument, inferred tags and source explanation. Searching Accordion retains the parent Chamber Strings library and shows the matching instrument. Inspector explicitly says discovery does not establish project inclusion."},
+    {"check": "Project onboarding", "result": "passed", "evidence": "setup-projects describes selected project roots and limited Ableton/Logic/REAPER evidence, explicitly states Cubase/Pro Tools decoding is unavailable, and preserves optional setup with clear Back/Continue controls. Text wraps within the bounded panel; root path truncation leaves Remove visible."},
+    {"check": "Current artwork", "result": "passed", "evidence": "Visually compared Resources/AppIcon.jpg with packaged IconMaster.png: the same striped tapered artwork is preserved and scaled onto the Dock tile. Packaging explicitly reads the JPG; AppMark is decoded from that source and Brand loads packaged AppMark. Welcome and sidebar captures display the matching artwork."},
+    {"check": "Hierarchy and accessibility continuity", "result": "passed", "evidence": "Previously repaired semantic cell padding, bounded inspector title and scrollable details remain in use. Search retains its accessible name; native table exposes current column titles and values. Sidebar foreground now reads clearly in dark captures. Welcome copy correctly distinguishes read-only scanning from reviewed plugin removal."}
+  ],
+  "blockers": [],
+  "nonblocking_followups": ["Plugin count uses '1 plugins'; apply singular copy when convenient.", "Library summary may be empty for inferred identities; current source/provenance remains visible but a concise summary would improve scanning.", "Full current artwork byte-identity to the user's original upload requires coordinator checksum evidence; this reviewer compared repository source image and packaged output visually."],
+  "limits": ["No human VoiceOver traversal", "No independently driven native open-panel interaction", "No numerical contrast measurement", "No independent build/test rerun; release smoke evidence supplied by coordinator", "No claim of complete Logic/Cubase/Pro Tools/Ableton usage coverage", "Packaged icon inspected; live Dock cache refresh not independently observed"]
+}

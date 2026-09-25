@@ -1,0 +1,39 @@
+{
+  "task_id": "catalog-browser",
+  "symptom": "No graphical browser",
+  "semantic_role": "Collection discovery and inspection",
+  "authority": "docs/ui-ux and Apple HIG",
+  "searches": [
+    "Sources inventory: CLI/core only",
+    "AppKit native list/search controls",
+    "Three comparable official workflows"
+  ],
+  "included_consumers": [
+    "Plugins",
+    "Samples",
+    "Libraries",
+    "Folder selection",
+    "Coverage detail"
+  ],
+  "excluded_consumers": [
+    "CLI presentation",
+    "Deletion",
+    "Persistent tags"
+  ],
+  "system_changes": [
+    "Shared native collection table",
+    "Shared state/evidence wording",
+    "Shared semantic colors and typography"
+  ],
+  "representative_tests": [
+    "category/search/sort",
+    "empty/loading/issues",
+    "light/dark min/typical",
+    "named accessibility controls"
+  ],
+  "regression_prevention": [
+    "native registry ID comparison",
+    "model tests",
+    "runtime smoke capture matrix"
+  ]
+}

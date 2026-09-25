@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "ui-performance-audit",
+  "gate": "ux_review",
+  "status": "passed",
+  "revision": "content:dad13ac1c80f24edee0e0ce38b676708799aacb9d2e034276f13f6cfcee1acce",
+  "timestamp": "2026-09-25T18:38:18.952272+00:00",
+  "producer": "ux-reviewer",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "ux_review-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/ui-performance-audit/final-review-report.json",
+        "sha256": "35095f573892b893ba543f474df1457fe163f6940eb81e2b1f52671e2b3b88f2"
+      }
+    }
+  ]
+}

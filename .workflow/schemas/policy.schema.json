@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["version", "authority", "tier_3_actions", "required_gates"],
+  "properties": {
+    "version": {"type": "integer", "minimum": 1},
+    "max_repair_attempts_per_failure": {"type": "integer", "minimum": 0},
+    "authority": {"type": "object"},
+    "tier_3_actions": {"type": "array", "items": {"type": "string"}, "uniqueItems": true},
+    "required_gates": {
+      "type": "object",
+      "required": ["0", "1", "2", "3"],
+      "additionalProperties": {"type": "array", "items": {"type": "string"}, "uniqueItems": true}
+    }
+  }
+}

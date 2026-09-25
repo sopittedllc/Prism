@@ -1,0 +1,48 @@
+{
+  "status": "passed",
+  "acting_client": "codex",
+  "role": "independent-specification-critic",
+  "scope": [
+    "Conservative plugin presentation grouping and individual format visibility",
+    "Explicit selection, exact-path review, and guarded macOS Trash operation",
+    "Partial failure handling, operation exclusion, and surviving selection",
+    "Repeated sample/library root addition and existing persistence",
+    "Synthetic-only removal verification and native interaction evidence"
+  ],
+  "reviewed_documents": [".work/active/plugin-products.md"],
+  "findings": [],
+  "verdict": "PASS: no blocking specification issues for the bounded plugin-management feature.",
+  "steering_delta_review": {
+    "status": "passed",
+    "scope": [
+      "More-specific explicit sample-root precedence with nested library exclusions",
+      "Per-category empty and unscanned diagnostics",
+      "Unambiguous REAPER product-name candidate associations from existing explicit declarations"
+    ],
+    "findings": [],
+    "rationale": [
+      "Root precedence addresses a demonstrated suppression issue while preserving exclusions for more-specific configured library content.",
+      "Library discovery remains evidence-based; the amendment does not invent unreadability from an empty UI when the isolated scan found candidates.",
+      "Plugin associations are explicitly candidate evidence with project-recency provenance, never verified installation dependencies or safe-removal conclusions.",
+      "The amendment does not expand parser coverage or imply supported usage history for other DAWs."
+    ],
+    "verification_notes": [
+      "Regression fixtures should exercise root ordering, overlap boundaries, explicit sample candidates, and deeper library exclusion.",
+      "Candidate labels and unsupported/unknown coverage must remain visible in both browsing and removal review."
+    ]
+  },
+  "rationale": [
+    "Grouping is explicitly a presentation heuristic; users see original names, formats, and exact installation paths before any file action.",
+    "Keep is the default, whole-product selection is explicit, and removal is confined to selected validated bundles through macOS Trash without permanent-delete or privilege escalation fallback.",
+    "Scanned identity and symlink checks, overlap rejection, partial failures, and scan/removal exclusion define concrete safety and recovery boundaries.",
+    "Successful items alone leave the inventory; failed entries and associated evidence remain available.",
+    "Multi-root work extends existing persisted arrays without promising unlimited underlying filesystem capacity, and tests cover repeated additions and reopening.",
+    "Runtime Trash tests are limited to generated fixtures; implementation authority does not authorize deletion of the user's real audio content during development."
+  ],
+  "limitations": [
+    "Specification critique only; implementation review must verify fail-closed handling when scanned identity is absent and truthful per-item Trash outcomes.",
+    "Grouping cannot establish product ownership or shared-content dependencies; confirmation and UI copy must retain that distinction.",
+    "Path-based Trash retains the disclosed final-validation race; no adversarial atomicity claim is approved.",
+    "No product code changed and no private content or .qa-criteria accessed."
+  ]
+}

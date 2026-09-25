@@ -1,0 +1,28 @@
+{
+  "status": "passed",
+  "client": "codex",
+  "scope": "Live scan-stage feedback and retained original-alpha logo correction",
+  "verification": [
+    "swift build passed on final UI source",
+    "swift test:31tests passed; progress core/model unchanged by subsequent UI animation repair",
+    "Release build passed before final separate-indicator UI adjustment; final debug packaged build validated",
+    "CLI integration/state/template checks in automated_tests.json",
+    "Native smoke passed; actual reading stage screenshot and interactive regression matrix captured",
+    "Original alpha-preserving logo packaging retained and local ad-hoc signature verified"
+  ],
+  "runtime": "native-runtime-report.json",
+  "review": "code-review-report.json",
+  "behavior": [
+    "Discovery shows counts without a guessed total",
+    "Reading/matching show real per-stage completed/total percentages",
+    "Elapsed seconds and current item update during work",
+    "No ETA promise; no extra pre-count traversal",
+    "No destructive operations; existing scan results remain available"
+  ],
+  "limits": [
+    "Current Mac only; manual VoiceOver not exercised",
+    "Blocking filesystem reads can delay an individual work unit; no cancellation added",
+    "Percentage tracks items within a stage, not predicted elapsed time",
+    "Older already-running app instances require reopening to gain the new UI"
+  ]
+}

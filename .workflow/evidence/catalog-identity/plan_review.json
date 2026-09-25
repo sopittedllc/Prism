@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "catalog-identity",
+  "gate": "plan_review",
+  "status": "passed",
+  "revision": "content:25deaa711e6c5e71edf5ca63150c2dcf670e8105c5184bd1280cf67c317d736e",
+  "timestamp": "2026-09-25T21:28:13.033591+00:00",
+  "producer": "critic",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "plan_review-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/catalog-identity/plan-review-report.json",
+        "sha256": "2527d3e9bde2ae7cc6901694e31b1cb08a1eef02583593580b99bbbfb3e4c3f1"
+      }
+    }
+  ]
+}

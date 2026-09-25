@@ -1,0 +1,42 @@
+{
+  "$schema": "./schemas/policy.schema.json",
+  "version": 1,
+  "max_repair_attempts_per_failure": 3,
+  "authority": {
+    "tier_0": "autonomous",
+    "tier_1": "autonomous_after_gates",
+    "tier_2": "ask_only_for_product_ambiguity",
+    "tier_3": "explicit_user_authorization"
+  },
+  "tier_3_actions": [
+    "publish",
+    "release",
+    "upload",
+    "git-push",
+    "git-commit-without-gates",
+    "history-rewrite",
+    "flash-hardware",
+    "erase-hardware",
+    "install-system-software",
+    "use-signing-credentials",
+    "spend-money",
+    "modify-external-service"
+  ],
+  "required_gates": {
+    "0": ["implementation", "automated_tests"],
+    "1": ["research", "plan_review", "implementation", "automated_tests", "code_review"],
+    "2": ["research", "plan_review", "implementation", "automated_tests", "code_review", "runtime_tests"],
+    "3": ["research", "plan_review", "implementation", "automated_tests", "code_review", "runtime_tests", "release_review"]
+  },
+  "domain_gates": {
+    "ui-ux": ["ui_research", "design_system_audit", "accessibility", "visual_regression", "ux_review", "runtime_tests"],
+    "stateful-feature": ["state_coverage", "preset_roundtrip", "state_migration", "state_integration"]
+  },
+  "ui_ux_evidence": {
+    "minimum_official_sources_for_unknowns": 1,
+    "minimum_comparable_use_cases_for_unknowns": 3,
+    "require_systemwide_inventory": true,
+    "require_runtime_interaction": true,
+    "require_visual_matrix": true
+  }
+}

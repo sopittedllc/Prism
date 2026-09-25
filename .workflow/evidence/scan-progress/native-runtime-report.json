@@ -1,0 +1,42 @@
+{
+  "checks" : [
+    "setup next\/back\/skip\/finish controls",
+    "draft cancellation",
+    "setup reopen restores accepted roots",
+    "explicit first scan",
+    "actual scan\/category controls",
+    "async completion",
+    "discovery counts and determinate reading progress",
+    "search",
+    "selection retention",
+    "sample provenance",
+    "unavailable matching",
+    "coverage issues",
+    "accessibility labels",
+    "keyboard search focus"
+  ],
+  "fixture_samples" : 3000,
+  "limits" : [
+    "VoiceOver user testing not performed",
+    "native open panel interaction not automated",
+    "current Mac only",
+    "first visual baseline, no previous image diff"
+  ],
+  "screenshots" : [
+    "empty-light",
+    "setup-welcome",
+    "setup-sounds",
+    "setup-projects",
+    "setup-ready",
+    "loading-light",
+    "reading-progress",
+    "samples-populated",
+    "sample-reference-light",
+    "sample-reference-dark-compact",
+    "no-match-dark",
+    "plugins-dark",
+    "libraries-dark",
+    "setup-dark"
+  ],
+  "status" : "passed"
+}

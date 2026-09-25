@@ -1,0 +1,195 @@
+{
+  "status": "findings",
+  "mode": "read-only independent UX and visual regression audit",
+  "date": "2026-09-25",
+  "scope": [
+    "CatalogWindow.swift",
+    "CatalogTheme.swift",
+    "SetupWindow.swift",
+    "docs/ui-ux/REVIEW_PROTOCOL.md",
+    "docs/ui-ux/VISUAL_TEST_MATRIX.md",
+    "existing captures/catalog screenshot matrix"
+  ],
+  "evidence_grade": "E1 independent source/image review of prior E2/E3 smoke artifacts; no new runtime execution by this reviewer",
+  "limitations": [
+    "No user data inspected or mutated.",
+    "No product code changed.",
+    "Largest text, localization, RTL, increased contrast, reduced transparency and human VoiceOver have not been validated.",
+    "Prior screenshots are static evidence, not a substitute for post-change native execution."
+  ],
+  "findings": [
+    {
+      "id": "UI-01",
+      "severity": "medium",
+      "title": "Table text lacks vertical row padding",
+      "source": "Sources/SimplifyCatalog/CatalogWindow.swift:217",
+      "root_cause": "The table delegate returns a bare NSTextField while rowHeight is 38; there is no cell container with a centerY constraint and horizontal content inset.",
+      "consumers": [
+        "Plugins table",
+        "Samples table",
+        "Libraries table",
+        "Selected and unselected rows"
+      ],
+      "evidence": [
+        "sample-reference-light.png",
+        "sample-reference-dark-compact.png",
+        "libraries-dark.png"
+      ],
+      "fix": "Use a shared NSTableCellView containing a single-line truncating label, center it vertically, and govern horizontal inset and row height in CatalogTheme. Reuse cells by column identifier.",
+      "tests": [
+        "Assert label midY equals cell midY within one point.",
+        "Capture multiple rows, selected and unselected, all categories at minimum and typical size in both appearances."
+      ]
+    },
+    {
+      "id": "UI-02",
+      "severity": "medium",
+      "title": "Sidebar icons touch selection highlight edge",
+      "source": "Sources/SimplifyCatalog/CatalogWindow.swift:63",
+      "root_cause": "Borderless NSButton fills the selection background but its image/title has no content padding; row bounds are used as visual bounds.",
+      "consumers": [
+        "Plugins navigation",
+        "Samples navigation",
+        "Libraries navigation"
+      ],
+      "evidence": [
+        "sample-reference-light.png",
+        "no-match-dark.png"
+      ],
+      "fix": "Give navigation rows an explicit leading/trailing content inset while preserving the full-row hit target and native keyboard/accessibility semantics. Apply the same rule to all category rows.",
+      "tests": [
+        "Measure icon and title bounds inside the selection pill; require at least 10 points leading padding.",
+        "Verify mouse, keyboard activation, selection state, and both appearances."
+      ]
+    },
+    {
+      "id": "UI-03",
+      "severity": "medium",
+      "title": "Setup folder rows sit at the bottom of oversized empty lists",
+      "source": "Sources/SimplifyCatalog/SetupWindow.swift:96",
+      "root_cause": "A natural-height NSStackView is used as an NSScrollView document view without an explicit flipped, viewport-height document container, leaving short lists bottom-aligned.",
+      "consumers": [
+        "Custom plugin folders",
+        "Sample folders",
+        "Library folders",
+        "Project folders",
+        "Empty folder lists"
+      ],
+      "evidence": [
+        "setup-welcome.png",
+        "setup-sounds.png",
+        "setup-projects.png",
+        "setup-dark.png"
+      ],
+      "fix": "Use a top-aligned/flipped document container at least as tall as the viewport, anchor rows at its top, and autohide unnecessary scrollbars. Define a shared folder-list row inset.",
+      "tests": [
+        "Capture zero, one, and overflowing folder lists in all setup steps.",
+        "Assert first row remains near viewport top and last row can be scrolled to; exercise Remove on overflowing lists."
+      ]
+    },
+    {
+      "id": "UI-04",
+      "severity": "medium",
+      "title": "Inspector typography changes after clearing selection",
+      "source": "Sources/SimplifyCatalog/CatalogWindow.swift:193",
+      "root_cause": "Selected content sets attributed text with bold section headings; the no-selection branch replaces only detail.string, which inherits prior typing/text-storage attributes instead of resetting a semantic body style.",
+      "consumers": [
+        "Inspector after clearing search results",
+        "Inspector after switching category",
+        "Initial no-selection inspector"
+      ],
+      "evidence": [
+        "loading-light.png",
+        "no-match-dark.png"
+      ],
+      "fix": "Render both selected and empty inspector content through one explicit attributed-text styling path; reset font/color and paragraph spacing each time.",
+      "tests": [
+        "Select sample, then search to zero results and compare empty inspector styling with fresh launch.",
+        "Assert no-selection body font is regular 12-point and has consistent text-container inset."
+      ]
+    },
+    {
+      "id": "UI-05",
+      "severity": "high",
+      "title": "First scan hides all useful collection results until every phase completes",
+      "source": "Sources/SimplifyCatalog/CatalogWindow.swift:158",
+      "root_cause": "The loading state promises results only when the scan finishes, so discovery/metadata/reference work share one all-or-nothing collection presentation. No stop control is exposed.",
+      "consumers": [
+        "First launch Scan",
+        "Onboarding Save setup & Scan",
+        "Large external/archive roots"
+      ],
+      "evidence": [
+        "loading-light.png",
+        "reading-progress.png"
+      ],
+      "fix": "Publish basic collection batches promptly; retain navigable search/table/selection while reference enrichment continues. Distinguish pending metadata from absent references. Provide cancel/stop with honest partial-result status and resumable rescan behavior.",
+      "tests": [
+        "Measured time to first usable result and under-60-second first-use criterion on representative folders.",
+        "Verify browsing/filtering/selecting partial batches, completing enrichment, cancellation, and starting a replacement scan retain consistent state."
+      ]
+    },
+    {
+      "id": "UI-06",
+      "severity": "medium",
+      "title": "Hard-coded layout dimensions lack long-text and boundary validation",
+      "source": "Sources/SimplifyCatalog/SetupWindow.swift:92",
+      "root_cause": "Setup cards hard-code 680-point width inside a fixed 740-point panel, while shell/sidebar/inspector and controls use disparate literal spacing. Long folder names, asset titles, errors and large text have no captured boundary cases.",
+      "consumers": [
+        "Setup cards and error footer",
+        "Collection heading/status footer",
+        "Inspector title/meta",
+        "Main table at minimum width"
+      ],
+      "evidence": [
+        "Static layout inspection; current screenshots contain only short asset titles and no save failure."
+      ],
+      "fix": "Constrain cards to parent width and centralize semantic padding roles. Bound/wrap long text deliberately and use scrollable setup body for overflowing content while preserving footer controls.",
+      "tests": [
+        "Long asset and folder names, multi-line setup save error, many roots, minimum width/height, wide/short and typical windows.",
+        "Validate all action controls remain visible and no unsatisfiable constraints are logged."
+      ]
+    },
+    {
+      "id": "UI-07",
+      "severity": "medium",
+      "title": "Visual pass does not detect layout regression or fully cover reachable states",
+      "source": "captures/catalog/runtime.json",
+      "root_cause": "Runtime smoke asserts controls and captures screenshots but has no geometry assertions, prior-image comparison, overflow text fixtures, scan-details screenshot or setup-save-error capture. It records first-baseline/no-diff and lacks measured interaction latency.",
+      "consumers": [
+        "All catalog/setup UI",
+        "Progress banner",
+        "Error/recovery flows"
+      ],
+      "evidence": [
+        "runtime.json",
+        "reading-progress.png shows 99% text with roughly one-third visual fill; capture may have caught native animation, so this is evidence inconsistency rather than proven progress-model failure."
+      ],
+      "fix": "Add layout geometry assertions and deterministic post-layout captures for all semantic components; capture determinate progress after animation settles or with animation disabled for fixture screenshots. Keep baseline comparison review explicit.",
+      "tests": [
+        "Minimum/typical pairwise light/dark plus long-text, issues, error, partial/cancelled scan and all setup steps.",
+        "Actual keyboard traversal and native accessibility state checks, with human VoiceOver limitation stated."
+      ]
+    },
+    {
+      "id": "UI-08",
+      "severity": "low",
+      "title": "Status and setup summary copy has grammatical and density issues",
+      "source": "Sources/SimplifyCatalog/CatalogWindow.swift:155",
+      "root_cause": "Counts use fixed plural strings and inspector content repeats long paths and disclaimers; semantics and paragraph spacing are assembled ad hoc.",
+      "consumers": [
+        "Scan status footer: 1 scan issues",
+        "Setup plugin summary: 1 custom folders",
+        "Sample inspector project list"
+      ],
+      "evidence": [
+        "sample-reference-light.png",
+        "setup-ready.png"
+      ],
+      "fix": "Centralize count formatting/pluralization and use concise project display names with full selectable path available in details/tooltip; retain the important recency-proxy explanation once.",
+      "tests": [
+        "Zero/one/many count cases; large reference list scrollability and copyable full paths."
+      ]
+    }
+  ]
+}

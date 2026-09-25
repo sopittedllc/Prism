@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "deny": [
+      "Read(/.env)",
+      "Read(/.env.*)",
+      "Read(/secrets/**)",
+      "Read(/credentials.*)",
+      "Read(/.qa-criteria/**)",
+      "Edit(/.workflow/policy.json)",
+      "Edit(/.claude/hooks/**)"
+    ]
+  },
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true,
+    "allowUnsandboxedCommands": false,
+    "failIfUnavailable": true,
+    "filesystem": {
+      "denyRead": [
+        "./.env",
+        "./.env.*",
+        "./secrets",
+        "./credentials.json",
+        "./.qa-criteria",
+        "~/.ssh",
+        "~/.aws",
+        "~/.config/gcloud",
+        "~/Library/Keychains"
+      ],
+      "denyWrite": [
+        "./.workflow/policy.json",
+        "./.claude/hooks"
+      ]
+    },
+    "network": {
+      "allowedDomains": [
+        "docs.anthropic.com",
+        "code.claude.com",
+        "developer.apple.com",
+        "docs.juce.com",
+        "github.com",
+        "raw.githubusercontent.com",
+        "electro-smith.github.io"
+      ]
+    }
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/scripts/pretool_guard.py\""
+          }
+        ]
+      }
+    ],
+    "TaskCompleted": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR}/.claude/hooks/completion_gate.sh\" check-complete-if-active"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PROJECT_DIR}/.claude/hooks/completion_gate.sh\" check-if-marked-complete"
+          }
+        ]
+      }
+    ]
+  }
+}

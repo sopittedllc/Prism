@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "catalog-identity",
+  "gate": "design_system_audit",
+  "status": "passed",
+  "revision": "content:25deaa711e6c5e71edf5ca63150c2dcf670e8105c5184bd1280cf67c317d736e",
+  "timestamp": "2026-09-25T21:28:13.325398+00:00",
+  "producer": "ux-reviewer",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "design_system_audit-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/catalog-identity/systemic-impact-report.json",
+        "sha256": "6eb05c73b99ccd8da057b34dab786a2844217ffa28f44177355813be65af8d62"
+      }
+    }
+  ]
+}

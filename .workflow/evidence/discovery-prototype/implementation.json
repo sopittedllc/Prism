@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "discovery-prototype",
+  "gate": "implementation",
+  "status": "passed",
+  "revision": "content:4fc26851b238ac0e0d8f422cc931e9b2be798122bde1020c2871641b814f62cb",
+  "timestamp": "2026-09-24T23:16:40.492221+00:00",
+  "producer": "implementer",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "implementation-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/discovery-prototype/implementation.md",
+        "sha256": "497a300e26ab127e31a998cd54783b1754fdccc7c391d089cd3b86b650677111"
+      }
+    }
+  ]
+}

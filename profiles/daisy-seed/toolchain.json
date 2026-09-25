@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "ci_checks": ["state-coverage", "build-debug"],
+  "checks": {
+    "build-debug": {"argv": ["make"], "timeout_seconds": 1200},
+    "clean-build": {"argv": ["make", "clean"], "timeout_seconds": 300},
+    "unit-tests": {"argv": [], "timeout_seconds": 1200},
+    "static-analysis": {"argv": [], "timeout_seconds": 1200},
+    "firmware-size": {"argv": [], "timeout_seconds": 300},
+    "hardware-smoke": {"argv": [], "timeout_seconds": 1200},
+    "hardware-soak": {"argv": [], "timeout_seconds": 7200},
+    "state-coverage": {"argv": ["python3", "scripts/feature_coverage.py", "validate"], "timeout_seconds": 60},
+    "state-registry-contract": {"argv": [], "timeout_seconds": 600},
+    "preset-roundtrip": {"argv": [], "timeout_seconds": 1200},
+    "preset-migration": {"argv": [], "timeout_seconds": 1200}
+  }
+}

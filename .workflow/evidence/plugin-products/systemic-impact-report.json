@@ -1,0 +1,36 @@
+{
+  "symptom": "Duplicate plugin formats and confusing empty sound collections",
+  "semantic_role": "Product-level browsing, exact installation removal, additive folder scope",
+  "authority": "PluginProduct, PluginFormatsWindow, SetupWindow and Scanner root precedence",
+  "searches": [
+    "All plugin row/filter/detail consumers",
+    "All source folder cards and root traversal",
+    "Review identity through Trash worker"
+  ],
+  "included_consumers": [
+    "Plugins list/detail/formats",
+    "Samples and Libraries source selection",
+    "Scan category budgets and empty-state diagnostics"
+  ],
+  "excluded_consumers": [
+    "Major-DAW usage adapters remain research",
+    "No real audio content removed"
+  ],
+  "system_changes": [
+    "Conservative complete bundle-ID grouping",
+    "Default Keep with explicit exact-path review",
+    "Specific configured roots override broader roots",
+    "Independent category budgets"
+  ],
+  "representative_tests": [
+    "39 Swift tests passed",
+    "Final release native smoke PASS: selected/all/cancel synthetic Trash",
+    "Independent source and native UX reviews passed"
+  ],
+  "regression_prevention": [
+    "Publisher/version/token collision tests",
+    "Reviewed identity replacement rejection",
+    "Nested root and category starvation regressions",
+    "Native long-path and choice-state assertions"
+  ]
+}

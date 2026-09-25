@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "ui-performance-audit",
+  "gate": "runtime_tests",
+  "status": "passed",
+  "revision": "content:dad13ac1c80f24edee0e0ce38b676708799aacb9d2e034276f13f6cfcee1acce",
+  "timestamp": "2026-09-25T18:38:18.662425+00:00",
+  "producer": "native-runtime",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "runtime_tests-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/ui-performance-audit/native-runtime-report.json",
+        "sha256": "29309fe06aa2c4a7ba95d57d427a83d90c0911fcee009c44931034a1072c198e"
+      }
+    }
+  ]
+}

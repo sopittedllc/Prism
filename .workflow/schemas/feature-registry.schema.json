@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["registry_version", "preset_schema_version", "unknown_field_policy", "settings"],
+  "properties": {
+    "registry_version": {"type": "integer", "minimum": 1},
+    "preset_schema_version": {"type": "integer", "minimum": 1},
+    "unknown_field_policy": {"enum": ["preserve", "reject", "ignore_with_warning"]},
+    "settings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "value_type", "default", "introduced_in", "policies"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z][a-z0-9._-]*$"},
+          "value_type": {"enum": ["boolean", "integer", "number", "string", "enumeration", "object", "array"]},
+          "default": {},
+          "introduced_in": {"type": "integer", "minimum": 1},
+          "deprecated_in": {"type": ["integer", "null"]},
+          "policies": {"type": "object"}
+        }
+      }
+    }
+  }
+}

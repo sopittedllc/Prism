@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "task_id": "discovery-prototype",
+  "title": "Read-only macOS discovery prototype",
+  "risk_tier": 2,
+  "state": "complete",
+  "base_revision": "UNBORN",
+  "domains": [],
+  "product_decisions_needed": [],
+  "acceptance_criteria": [
+    {
+      "id": "AC1",
+      "statement": "Build and fixture tests pass for discovery and boundaries",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/discovery-prototype/automated_tests.json"
+      ]
+    },
+    {
+      "id": "AC2",
+      "statement": "CLI contract and partial reports pass end-to-end checks",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/discovery-prototype/automated_tests.json"
+      ]
+    },
+    {
+      "id": "AC3",
+      "statement": "Scanned fixture files remain unchanged",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/discovery-prototype/automated_tests.json"
+      ]
+    },
+    {
+      "id": "AC4",
+      "statement": "Read-only standard-plugin runtime scan reports aggregate results",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/discovery-prototype/runtime_tests.json"
+      ]
+    },
+    {
+      "id": "AC5",
+      "statement": "Saved-project inclusion semantics, experimental adapter coverage, and remaining DAW gaps are documented",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/discovery-prototype/research.json"
+      ]
+    }
+  ],
+  "gates": {
+    "research": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/discovery-prototype/research.json"
+      ],
+      "revision": "content:4fc26851b238ac0e0d8f422cc931e9b2be798122bde1020c2871641b814f62cb",
+      "agent": "researcher"
+    },
+    "plan_review": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/discovery-prototype/plan_review.json"
+      ],
+      "revision": "content:4fc26851b238ac0e0d8f422cc931e9b2be798122bde1020c2871641b814f62cb",
+      "agent": "specification-critic"
+    },
+    "implementation": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/discovery-prototype/implementation.json"
+      ],
+      "revision": "content:4fc26851b238ac0e0d8f422cc931e9b2be798122bde1020c2871641b814f62cb",
+      "agent": "implementer"
+    },
+    "automated_tests": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/discovery-prototype/automated_tests.json"
+      ],
+      "revision": "content:4fc26851b238ac0e0d8f422cc931e9b2be798122bde1020c2871641b814f62cb",
+      "agent": "scripts/run_check.py"
+    },
+    "code_review": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/discovery-prototype/code_review.json"
+      ],
+      "revision": "content:4fc26851b238ac0e0d8f422cc931e9b2be798122bde1020c2871641b814f62cb",
+      "agent": "reviewer"
+    },
+    "runtime_tests": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/discovery-prototype/runtime_tests.json"
+      ],
+      "revision": "content:4fc26851b238ac0e0d8f422cc931e9b2be798122bde1020c2871641b814f62cb",
+      "agent": "scripts/run_check.py"
+    }
+  },
+  "current_revision": "content:4fc26851b238ac0e0d8f422cc931e9b2be798122bde1020c2871641b814f62cb"
+}

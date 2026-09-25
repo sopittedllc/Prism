@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "task": "ui-performance-audit",
+  "role": "researcher",
+  "client": "codex",
+  "status": "audit_complete",
+  "scope": "Read-only source audit; no product source edits and no user content scans. Line numbers refer to pre-implementation source on 2026-09-25.",
+  "findings": [
+    {
+      "severity": "high",
+      "source": "Scanner.swift:121-148; CatalogModel.swift:99-110",
+      "observation": "All roots including project archives are enumerated before any basic asset is inspected, and GUI receives only a final report.",
+      "cost": "First useful inventory latency equals all discovery + all parsing + matching.",
+      "recommendation": "Construct basic assets during discovery, emit throttled immutable inventory snapshots, and start project discovery/parsing after inventory; show background enrichment explicitly."
+    },
+    {
+      "severity": "high",
+      "source": "CatalogModel.swift:118-165; CatalogWindow.swift:137-162,193-205",
+      "observation": "visibleAssets rebuilds inclusion-date dictionary, filters and sorts every access; selectedAsset invokes it even for nil selection; inspector/detail repeat it.",
+      "cost": "Up to three O(N log N) localized sorts per refresh and multiple sorts per row selection on main actor.",
+      "recommendation": "Cache filtered/sorted rows keyed by report revision/category/query/sort; obtain selection directly from path index. Build sample-inclusion dictionary once per report; avoid full refresh for pure progress."
+    },
+    {
+      "severity": "medium",
+      "source": "Scanner.swift:99-109",
+      "observation": "Each directory accumulates and sorts all children before visiting first child, comparing repeated URL.path properties.",
+      "cost": "O(k log k) work and k child allocations per directory delaying first result; deterministic traversal currently defines truncation subset.",
+      "recommendation": "Stream children, cache path strings, and sort presentation once; preserve cap reporting and document filesystem-order selection if limit truncates."
+    },
+    {
+      "severity": "medium",
+      "source": "Scanner.swift:39-54,135-148",
+      "observation": "Bundle-ID metadata reads and complete project parsing are serialized in same candidate queue as cheap sample/file attributes.",
+      "cost": "Thousands of plugin Info.plist opens, then each project input up to32MiB decoded64MiB; all on first result critical path.",
+      "recommendation": "Publish basic identity/name/format/size first; enrich plugin IDs and project reports afterward. Consider bounded small concurrency only after storage benchmarks; never unbounded task per path."
+    },
+    {
+      "severity": "medium",
+      "source": "ProjectReader.swift:15-30,50-60; Scanner.swift:173-179",
+      "observation": "Every plugin plist and project repeats rootward symlink metadata checks; Logic repeats traversal for metadata.",
+      "cost": "O(number of candidates \u00d7 path depth) potential filesystem metadata lookups, including unsupported projects.",
+      "recommendation": "Keep checks until a measured safe descriptor-relative traversal replaces them; naive shared ancestor cache can weaken safety if symlink changes."
+    },
+    {
+      "severity": "medium",
+      "source": "Scanner.swift:24-30,65-66,102-105,157-162",
+      "observation": "Progress output is throttled, but caller creates url.path and publish reads Date even when 250ms throttle drops notification.",
+      "cost": "Per-entry overhead on large trees; already separate progress-only GUI callback avoids table reload.",
+      "recommendation": "Throttle cheap counter before materializing paths when feasible; maintain phase/sequence ordering and forced terminal update."
+    },
+    {
+      "severity": "medium",
+      "source": "CatalogModel.swift:89-115; Scanner.swift:12-170",
+      "observation": "No cancellation or time-budget checks; detached synchronous scan continues until bounded entry/depth completion.",
+      "cost": "Entry/byte bounds do not imply wall-clock deadline on external/disconnected/cloud storage.",
+      "recommendation": "Cooperative cancellation and a soft foreground budget; present partial browseable inventory and ongoing background discovery before60s. Explicitly report a stalled OS call cannot be forcibly bounded by this synchronous API."
+    },
+    {
+      "severity": "low",
+      "source": "Scanner.swift:149-167",
+      "observation": "Reference matching already builds dictionary indexed by exact resolved path and deduplicates project paths.",
+      "cost": "Approximately linear references + samples; not an N\u00d7M nested-match hotspot.",
+      "recommendation": "Preserve exact matching and unresolved-path exclusions. Intermediate snapshots must say not checked, never no references found."
+    }
+  ],
+  "measurement": "scanner-baseline.json: synthetic local debug CLI; does not measure GUI or external storage.",
+  "recommended_acceptance": [
+    "First nonempty inventory publication precedes any project-file parsing.",
+    "Intermediate report coverage explicitly pending; final coverage remains partial/unsupported/failed as appropriate.",
+    "Browsing and selection remain responsive during background analysis; throttled progress does not trigger row rebuild.",
+    "Synthetic large collection shows first usable inventory in <60s; actual external-storage latency is separately measured, never promised universally.",
+    "Symlink, package exclusions, regular-file validation, parser/entry/depth caps and immutability regressions pass."
+  ],
+  "benchmark_gaps": [
+    "Need stage durations and first-inventory callback timing with final implementation.",
+    "Need large-window GUI refresh/selection timing; source establishes repeated sorting but no profiler distribution measured.",
+    "Need permission-conscious bounded real storage test to quantify external/cloud latency.",
+    "Do not claim a speedup factor from source inspection alone."
+  ]
+}

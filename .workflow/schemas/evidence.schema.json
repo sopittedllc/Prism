@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["schema_version", "task_id", "gate", "status", "revision", "timestamp", "producer", "checks"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "task_id": {"type": "string"},
+    "gate": {"type": "string"},
+    "status": {"enum": ["passed", "failed", "blocked", "not_applicable"]},
+    "revision": {"type": "string"},
+    "timestamp": {"type": "string"},
+    "producer": {"type": "string"},
+    "client": {"enum": ["claude-code", "codex", "human", "automation", "unknown"]},
+    "model": {"type": "string"},
+    "target": {"type": "string"},
+    "configuration": {"type": "string"},
+    "artifact_sha256": {"type": "string"},
+    "checks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["name", "status"],
+        "properties": {
+          "name": {"type": "string"},
+          "status": {"enum": ["passed", "failed", "blocked", "not_applicable"]},
+          "command": {"type": "string"},
+          "exit_code": {"type": "integer"},
+          "measurement": {},
+          "log": {"type": "string"}
+        }
+      }
+    }
+  }
+}

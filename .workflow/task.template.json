@@ -1,0 +1,34 @@
+{
+  "$schema": "./schemas/task.schema.json",
+  "schema_version": 1,
+  "task_id": "replace-me",
+  "title": "Replace with user outcome",
+  "risk_tier": 1,
+  "domains": [],
+  "state": "framing",
+  "base_revision": "UNBORN",
+  "current_revision": "UNBORN",
+  "product_decisions_needed": [],
+  "acceptance_criteria": [
+    {"id": "AC-1", "statement": "Replace with observable outcome", "status": "pending", "evidence": []}
+  ],
+  "gates": {
+    "research": {"status": "pending", "evidence": []},
+    "plan_review": {"status": "pending", "evidence": []},
+    "implementation": {"status": "pending", "evidence": []},
+    "automated_tests": {"status": "pending", "evidence": []},
+    "code_review": {"status": "pending", "evidence": []},
+    "runtime_tests": {"status": "pending", "evidence": []},
+    "release_review": {"status": "pending", "evidence": []},
+    "ui_research": {"status": "pending", "evidence": []},
+    "design_system_audit": {"status": "pending", "evidence": []},
+    "accessibility": {"status": "pending", "evidence": []},
+    "visual_regression": {"status": "pending", "evidence": []},
+    "ux_review": {"status": "pending", "evidence": []},
+    "state_coverage": {"status": "pending", "evidence": []},
+    "preset_roundtrip": {"status": "pending", "evidence": []},
+    "state_migration": {"status": "pending", "evidence": []},
+    "state_integration": {"status": "pending", "evidence": []}
+  },
+  "repair_attempts": {}
+}

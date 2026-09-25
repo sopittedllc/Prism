@@ -1,0 +1,65 @@
+{
+  "task_id": "catalog-browser",
+  "official_sources": [
+    "https://developer.apple.com/design/human-interface-guidelines/lists-and-tables",
+    "https://developer.apple.com/design/human-interface-guidelines/sidebars",
+    "https://developer.apple.com/design/human-interface-guidelines/keyboards",
+    "https://developer.apple.com/design/human-interface-guidelines/color"
+  ],
+  "comparable_cases": [
+    {
+      "name": "Finder",
+      "url": "https://support.apple.com/en-ca/guide/mac-pro/apddf030866a/mac",
+      "user_context": "Filesystem users",
+      "task": "Browse and inspect files",
+      "pattern": "Categories, list, selected detail",
+      "success": "Familiar navigation and preview",
+      "failure": "Unrestricted file actions would exceed scope",
+      "transferability": "Native collection browser without mutation"
+    },
+    {
+      "name": "Music",
+      "url": "https://support.apple.com/guide/music/sort-songs-mus53d258611/mac",
+      "user_context": "Large media collections",
+      "task": "Find and sort items",
+      "pattern": "Named columns and clear sorting",
+      "success": "Dense scannable lists",
+      "failure": "Artwork and playback irrelevant",
+      "transferability": "Search/sort with preserved selection"
+    },
+    {
+      "name": "Disk Utility",
+      "url": "https://support.apple.com/guide/disk-utility/view-all-devices-or-only-volumes-dskud6b39edb/mac",
+      "user_context": "Storage inspection",
+      "task": "Inspect object identity",
+      "pattern": "Collection plus detail",
+      "success": "Hierarchy distinguishes objects",
+      "failure": "Destructive controls unnecessary here",
+      "transferability": "Distinguish format installations and library candidates"
+    }
+  ],
+  "synthesis": {
+    "requirements": [
+      "Native labeled controls",
+      "Semantic system colors",
+      "Keyboard selection and search"
+    ],
+    "recurring_patterns": [
+      "Collection navigation and selected detail",
+      "Search and explicit sorting"
+    ],
+    "project_inferences": [
+      "Reference coverage belongs beside results",
+      "Session-only preview needs explicit lifetime"
+    ],
+    "hypotheses": [
+      "A compact three-category browser is sufficient for initial collection inspection"
+    ]
+  },
+  "decision": "Native AppKit catalog with shared table/detail and explicit read-only evidence",
+  "validation": [
+    "Fixture model tests",
+    "Runtime controls and screenshot matrix",
+    "Independent UX review"
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "catalog-browser",
+  "gate": "preset_roundtrip",
+  "status": "passed",
+  "revision": "content:f3fab40a433cd4a4284cc4224ada9c099450c72c36dfa78997020903271efbca",
+  "timestamp": "2026-09-24T23:42:05.183307+00:00",
+  "producer": "codex-report-backed-validation",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "preset_roundtrip-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/catalog-browser/delivery-report.json",
+        "sha256": "6afe1fc95bd100a162a46c8a19c0ba243f2dd674c3e466d508d9f319902d474b"
+      }
+    }
+  ]
+}

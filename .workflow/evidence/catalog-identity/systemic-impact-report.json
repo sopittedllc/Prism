@@ -1,0 +1,40 @@
+{
+  "symptom": "Real vendor formats split, incorrect branding source, arbitrary library folders and unusable instrument search",
+  "semantic_role": "Product identity and evidence-backed catalog discovery",
+  "authority": "PluginProduct, LibraryDiscovery/LibraryMetadata, CatalogWindow, SetupWindow, prepare_icon/build_app",
+  "searches": [
+    "All branding source references",
+    "All plugin list and detail consumers",
+    "All library discovery and metadata search consumers",
+    "Setup and reference coverage copy"
+  ],
+  "included_consumers": [
+    "Dock/app/welcome/sidebar icons",
+    "Plugin list and removal sheet",
+    "Library list/details/search",
+    "Setup project coverage"
+  ],
+  "excluded_consumers": [
+    "Full primary DAW history adapters remain incomplete",
+    "No dynamic web enrichment or saved user tags"
+  ],
+  "system_changes": [
+    "Exact JPG deterministic conversion",
+    "Verified vendor grouping namespaces",
+    "Two visible plugin columns",
+    "Manifest/catalog metadata with instrument tags",
+    "Explicit coverage and unknown history"
+  ],
+  "representative_tests": [
+    "46 Swift tests including special files and overlapping roots",
+    "Native release UI PASS with Accordion search and plugin column assertions",
+    "Read-only installed library scan with positive Accordion/Banjo results",
+    "Exact JPG byte identity and visual icon inspection"
+  ],
+  "regression_prevention": [
+    "Actual vendor ID layout fixtures",
+    "Missing/catalog-only/linked/out-of-scope SINE checks",
+    "Bounded XML/JSON/SQLite input work and output",
+    "Independent source and native UI review"
+  ]
+}

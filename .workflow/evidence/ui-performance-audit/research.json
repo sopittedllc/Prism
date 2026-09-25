@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "ui-performance-audit",
+  "gate": "research",
+  "status": "passed",
+  "revision": "content:dad13ac1c80f24edee0e0ce38b676708799aacb9d2e034276f13f6cfcee1acce",
+  "timestamp": "2026-09-25T18:38:18.426492+00:00",
+  "producer": "researcher",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "research-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/ui-performance-audit/scanner-audit.json",
+        "sha256": "b06a88ed34672e9ad85b22ff1e85bdbaf92ed8af6728aafe6bfd165cca05e495"
+      }
+    }
+  ]
+}

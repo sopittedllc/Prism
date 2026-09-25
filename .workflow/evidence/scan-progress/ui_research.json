@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "scan-progress",
+  "gate": "ui_research",
+  "status": "passed",
+  "revision": "content:e2744b65b627ba2bd2e085a99d29d10b7ee07b6f46ece909ba288443c6ea38ad",
+  "timestamp": "2026-09-25T18:05:39.253317+00:00",
+  "producer": "codex-report-backed-validation",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "ui_research-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/scan-progress/ui-research-report.json",
+        "sha256": "05184f4319aba8f2a4256fb471b39edccdb77631b9e5b06952f71dbd468680a0"
+      }
+    }
+  ]
+}

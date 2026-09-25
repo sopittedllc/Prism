@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "catalog-identity",
+  "gate": "code_review",
+  "status": "passed",
+  "revision": "content:25deaa711e6c5e71edf5ca63150c2dcf670e8105c5184bd1280cf67c317d736e",
+  "timestamp": "2026-09-25T21:28:13.150666+00:00",
+  "producer": "reviewer",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "code_review-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/catalog-identity/source-review-report.json",
+        "sha256": "2a02f1c7add7de265e71beb9e864505a7ab8eac677cba10480666cd2cc5be7ca"
+      }
+    }
+  ]
+}

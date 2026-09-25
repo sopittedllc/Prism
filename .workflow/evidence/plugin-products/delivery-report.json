@@ -1,0 +1,19 @@
+{
+  "status": "passed",
+  "client": "codex",
+  "role": "implementer",
+  "build": "swift build -c release passed; release package completed",
+  "tests": "swift test:39 tests passed",
+  "runtime": "Final packaged native UI smoke PASS; synthetic Trash only",
+  "reviews": [
+    "source-review-report.json",
+    "native-ui-review-report.json"
+  ],
+  "limits": [
+    "Mandatory Logic/Ableton/Cubase/ProTools usage adapters not delivered",
+    "Instrument-level usage evidence remains research",
+    "No human VoiceOver testing",
+    "Alternate client unavailable; independent Codex reviews used",
+    "Bounded partial scans, not full inventory guarantee"
+  ]
+}

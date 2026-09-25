@@ -1,0 +1,204 @@
+{
+  "schema_version": 1,
+  "task_id": "onboarding-redesign",
+  "title": "Collection browser redesign and useful setup",
+  "risk_tier": 2,
+  "state": "complete",
+  "base_revision": "content:f3fab40a433cd4a4284cc4224ada9c099450c72c36dfa78997020903271efbca",
+  "domains": [
+    "ui-ux",
+    "stateful-feature"
+  ],
+  "product_decisions_needed": [],
+  "acceptance_criteria": [
+    {
+      "id": "AC1",
+      "statement": "Build and objective checks",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/onboarding-redesign/delivery-report.json",
+        ".workflow/evidence/onboarding-redesign/automated_tests.json",
+        ".workflow/evidence/onboarding-redesign/native-runtime-report.json",
+        ".workflow/evidence/onboarding-redesign/code-review-report.json"
+      ]
+    },
+    {
+      "id": "AC2",
+      "statement": "Brand and layout",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/onboarding-redesign/delivery-report.json",
+        ".workflow/evidence/onboarding-redesign/automated_tests.json",
+        ".workflow/evidence/onboarding-redesign/native-runtime-report.json",
+        ".workflow/evidence/onboarding-redesign/code-review-report.json"
+      ]
+    },
+    {
+      "id": "AC3",
+      "statement": "Interactive setup transitions",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/onboarding-redesign/delivery-report.json",
+        ".workflow/evidence/onboarding-redesign/automated_tests.json",
+        ".workflow/evidence/onboarding-redesign/native-runtime-report.json",
+        ".workflow/evidence/onboarding-redesign/code-review-report.json"
+      ]
+    },
+    {
+      "id": "AC4",
+      "statement": "Durable setup and recovery",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/onboarding-redesign/delivery-report.json",
+        ".workflow/evidence/onboarding-redesign/automated_tests.json",
+        ".workflow/evidence/onboarding-redesign/native-runtime-report.json",
+        ".workflow/evidence/onboarding-redesign/code-review-report.json"
+      ]
+    },
+    {
+      "id": "AC5",
+      "statement": "Native interaction and evidence",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/onboarding-redesign/delivery-report.json",
+        ".workflow/evidence/onboarding-redesign/automated_tests.json",
+        ".workflow/evidence/onboarding-redesign/native-runtime-report.json",
+        ".workflow/evidence/onboarding-redesign/code-review-report.json"
+      ]
+    },
+    {
+      "id": "AC6",
+      "statement": "Independent review and state policy",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/onboarding-redesign/delivery-report.json",
+        ".workflow/evidence/onboarding-redesign/automated_tests.json",
+        ".workflow/evidence/onboarding-redesign/native-runtime-report.json",
+        ".workflow/evidence/onboarding-redesign/code-review-report.json"
+      ]
+    }
+  ],
+  "gates": {
+    "research": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/onboarding-redesign/research.json"
+      ],
+      "revision": "content:50eb72739507be76b3d1dadcc15a70ac1511338c156f9e90acb9d62601e09a35",
+      "agent": "codex-report-backed-validation"
+    },
+    "plan_review": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/onboarding-redesign/plan_review.json"
+      ],
+      "revision": "content:50eb72739507be76b3d1dadcc15a70ac1511338c156f9e90acb9d62601e09a35",
+      "agent": "codex-report-backed-validation"
+    },
+    "implementation": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/onboarding-redesign/implementation.json"
+      ],
+      "revision": "content:50eb72739507be76b3d1dadcc15a70ac1511338c156f9e90acb9d62601e09a35",
+      "agent": "codex-report-backed-validation"
+    },
+    "automated_tests": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/onboarding-redesign/automated_tests.json"
+      ],
+      "revision": "content:50eb72739507be76b3d1dadcc15a70ac1511338c156f9e90acb9d62601e09a35",
+      "agent": "scripts/run_check.py"
+    },
+    "code_review": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/onboarding-redesign/code_review.json"
+      ],
+      "revision": "content:50eb72739507be76b3d1dadcc15a70ac1511338c156f9e90acb9d62601e09a35",
+      "agent": "codex-report-backed-validation"
+    },
+    "runtime_tests": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/onboarding-redesign/runtime_tests.json"
+      ],
+      "revision": "content:50eb72739507be76b3d1dadcc15a70ac1511338c156f9e90acb9d62601e09a35",
+      "agent": "codex-report-backed-validation"
+    },
+    "ui_research": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/onboarding-redesign/ui_research.json"
+      ],
+      "revision": "content:50eb72739507be76b3d1dadcc15a70ac1511338c156f9e90acb9d62601e09a35",
+      "agent": "codex-report-backed-validation"
+    },
+    "design_system_audit": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/onboarding-redesign/design_system_audit.json"
+      ],
+      "revision": "content:50eb72739507be76b3d1dadcc15a70ac1511338c156f9e90acb9d62601e09a35",
+      "agent": "codex-report-backed-validation"
+    },
+    "accessibility": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/onboarding-redesign/accessibility.json"
+      ],
+      "revision": "content:50eb72739507be76b3d1dadcc15a70ac1511338c156f9e90acb9d62601e09a35",
+      "agent": "codex-report-backed-validation"
+    },
+    "visual_regression": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/onboarding-redesign/visual_regression.json"
+      ],
+      "revision": "content:50eb72739507be76b3d1dadcc15a70ac1511338c156f9e90acb9d62601e09a35",
+      "agent": "codex-report-backed-validation"
+    },
+    "ux_review": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/onboarding-redesign/ux_review.json"
+      ],
+      "revision": "content:50eb72739507be76b3d1dadcc15a70ac1511338c156f9e90acb9d62601e09a35",
+      "agent": "codex-report-backed-validation"
+    },
+    "state_coverage": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/onboarding-redesign/state_coverage.json"
+      ],
+      "revision": "content:50eb72739507be76b3d1dadcc15a70ac1511338c156f9e90acb9d62601e09a35",
+      "agent": "codex-report-backed-validation"
+    },
+    "preset_roundtrip": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/onboarding-redesign/preset_roundtrip.json"
+      ],
+      "revision": "content:50eb72739507be76b3d1dadcc15a70ac1511338c156f9e90acb9d62601e09a35",
+      "agent": "codex-report-backed-validation"
+    },
+    "state_migration": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/onboarding-redesign/state_migration.json"
+      ],
+      "revision": "content:50eb72739507be76b3d1dadcc15a70ac1511338c156f9e90acb9d62601e09a35",
+      "agent": "codex-report-backed-validation"
+    },
+    "state_integration": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/onboarding-redesign/state_integration.json"
+      ],
+      "revision": "content:50eb72739507be76b3d1dadcc15a70ac1511338c156f9e90acb9d62601e09a35",
+      "agent": "codex-report-backed-validation"
+    }
+  },
+  "current_revision": "content:50eb72739507be76b3d1dadcc15a70ac1511338c156f9e90acb9d62601e09a35"
+}

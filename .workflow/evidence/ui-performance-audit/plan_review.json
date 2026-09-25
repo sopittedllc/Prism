@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "ui-performance-audit",
+  "gate": "plan_review",
+  "status": "passed",
+  "revision": "content:dad13ac1c80f24edee0e0ce38b676708799aacb9d2e034276f13f6cfcee1acce",
+  "timestamp": "2026-09-25T18:38:18.484929+00:00",
+  "producer": "critic",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "plan_review-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/ui-performance-audit/plan-review-report.json",
+        "sha256": "0e4675ab4b3d96e87ddb463b2443aca443dabaac56a4dd31750f88978a6549a6"
+      }
+    }
+  ]
+}

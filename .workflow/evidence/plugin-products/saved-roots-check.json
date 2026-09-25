@@ -1,0 +1,12 @@
+{
+  "asset_counts": {
+    "library": 14,
+    "sample": 75446
+  },
+  "issues": 1,
+  "issue_categories": {
+    "Entry limit reached; scan is incomplete": 1
+  },
+  "seconds": 3.7979769706726074,
+  "scope": "Saved sample/library roots only; read-only; no project analysis"
+}

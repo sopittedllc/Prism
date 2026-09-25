@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "ui-performance-audit",
+  "gate": "accessibility",
+  "status": "passed",
+  "revision": "content:dad13ac1c80f24edee0e0ce38b676708799aacb9d2e034276f13f6cfcee1acce",
+  "timestamp": "2026-09-25T18:38:18.835763+00:00",
+  "producer": "accessibility-reviewer",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "accessibility-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/ui-performance-audit/accessibility-final-report.json",
+        "sha256": "ca60805f8e942193dec4089c3d035a3f74c1d7c58bff8a910e11c3cea669b0a0"
+      }
+    }
+  ]
+}

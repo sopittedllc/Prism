@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "discovery-prototype",
+  "gate": "code_review",
+  "status": "passed",
+  "revision": "content:4fc26851b238ac0e0d8f422cc931e9b2be798122bde1020c2871641b814f62cb",
+  "timestamp": "2026-09-24T23:16:40.556627+00:00",
+  "producer": "reviewer",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "code_review-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/discovery-prototype/code-review.md",
+        "sha256": "4aa89618895ae0b5d25675f88298f163316643708afe9a1e39640b5252adadcc"
+      }
+    }
+  ]
+}

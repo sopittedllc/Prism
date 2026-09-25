@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "onboarding-redesign",
+  "gate": "runtime_tests",
+  "status": "passed",
+  "revision": "content:50eb72739507be76b3d1dadcc15a70ac1511338c156f9e90acb9d62601e09a35",
+  "timestamp": "2026-09-25T00:04:10.194191+00:00",
+  "producer": "codex-report-backed-validation",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "runtime_tests-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/onboarding-redesign/native-runtime-report.json",
+        "sha256": "e7d75ab26d9a51378a771a10d8995ca7212f994e10a7a291d050b9f153ac4628"
+      }
+    }
+  ]
+}

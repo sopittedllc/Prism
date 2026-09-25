@@ -1,0 +1,9 @@
+{
+  "name": "Claude Project Template",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu-24.04",
+  "remoteUser": "vscode",
+  "mounts": [],
+  "containerEnv": {
+    "CLAUDE_USER_AUTHORIZED_ACTIONS": ""
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "$schema": "./schemas/cross-cutting-policy.schema.json",
+  "version": 1,
+  "required_concerns": [
+    "preset",
+    "project_persistence",
+    "default_reset",
+    "migration",
+    "undo",
+    "automation",
+    "copy_paste",
+    "sync",
+    "accessibility",
+    "privacy",
+    "analytics",
+    "export_import"
+  ],
+  "allowed_decisions": ["included", "excluded", "not_applicable"],
+  "exclusion_requires_reason": true,
+  "stable_ids_required": true,
+  "preset_unknown_field_policy_required": true,
+  "released_fixture_per_schema_version": true
+}

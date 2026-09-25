@@ -1,0 +1,59 @@
+{
+  "status": "passed",
+  "acting_client": "codex",
+  "role": "independent-reviewer",
+  "scope": [
+    "PluginProduct grouping",
+    "PluginRemoval identities, validation and partial-result behavior",
+    "Scanner explicit-root precedence",
+    "CatalogModel product/reference indexes and removal",
+    "PluginFormatsWindow confirmation and choices"
+  ],
+  "findings": [],
+  "positive_observations": [
+    "Removal validates standardized plugin paths, lstat identity and non-symlink ancestors; no permanent deletion or privilege escalation",
+    "Per-item errors preserve failed catalog entries; keep defaults and Cancel-default explicit confirmation present",
+    "Candidate REAPER name references explicitly disclaim verified installation dependency",
+    "Specific sample roots override broad library roots while nested library exclusions remain",
+    "Partial filesystem race is explicitly acknowledged in plan; no atomic/adversarial guarantee claimed",
+    "Reviewed Assets reach worker unchanged after identity and bundle-ID comparison with current catalog",
+    "Hosted-owner and unknown-ID installations stay separate",
+    "Traversal budgets reset per category, allowing project discovery after sample truncation; final issues remain present"
+  ],
+  "limitations": [
+    "Read-only source review; coordinator reports39 tests and release packaging passed, not independently executed",
+    "Native removal/format-sheet runtime validation remains separate",
+    "Logic, Ableton, Cubase and Pro Tools full plugin/sample/instrument adapters are upcoming research scope, not claimed implemented",
+    "Path-based Trash retains disclosed residual external filesystem race; no atomic adversarial guarantee",
+    "No real user content removed or holdout criteria accessed"
+  ],
+  "resolved_findings": [
+    {
+      "severity": "P2",
+      "file": "Sources/SimplifyCore/PluginProduct.swift",
+      "line": 24,
+      "title": "Publisher prefix collapses unrelated hosted namespaces",
+      "detail": "Identifiers io.github.alice.Synth and io.github.bob.Synth both become io.github; same-name plugins then appear as one product and Remove all formats spans both owners. This contradicts conservative separation of conflicting publishers.",
+      "repair": "Retain owner-level information for hosted/reverse-domain namespaces, or keep ambiguous identities separate; add same-name distinct-owner regression.",
+      "resolution": "Full identifier retained instead of first-two-label publisher; unknown IDs isolated per path. Terminal-suffix boundary still requires repair below."
+    },
+    {
+      "severity": "P2",
+      "file": "Sources/SimplifyCatalog/PluginFormatsWindow.swift",
+      "line": 81,
+      "title": "Removal discards the identities captured by the reviewed installation list",
+      "detail": "Confirmation captures Asset values but passes only paths. CatalogModel.trashPlugins re-resolves targets from the current report and can accept newer identities if the report was replaced after the formats draft opened. Current modal UI substantially narrows this route but the model authorization boundary does not enforce reviewed identity.",
+      "repair": "Pass reviewed Assets/identities into model, require identity equality with current catalog, and validate those captured identities immediately before Trash. Add stale-review/current-report replacement regression.",
+      "resolution": "Confirmation passes captured Assets; model compares identities and bundle IDs with current catalog and passes captured assets to filesystem validation."
+    },
+    {
+      "severity": "P2",
+      "file": "Sources/SimplifyCore/PluginProduct.swift",
+      "line": 25,
+      "title": "Format suffix stripping lacks token boundary",
+      "detail": "hasSuffix(\"au\") strips ordinary identifier word endings, e.g. com.vendor.tableau becomes com.vendor.table. Distinct same-name IDs may consequently merge despite full-namespace repair.",
+      "repair": "Strip only delimiter-separated terminal format components or separately verified vendor-specific forms; test ordinary identifier words ending in format strings.",
+      "resolution": "Only delimiter-separated terminal format tokens are stripped; tableau regression present."
+    }
+  ]
+}

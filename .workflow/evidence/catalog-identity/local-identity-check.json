@@ -1,0 +1,28 @@
+{
+  "source_jpg_byte_identical": true,
+  "source_sha256": "b2a8d3d3a7e757fc106b85e1ba7dfd7c7529957b1e58d7ed6e403c6e329c2867",
+  "libraries": 455,
+  "players": {
+    "SINE": 20,
+    "Kontakt": 422,
+    "Spectrasonics": 3,
+    "Decent Sampler": 3,
+    "Soundpaint": 7
+  },
+  "instrument_labels": 9871,
+  "duration_seconds": 5.9515169858932495,
+  "issues": {
+    "Kontakt manifest could not be identified": 1,
+    "Library entry or depth limit reached; scan is incomplete": 1
+  },
+  "queries": {
+    "accordion": 4,
+    "banjo": 5
+  },
+  "limits": [
+    "Read-only installed metadata check",
+    "Counts include inferred instrument groups, not only verified products",
+    "Partial root budget and one unparsed manifest",
+    "No usage-history conclusion"
+  ]
+}

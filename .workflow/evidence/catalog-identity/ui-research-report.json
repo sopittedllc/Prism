@@ -1,0 +1,123 @@
+{
+  "task_id": "catalog-identity",
+  "status": "researched",
+  "research_date": "2026-09-24",
+  "official_sources": [
+    "https://developer.apple.com/design/human-interface-guidelines/onboarding?changes=_7",
+    "https://developer.apple.com/design/human-interface-guidelines/sidebars?changes=_11",
+    "https://developer.apple.com/design/human-interface-guidelines/lists-and-tables?changes=_5",
+    "https://developer.apple.com/design/human-interface-guidelines/accessibility?changes=latest_maj_6_3&language=objc",
+    "https://developer.apple.com/design/human-interface-guidelines/keyboards",
+    "https://developer.apple.com/design/human-interface-guidelines/color?changes=_5_2",
+    "https://developer.apple.com/design/human-interface-guidelines/app-icons?country=63",
+    "https://developer.apple.com/documentation/foundation/filemanager/trashitem(at:resultingitemurl:)",
+    "https://developer.apple.com/design/human-interface-guidelines/alerts",
+    "https://support.apple.com/en-mz/guide/mac-help/mchlp1093/mac",
+    "https://support.apple.com/en-gb/109315",
+    "https://help.ableton.com/hc/en-us/articles/209068929-Using-AU-and-VST-plug-ins-on-macOS",
+    "https://orchestraltools.helpscoutdocs.com/article/329-installing-instruments-on-offline-systems",
+    "https://support.native-instruments.com/support/solutions/articles/69000879770-can-i-change-the-folder-structure-of-my-kontakt-based-library-",
+    "https://soundpaint.com/a/faqs"
+  ],
+  "source_limitations": "Some canonical Apple HIG URLs returned JavaScript shells. Full indexed official page text was read using changes query variants. Comparable workflows were inspected through official documentation, not independently run. Success and failure assessments below are design inferences, not usability study outcomes.",
+  "local_evidence": [
+    "CatalogWindow.swift: title, subtitle, actions, category segmented control, search/sort, status and count form seven stacked rows above results; fixed 150pt bottom details uses unstructured NSTextView copy.",
+    "CatalogModel.swift: plugins enabled by default; roots configured by kind; session-only state; background scan; exact-path sample reference matching; plugin/library reference matching unavailable.",
+    "Projector/Views/FileManager/FileManagerView.swift: compact headerBar, divider and content area; contextual suggestion only when applicable.",
+    "Projector/Utilities/LayoutConstants.swift: reusable 4/8/12/16/20/24pt spacing family and shared 8pt panel radius.",
+    "User feedback: UI requires major improvement; guided effective setup wanted; supplied icon is not visibly used. Treat visible brand identity as an explicit requirement."
+  ],
+  "comparable_cases": [
+    {
+      "name": "Finder Trash",
+      "user_context": "Mac file management",
+      "task": "Remove and recover selected files",
+      "pattern": "Explicit selections and Trash restoration",
+      "success": "Recoverability familiar to Mac users",
+      "failure": "Permanent deletion not reversible; permissions can fail",
+      "transferability": "Use OS Trash only, return per-installation errors, exact path review"
+    },
+    {
+      "name": "Logic Audio Units management",
+      "user_context": "Mac musicians troubleshooting formats",
+      "task": "Remove or disable installed Audio Units",
+      "pattern": "Format-specific installed file management",
+      "success": "Removes intended installed format without discovering arbitrary auxiliary content",
+      "failure": "Project dependencies can break",
+      "transferability": "List AU alongside other formats; caution about project load dependencies"
+    },
+    {
+      "name": "Ableton AU/VST format installation",
+      "user_context": "DAW users with parallel formats",
+      "task": "Understand installed AU,VST2,VST3 formats",
+      "pattern": "Distinct formats and standard filesystem locations",
+      "success": "Clarifies format identity and scope",
+      "failure": "Different formats are not guaranteed interchangeable project dependencies",
+      "transferability": "Group for browsing only; enumerate exact installations for removal"
+    }
+  ],
+  "synthesis": {
+    "requirements": [
+      "Apple guidance: keep onboarding brief, interactive, optional and available later; defer nonessential customization.",
+      "Apple guidance: use descriptive table headings, succinct content, readable truncation, sorting and column resizing where useful.",
+      "Apple guidance: preserve keyboard conventions, provide text or symbols alongside status colors, and support semantic colors across appearances.",
+      "Product contract: supplied icon is visible; preserve source artwork; reviewed recoverable removal and no unimplemented last-used claims."
+    ],
+    "recurring_patterns": [
+      "Persistent orientation with collection navigation beside task content.",
+      "Explicit source selection followed by scanning and results.",
+      "Concise lists expose detail on selection instead of displaying explanatory transcripts everywhere."
+    ],
+    "project_inferences": [
+      "Use a compact sidebar with Simplify mark/title, Plugins/Samples/Libraries with counts, and a Sources/Setup entry. The list should dominate window area.",
+      "Use one compact collection heading and command row: search, sort or sortable headers, Scan. Move source toggles into setup/source management.",
+      "Replace bottom debug-like detail text with an inspector organized as name, kind/format, location, size, project evidence. At narrow widths collapse inspector into an accessible disclosure or sheet.",
+      "Keep a single compact coverage status with a details affordance. Show project evidence column for samples; avoid a whole plugin/library column of Not available.",
+      "Show the supplied app artwork in welcome and modest sidebar branding, and verify bundle Dock/Finder identity separately.",
+      "Four short setup steps are a safe reversible default: Welcome; Sources; Projects; Ready. Sources keeps standard plugin scanning enabled and offers optional sample/library roots. Projects explains saved inclusion, supports optional project folders, and never implies all DAWs are decoded.",
+      "Plain examples: Samples means loose audio files including locally downloaded Splice; Libraries means folders containing Kontakt, SINE, Soundpaint and similar instruments. These examples do not claim automatic vendor classification.",
+      "Allow Skip setup and Back without discarding chosen roots. Ready summarizes scope and starts the real scan. Reopen setup from the app. Do not add account sign-in, arbitrary DAW checklists, donation prompts or a web metadata promise to initial setup."
+    ],
+    "hypotheses": [
+      "A 180-210pt sidebar and 260-300pt optional inspector at typical desktop widths give the list enough room while improving orientation.",
+      "Users can complete optional folder setup in under two minutes if paths are known; must be assessed with representative people, not inferred from automation.",
+      "Persisting chosen roots and completion will materially improve onboarding; if implemented, schema/privacy/reset/error recovery require explicit state policies. Otherwise session-only lifetime must remain clearly stated."
+    ]
+  },
+  "semantic_inventory": {
+    "included": [
+      "App identity",
+      "Main collection navigation",
+      "Table headers and cells",
+      "Search/sort/scan actions",
+      "Empty/no-match/loading states",
+      "Selection inspector",
+      "Source picker and root removal",
+      "Coverage/errors",
+      "Onboarding welcome/sources/projects/review",
+      "Keyboard/menu routes",
+      "Product grouping and reviewed per-format Trash"
+    ],
+    "excluded": [
+      "Scanner semantics",
+      "Playback tracking",
+      "Metadata tagging",
+      "Automatic recurring scans",
+      "Donation payment flow",
+      "Projector source changes"
+    ]
+  },
+  "interaction_contract": {
+    "welcome": "Get started primary; Skip setup secondary; exact artwork visible; say collection organization in plain language.",
+    "sources": "Standard plugins enabled by default; Samples and Libraries each have purpose, selected folder count and Choose folders; all optional; picker cancellation preserves state.",
+    "projects": "Optional Choose folders; explain inclusion in saved projects, not playback; supported coverage is partial; project root already supplied should be visible and retained.",
+    "ready": "Summary of included sources; Back/Edit retained; Scan now primary; no promises about scan duration or complete DAW matching.",
+    "scanning": "Progress indicator and current state; prevent duplicate scans and conflicting root changes; retain previous results when rescanning.",
+    "failure_recovery": "Unreadable or disconnected roots stay visible with readable issues and a choose/remove-from-scan action; removing scope never removes files.",
+    "focus": "Stable tab sequence; initial focus to primary setup action; Back and Next have labels; Escape can leave optional setup; returning from picker restores initiating focus; Cmd-F search and Cmd-R scan remain conventional.",
+    "responsive": "Validate 1120x760 and 960x680. Main list gets flexible space; inspector text scrolls; folder paths truncate centrally with full tooltip/accessibility value; no horizontal clipping of setup actions.",
+    "accessibility": "Native labeled controls and table semantics; headings grouped; icon decorative when adjacent to Simplify name; no color-only statuses; selection focus visible; full keyboard and VoiceOver evaluation reported separately from label assertions."
+  },
+  "decision": "Exact supplied JPG; name/last-used plugin rows with unknown history explicit; manifest/catalog identified libraries and instrument keyword search; source and coverage details remain accessible.",
+  "validation": "46 Swift tests, read-only local installed metadata check, final native smoke including two-column plugin and Accordion search, independent source/visual review."
+}

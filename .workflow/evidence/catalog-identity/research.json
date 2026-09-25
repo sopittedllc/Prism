@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "catalog-identity",
+  "gate": "research",
+  "status": "passed",
+  "revision": "content:25deaa711e6c5e71edf5ca63150c2dcf670e8105c5184bd1280cf67c317d736e",
+  "timestamp": "2026-09-25T21:28:12.972633+00:00",
+  "producer": "researcher",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "research-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/catalog-identity/ui-research-report.json",
+        "sha256": "4d344dcc8ae7cda918d8892e6b356f5efe13922f34c64d0e34b2cb1669f8fadc"
+      }
+    }
+  ]
+}

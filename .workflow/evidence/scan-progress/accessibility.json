@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "scan-progress",
+  "gate": "accessibility",
+  "status": "passed",
+  "revision": "content:e2744b65b627ba2bd2e085a99d29d10b7ee07b6f46ece909ba288443c6ea38ad",
+  "timestamp": "2026-09-25T18:05:39.362301+00:00",
+  "producer": "codex-report-backed-validation",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "accessibility-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/scan-progress/code-review-report.json",
+        "sha256": "9b51a156511700940952ef5955418d6dfdb60ba21ccaac9eeea7cdbb3afb1540"
+      }
+    }
+  ]
+}

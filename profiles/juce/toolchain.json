@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "ci_checks": ["state-coverage", "configure-debug", "build-debug", "unit-tests"],
+  "checks": {
+    "configure-debug": {"argv": ["cmake", "-S", ".", "-B", "build", "-DCMAKE_BUILD_TYPE=Debug"], "timeout_seconds": 600},
+    "build-debug": {"argv": ["cmake", "--build", "build", "--config", "Debug", "--parallel"], "timeout_seconds": 1800},
+    "unit-tests": {"argv": ["ctest", "--test-dir", "build", "--build-config", "Debug", "--output-on-failure"], "timeout_seconds": 1800},
+    "build-release": {"argv": ["cmake", "--build", "build", "--config", "Release", "--parallel"], "timeout_seconds": 1800},
+    "plugin-validation": {"argv": [], "timeout_seconds": 1800},
+    "host-smoke": {"argv": [], "timeout_seconds": 1800},
+    "realtime-allocation-check": {"argv": [], "timeout_seconds": 1800},
+    "sanitizers": {"argv": [], "timeout_seconds": 1800},
+    "ui-structural-tests": {"argv": [], "timeout_seconds": 1200},
+    "accessibility-tests": {"argv": [], "timeout_seconds": 1800},
+    "visual-regression": {"argv": [], "timeout_seconds": 1800},
+    "editor-host-matrix": {"argv": [], "timeout_seconds": 3600},
+    "state-coverage": {"argv": ["python3", "scripts/feature_coverage.py", "validate"], "timeout_seconds": 60},
+    "state-registry-contract": {"argv": [], "timeout_seconds": 600},
+    "preset-roundtrip": {"argv": [], "timeout_seconds": 1200},
+    "preset-migration": {"argv": [], "timeout_seconds": 1200}
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "catalog-browser",
+  "gate": "runtime_tests",
+  "status": "passed",
+  "revision": "content:f3fab40a433cd4a4284cc4224ada9c099450c72c36dfa78997020903271efbca",
+  "timestamp": "2026-09-24T23:42:04.778819+00:00",
+  "producer": "codex-report-backed-validation",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "runtime_tests-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/catalog-browser/native-runtime-report.json",
+        "sha256": "598fc37283d2a42616f722aed26984593b43ca2c9cdccdf93da69173e35ea502"
+      }
+    }
+  ]
+}

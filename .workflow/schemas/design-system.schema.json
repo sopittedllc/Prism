@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["version", "status", "foundations", "components", "patterns", "exceptions"],
+  "properties": {
+    "version": {"type": "integer", "minimum": 1},
+    "status": {"enum": ["proposed", "validated"]},
+    "foundations": {"type": "object"},
+    "components": {
+      "type": "array",
+      "items": {"type": "object", "required": ["semantic_role", "authority", "states", "examples", "tests"]}
+    },
+    "patterns": {"type": "array"},
+    "exceptions": {
+      "type": "array",
+      "items": {"type": "object", "required": ["exception", "reason", "removal_condition"]}
+    }
+  }
+}

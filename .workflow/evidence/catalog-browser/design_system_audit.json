@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "catalog-browser",
+  "gate": "design_system_audit",
+  "status": "passed",
+  "revision": "content:f3fab40a433cd4a4284cc4224ada9c099450c72c36dfa78997020903271efbca",
+  "timestamp": "2026-09-24T23:42:04.897306+00:00",
+  "producer": "codex-report-backed-validation",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "design_system_audit-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/catalog-browser/systemic-impact.json",
+        "sha256": "07ed97b7e075ee105dfe8e6d929e396e8a9daec832dbdc7ebe394109d8a62f95"
+      }
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+{
+  "status": "passed",
+  "acting_client": "codex",
+  "role": "independent-reviewer",
+  "reviewed_at": "2026-09-25T21:24:47.108838+00:00",
+  "scope": [
+    "LibraryDiscovery.swift",
+    "LibraryMetadata.swift",
+    "Scanner.swift",
+    "PluginProduct.swift",
+    "CatalogModel.swift",
+    "ProjectReader.swift Ableton descriptor extraction",
+    "scripts/prepare_icon.swift"
+  ],
+  "findings": [],
+  "observations": [
+    "SINE now requires both regular non-symlink physical metadata and matching sample archive within selected scope.",
+    "SQLite path-reopen race is explicitly documented in the plan; no adversarial atomic boundary is claimed.",
+    "Current nested-depth test cannot exercise repeated append because its parent traversal never reaches the instrument. A same-owner manifest visited from both overlapping roots would more directly verify deduplication.",
+    "Native runtime and visual checks remain separate."
+  ],
+  "limitations": [
+    "Source re-review passed; coordinator owns test execution. No independent test rerun.",
+    "No native runtime or JPG visual verdict in this source review.",
+    "No holdout access.",
+    "Mandatory full DAW/instrument usage support remains outside implemented adapter coverage."
+  ],
+  "previous_findings": [
+    {
+      "id": "R1",
+      "severity": "high",
+      "file": "Sources/SimplifyCore/LibraryDiscovery.swift",
+      "line": 25,
+      "finding": "Visited paths are inserted before depth/budget admission and shared across explicit roots. A parent scan that reaches a selected nested root beyond the depth cap poisons that root; its later explicit depth-zero scan returns immediately. Even successful shallow traversal prevents the deeper coverage authorized by the nested root.",
+      "repair": "Track traversal context/depth or restart visited state for each explicit root, ensuring inherited ownership and instrument deduplication remain correct. Add parent-plus-nested-root depth-limit regression."
+    },
+    {
+      "id": "R2",
+      "severity": "medium",
+      "file": "Sources/SimplifyCore/LibraryDiscovery.swift",
+      "line": 31,
+      "finding": "Missing/unavailable library roots and failed directory enumeration silently return. The user gets no matching items with zero issues rather than incomplete discovery. The enumerator also has no errorHandler for traversal failures.",
+      "repair": "Report unavailable/unsafe/non-directory roots and enumerator errors as ScanIssue; preserve partial results. Test missing root and inaccessible enumeration."
+    },
+    {
+      "id": "R3",
+      "severity": "high",
+      "file": "Sources/SimplifyCore/LibraryMetadata.swift",
+      "line": 67,
+      "finding": "SQLite opens a path without validating a regular file through a nonblocking descriptor boundary. A FIFO at the catalog location can block before busy timeout/progress-handler installation. Kontakt line37 also reintroduces check-then-blocking-open instead of the existing bounded nonblocking reader boundary.",
+      "repair": "Reject nonregular files without blocking and guard identity at open; keep NICNT prefix-read semantics using a descriptor-based nonblocking/no-follow reader. Add FIFO regressions for both entry points."
+    },
+    {
+      "id": "R4",
+      "severity": "medium",
+      "file": "Sources/SimplifyCore/LibraryMetadata.swift",
+      "line": 89,
+      "finding": "SQLite query row/VM limits do not bound individual text values. sqlite3_column_text and String(cString:) can materialize huge metadata cells and retain them across many collections, bypassing the documented metadata byte boundary.",
+      "repair": "Set an appropriate SQLite SQLITE_LIMIT_LENGTH before preparing the query, enforce per-value/aggregate metadata budgets, and report partial-read issues. Add oversized-cell fixture."
+    },
+    {
+      "id": "R5",
+      "severity": "medium",
+      "file": "Sources/SimplifyCore/LibraryDiscovery.swift",
+      "line": 20,
+      "finding": "Per-root visited reset repairs depth recovery but re-appends instruments to existing library assets. With roots /Root and /Root/Library containing X.nicnt and Banjo.nki, the same instrument is appended twice. Overlap can exhaust the 2,000 instrument limit with duplicates and omit real instruments.",
+      "repair": "Deduplicate instrument paths per owner before applying the cap; add overlapping roots with a shared NICNT owner regression."
+    }
+  ],
+  "resolved": [
+    "R1 depth recovery now works through per-root visited reset; follow-on duplicate issue R5 remains.",
+    "R2 unavailable roots and enumerator errors now produce issues.",
+    "R3 NICNT uses nonblocking descriptor validation; static SQLite FIFOs rejected by BoundedFile preflight and symlinks rejected by OPEN_NOFOLLOW.",
+    "R4 SQLite length and aggregate byte limits now enforced.",
+    "Premature discoveryComplete removed, SINE sample-root precedence added, SINE truncation issue added.",
+    "R5 per-owner instrument-path set deduplicates repeated traversal before output cap."
+  ]
+}

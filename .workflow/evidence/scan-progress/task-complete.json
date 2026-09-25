@@ -1,0 +1,138 @@
+{
+  "schema_version": 1,
+  "task_id": "scan-progress",
+  "title": "Live scan progress and restored logo",
+  "risk_tier": 2,
+  "state": "complete",
+  "base_revision": "content:50eb72739507be76b3d1dadcc15a70ac1511338c156f9e90acb9d62601e09a35",
+  "domains": [
+    "ui-ux"
+  ],
+  "product_decisions_needed": [],
+  "acceptance_criteria": [
+    {
+      "id": "AC1",
+      "statement": "Bounded scanner behavior retained with truthful phase progress",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/scan-progress/delivery-report.json",
+        ".workflow/evidence/scan-progress/automated_tests.json",
+        ".workflow/evidence/scan-progress/native-runtime-report.json",
+        ".workflow/evidence/scan-progress/code-review-report.json"
+      ]
+    },
+    {
+      "id": "AC2",
+      "statement": "Responsive native progress/count/current item/elapsed UI",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/scan-progress/delivery-report.json",
+        ".workflow/evidence/scan-progress/automated_tests.json",
+        ".workflow/evidence/scan-progress/native-runtime-report.json",
+        ".workflow/evidence/scan-progress/code-review-report.json"
+      ]
+    },
+    {
+      "id": "AC3",
+      "statement": "Verified runtime and review, supplied alpha logo retained",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/scan-progress/delivery-report.json",
+        ".workflow/evidence/scan-progress/automated_tests.json",
+        ".workflow/evidence/scan-progress/native-runtime-report.json",
+        ".workflow/evidence/scan-progress/code-review-report.json"
+      ]
+    }
+  ],
+  "gates": {
+    "research": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/scan-progress/research.json"
+      ],
+      "revision": "content:e2744b65b627ba2bd2e085a99d29d10b7ee07b6f46ece909ba288443c6ea38ad",
+      "agent": "codex-report-backed-validation"
+    },
+    "plan_review": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/scan-progress/plan_review.json"
+      ],
+      "revision": "content:e2744b65b627ba2bd2e085a99d29d10b7ee07b6f46ece909ba288443c6ea38ad",
+      "agent": "codex-report-backed-validation"
+    },
+    "implementation": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/scan-progress/implementation.json"
+      ],
+      "revision": "content:e2744b65b627ba2bd2e085a99d29d10b7ee07b6f46ece909ba288443c6ea38ad",
+      "agent": "codex-report-backed-validation"
+    },
+    "automated_tests": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/scan-progress/automated_tests.json"
+      ],
+      "revision": "content:e2744b65b627ba2bd2e085a99d29d10b7ee07b6f46ece909ba288443c6ea38ad",
+      "agent": "scripts/run_check.py"
+    },
+    "code_review": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/scan-progress/code_review.json"
+      ],
+      "revision": "content:e2744b65b627ba2bd2e085a99d29d10b7ee07b6f46ece909ba288443c6ea38ad",
+      "agent": "codex-report-backed-validation"
+    },
+    "runtime_tests": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/scan-progress/runtime_tests.json"
+      ],
+      "revision": "content:e2744b65b627ba2bd2e085a99d29d10b7ee07b6f46ece909ba288443c6ea38ad",
+      "agent": "codex-report-backed-validation"
+    },
+    "ui_research": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/scan-progress/ui_research.json"
+      ],
+      "revision": "content:e2744b65b627ba2bd2e085a99d29d10b7ee07b6f46ece909ba288443c6ea38ad",
+      "agent": "codex-report-backed-validation"
+    },
+    "design_system_audit": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/scan-progress/design_system_audit.json"
+      ],
+      "revision": "content:e2744b65b627ba2bd2e085a99d29d10b7ee07b6f46ece909ba288443c6ea38ad",
+      "agent": "codex-report-backed-validation"
+    },
+    "accessibility": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/scan-progress/accessibility.json"
+      ],
+      "revision": "content:e2744b65b627ba2bd2e085a99d29d10b7ee07b6f46ece909ba288443c6ea38ad",
+      "agent": "codex-report-backed-validation"
+    },
+    "visual_regression": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/scan-progress/visual_regression.json"
+      ],
+      "revision": "content:e2744b65b627ba2bd2e085a99d29d10b7ee07b6f46ece909ba288443c6ea38ad",
+      "agent": "codex-report-backed-validation"
+    },
+    "ux_review": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/scan-progress/ux_review.json"
+      ],
+      "revision": "content:e2744b65b627ba2bd2e085a99d29d10b7ee07b6f46ece909ba288443c6ea38ad",
+      "agent": "codex-report-backed-validation"
+    }
+  },
+  "current_revision": "content:e2744b65b627ba2bd2e085a99d29d10b7ee07b6f46ece909ba288443c6ea38ad"
+}

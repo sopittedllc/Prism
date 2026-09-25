@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "plugin-products",
+  "gate": "design_system_audit",
+  "status": "passed",
+  "revision": "content:2a5e5d3e8b8442a82e2a9d5d215654123e77234f1ef0cf48afd7e77170827bc1",
+  "timestamp": "2026-09-25T19:10:35.655165+00:00",
+  "producer": "ux-reviewer",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "design_system_audit-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/plugin-products/systemic-impact-report.json",
+        "sha256": "d178cb996e996992b1e9edcbbe526c4601c31aa501495608d247c777f9173469"
+      }
+    }
+  ]
+}

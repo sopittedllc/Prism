@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "catalog-identity",
+  "gate": "ux_review",
+  "status": "passed",
+  "revision": "content:25deaa711e6c5e71edf5ca63150c2dcf670e8105c5184bd1280cf67c317d736e",
+  "timestamp": "2026-09-25T21:28:13.499230+00:00",
+  "producer": "ux-reviewer",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "ux_review-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/catalog-identity/native-ui-review-report.json",
+        "sha256": "fac409f76fe0b37b402b3baf4fc103f0a372df37548fc64f947ba22f2b97e83f"
+      }
+    }
+  ]
+}

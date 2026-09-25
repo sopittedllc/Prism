@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "ci_checks": [],
+  "checks": {
+    "configure": {"argv": [], "timeout_seconds": 600},
+    "build-debug": {"argv": [], "timeout_seconds": 1200},
+    "build-release": {"argv": [], "timeout_seconds": 1800},
+    "unit-tests": {"argv": [], "timeout_seconds": 1200},
+    "integration-tests": {"argv": [], "timeout_seconds": 1800},
+    "static-analysis": {"argv": [], "timeout_seconds": 1200},
+    "format-check": {"argv": [], "timeout_seconds": 600},
+    "package": {"argv": [], "timeout_seconds": 1800},
+    "state-coverage": {"argv": ["python3", "scripts/feature_coverage.py", "validate"], "timeout_seconds": 60},
+    "state-registry-contract": {"argv": [], "timeout_seconds": 600},
+    "preset-roundtrip": {"argv": [], "timeout_seconds": 1200},
+    "preset-migration": {"argv": [], "timeout_seconds": 1200}
+  }
+}

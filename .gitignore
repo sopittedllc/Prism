@@ -1,0 +1,41 @@
+# Build output
+.build/
+.swiftpm/
+build/
+Builds/
+cmake-build-*/
+out/
+dist/
+
+# Dependencies and generated IDE state
+.cache/
+.vscode/
+.idea/
+*.user
+*.suo
+*.xcuserstate
+xcuserdata/
+
+# OS/editor
+.DS_Store
+*~
+*.swp
+__pycache__/
+*.pyc
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+credentials.*
+*.key
+*.pem
+.claude/settings.local.json
+.codex/config.local.toml
+
+# Logs and captures
+*.log
+captures/
+
+# Active work belongs in Git; ephemeral scratch does not
+.work/scratch/

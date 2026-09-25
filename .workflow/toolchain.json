@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "ci_checks": [
+    "build-debug",
+    "unit-tests",
+    "integration-tests",
+    "template-integrity",
+    "adapter-integrity",
+    "catalog-state"
+  ],
+  "checks": {
+    "build-debug": {
+      "argv": [
+        "swift",
+        "build"
+      ],
+      "timeout_seconds": 600
+    },
+    "build-release": {
+      "argv": [
+        "swift",
+        "build",
+        "-c",
+        "release"
+      ],
+      "timeout_seconds": 600
+    },
+    "unit-tests": {
+      "argv": [
+        "swift",
+        "test"
+      ],
+      "timeout_seconds": 600
+    },
+    "integration-tests": {
+      "argv": [
+        "python3",
+        "scripts/probe_smoke.py"
+      ],
+      "timeout_seconds": 600
+    },
+    "template-integrity": {
+      "argv": [
+        "python3",
+        "scripts/template_self_test.py"
+      ],
+      "timeout_seconds": 600
+    },
+    "adapter-integrity": {
+      "argv": [
+        "python3",
+        "scripts/sync_agent_adapters.py",
+        "--check"
+      ],
+      "timeout_seconds": 600
+    },
+    "runtime-tests": {
+      "argv": [
+        "python3",
+        "scripts/probe_runtime.py"
+      ],
+      "timeout_seconds": 600
+    },
+    "catalog-state": {
+      "argv": [
+        "python3",
+        "scripts/catalog_state_check.py"
+      ],
+      "timeout_seconds": 60
+    },
+    "app-package": {
+      "argv": [
+        "python3",
+        "scripts/build_app.py"
+      ],
+      "timeout_seconds": 60
+    },
+    "catalog-runtime": {
+      "argv": [
+        "build/Simplify.app/Contents/MacOS/Simplify",
+        "--ui-smoke",
+        "captures/catalog"
+      ],
+      "timeout_seconds": 180
+    }
+  }
+}

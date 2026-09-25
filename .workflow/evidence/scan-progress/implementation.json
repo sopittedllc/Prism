@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "scan-progress",
+  "gate": "implementation",
+  "status": "passed",
+  "revision": "content:e2744b65b627ba2bd2e085a99d29d10b7ee07b6f46ece909ba288443c6ea38ad",
+  "timestamp": "2026-09-25T18:05:39.089727+00:00",
+  "producer": "codex-report-backed-validation",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "implementation-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/scan-progress/delivery-report.json",
+        "sha256": "446b5fc3b069cc04eb7392a1c4876b04dba5bfa99046d0a37163d32fc79f0fd6"
+      }
+    }
+  ]
+}

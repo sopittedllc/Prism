@@ -1,0 +1,16 @@
+name: Template integrity
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  integrity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate template and workflow controls
+        run: python3 scripts/template_self_test.py

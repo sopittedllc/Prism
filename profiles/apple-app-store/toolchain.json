@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "ci_checks": [],
+  "checks": {
+    "build-debug": {"argv": [], "timeout_seconds": 1800},
+    "unit-tests": {"argv": [], "timeout_seconds": 1800},
+    "integration-tests": {"argv": [], "timeout_seconds": 2400},
+    "ui-tests": {"argv": [], "timeout_seconds": 3600},
+    "static-analysis": {"argv": [], "timeout_seconds": 1800},
+    "sanitizers": {"argv": [], "timeout_seconds": 3600},
+    "archive-release": {"argv": [], "timeout_seconds": 3600},
+    "archive-inspection": {"argv": [], "timeout_seconds": 1200},
+    "privacy-audit": {"argv": [], "timeout_seconds": 1200},
+    "accessibility-audit": {"argv": [], "timeout_seconds": 1800},
+    "storekit-tests": {"argv": [], "timeout_seconds": 1800},
+    "physical-device-smoke": {"argv": [], "timeout_seconds": 1800},
+    "upload-validation": {"argv": [], "timeout_seconds": 1800},
+    "visual-regression": {"argv": [], "timeout_seconds": 1800},
+    "keyboard-voiceover-flow": {"argv": [], "timeout_seconds": 1800},
+    "localization-matrix": {"argv": [], "timeout_seconds": 1800},
+    "state-coverage": {"argv": ["python3", "scripts/feature_coverage.py", "validate"], "timeout_seconds": 60},
+    "state-registry-contract": {"argv": [], "timeout_seconds": 600},
+    "preset-roundtrip": {"argv": [], "timeout_seconds": 1200},
+    "preset-migration": {"argv": [], "timeout_seconds": 1200}
+  }
+}

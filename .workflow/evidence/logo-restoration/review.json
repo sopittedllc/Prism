@@ -1,0 +1,24 @@
+{
+  "status": "passed",
+  "acting_client": "codex",
+  "role": "independent-reviewer",
+  "scope": [
+    "prepare_icon.swift alpha handling",
+    "build_app.py icon resizing and packaging",
+    "source identity and generated IconMaster visual inspection"
+  ],
+  "findings": [],
+  "evidence": {
+    "source_matches_supplied_png": true,
+    "source_sha256": "c133f98d47f9a2d6576a41f1e92d850c4252fcd89d81791ff2db4cc472775e11",
+    "pipeline": "Original PNG copied to AppMark and downsampled with alpha; original NSImage composited source-over on white Dock tile. No raw RGB reconstruction.",
+    "packaged_appmark_has_alpha": true,
+    "generated_icon_visual": "Ribbed teardrop artwork visible on white rounded tile; previously exposed rectangular hidden RGB pixels absent."
+  },
+  "prior_review_correction": "Previous approval of RGB-only conversion was incorrect. Hidden RGB values in transparent pixels are not visible artwork; matching those values did not establish fidelity. This review supersedes earlier icon-fidelity approval.",
+  "limitations": [
+    "Source and generated-artifact review only",
+    "Restored running-app and Dock smoke verification remains with coordinator; no independent GUI launch in this review",
+    "Fine ribs naturally reduce in visibility at small icon sizes"
+  ]
+}

@@ -1,0 +1,52 @@
+{
+  "status": "passed",
+  "acting_client": "codex",
+  "role": "independent-reviewer",
+  "scope": [
+    "CatalogWindow and SetupWindow AppKit controllers",
+    "SetupStore versioning, read bounds, errors and local persistence",
+    "CatalogModel draft/accept/cancel and background scan lifecycle",
+    "App startup and isolated runtime-smoke configuration",
+    "prepare_icon.swift and build_app.py derived icon packaging"
+  ],
+  "resolved_findings": [
+    {
+      "severity": "P1",
+      "finding": "Setup Data(contentsOf:) could block launch on nonregular files and exceed size precheck",
+      "resolution": "SetupStore now calls shared BoundedFile.read with nonblocking/no-follow open, fstat regular validation, and 1 MiB read cap; FIFO and oversized regression tests present"
+    }
+  ],
+  "remaining_blockers": [],
+  "observations": [
+    "Configuration applies only after successful save, or explicit session-only acceptance",
+    "Dismissed setup draft does not mutate active configuration",
+    "Saved version and types rejected before overwrite; filters and results remain session-only",
+    "Reference wording distinguishes candidates, unsupported coverage, and modification-date proxy",
+    "Derived AppMark visibly matches rendered source RGB; IconMaster composes this art on rounded white tile while preserving source"
+  ],
+  "visual_review": {
+    "status": "passed",
+    "reviewed": [
+      "setup-sounds.png",
+      "setup-ready.png",
+      "sample-reference-dark-compact.png",
+      "setup-welcome.png",
+      "setup-dark.png",
+      "samples-populated.png",
+      "dock.png"
+    ],
+    "observations": "Light and dark setup actions and text are readable; populated catalog retains clear collection/navigation/inspector hierarchy. Corrected supplied black block-and-stem artwork is visible in setup, sidebar, and actual Dock beside Terminal. No blocking clipping or overlap observed."
+  },
+  "limitations": [
+    "Source and provided runtime-artifact review; reviewer did not independently run test suite or interact with app",
+    "Current Mac only; Intel and older macOS not exercised",
+    "VoiceOver human validation and native open-panel interaction not performed",
+    "First visual baseline; no previous image diff",
+    "No .qa-criteria access or product code changes"
+  ],
+  "icon_runtime_review": {
+    "status": "passed",
+    "evidence": "captures/catalog/dock.png",
+    "observation": "Actual macOS Dock shows corrected black artwork on white rounded tile with running indicator."
+  }
+}

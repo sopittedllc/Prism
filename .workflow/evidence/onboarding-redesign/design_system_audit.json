@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "onboarding-redesign",
+  "gate": "design_system_audit",
+  "status": "passed",
+  "revision": "content:50eb72739507be76b3d1dadcc15a70ac1511338c156f9e90acb9d62601e09a35",
+  "timestamp": "2026-09-25T00:04:10.304840+00:00",
+  "producer": "codex-report-backed-validation",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "design_system_audit-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/onboarding-redesign/systemic-impact-report.json",
+        "sha256": "4c915ddcdfeb87f5b575887149caa6b51fa5cab47a4933711fd15eefb7eb7b93"
+      }
+    }
+  ]
+}

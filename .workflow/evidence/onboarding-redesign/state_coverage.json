@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "onboarding-redesign",
+  "gate": "state_coverage",
+  "status": "passed",
+  "revision": "content:50eb72739507be76b3d1dadcc15a70ac1511338c156f9e90acb9d62601e09a35",
+  "timestamp": "2026-09-25T00:04:10.525848+00:00",
+  "producer": "codex-report-backed-validation",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "state_coverage-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/onboarding-redesign/delivery-report.json",
+        "sha256": "3932b8d3160f08d84fe7bb3758f84e830ab09c317640f506034cde37f6ee10ce"
+      }
+    }
+  ]
+}

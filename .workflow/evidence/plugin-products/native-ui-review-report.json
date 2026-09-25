@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "status": "passed",
+  "client": "codex",
+  "role": "independent UX/accessibility/visual reviewer",
+  "scope": "Plugin formats, removal review/result and adjacent multi-folder setup",
+  "method": "Fresh read-only inspection of native source, supplied release-runtime evidence and four current captures",
+  "sources": ["Sources/SimplifyCatalog/PluginFormatsWindow.swift", "Sources/SimplifyCatalog/CatalogWindow.swift", "Sources/SimplifyCatalog/SetupWindow.swift", "Sources/SimplifyCatalog/CatalogModel.swift", "Sources/SimplifyApp/main.swift"],
+  "runtime_evidence": "captures/catalog/runtime.json",
+  "captures_reviewed": ["captures/catalog/plugin-formats-dark.png", "captures/catalog/plugin-removal-review.png", "captures/catalog/plugin-removal-result.png", "captures/catalog/setup-long-folders.png"],
+  "checks": [
+    {"check": "Default Keep", "result": "passed", "evidence": "Every checkbox initializes off; subtitle explicitly states unchecked installations remain; Review selected is disabled with zero selections. Runtime asserts these conditions and the initial capture shows 0 selected / 2 kept."},
+    {"check": "Review before removal and safe keyboard default", "result": "passed", "evidence": "Both selected and all-format actions call the same review stage. NSAlert lists exact format paths, explains project risk and incomplete references; Cancel owns Return while Move to Trash has no key equivalent and is marked destructive."},
+    {"check": "Cancel preserves files", "result": "passed", "evidence": "Only alertSecondButtonReturn reaches trashPlugins. Supplied native smoke cancels the all-formats review and asserts both synthetic installations still exist."},
+    {"check": "Long names and bounded layout", "result": "passed", "evidence": "Formats panel fixes content width at 740 points; title is bounded with a full tooltip; checkbox/path rows compress horizontally. Current long-name capture remains within the parent and keeps footer actions visible. Review paths wrap in a fixed-size selectable scroll area."},
+    {"check": "Padding and hierarchy", "result": "passed", "evidence": "Panel has 24-point outer insets, 16-point major spacing and 14-point installation row spacing. Labels and action controls do not overlap in reviewed captures; installation choice and exact path are visually paired."},
+    {"check": "Removal feedback", "result": "passed", "evidence": "During work selections/Done are disabled. Result capture reports one moved, zero failed, one kept; removed installation is disabled, survivor stays available. Source retains explicit per-path errors in a separate scrollable alert when removal fails."},
+    {"check": "Accessible choice semantics", "result": "passed", "evidence": "Native checkboxes expose Remove plus full format/path labels, avoiding ambiguity between installations. Standard buttons preserve native semantics. Long visible labels have selectable path text and tooltips."},
+    {"check": "Multi-folder setup", "result": "passed", "evidence": "Add folders copy communicates additive selection; NSOpenPanel allowsMultipleSelection. Category counts and ten-row scrollable fixture are visible; full path truncation preserves Remove controls within the 740-point sheet, and edit focus returns to the relevant Add button."},
+    {"check": "Real-target evidence scope", "result": "passed", "evidence": "Supplied runtime reports grouped-format selection, cancel preservation and selective/whole-product Trash operations using synthetic fixtures only. Source verifies the remaining grouped product survives selective removal."}
+  ],
+  "blockers": [],
+  "nonblocking_followups": [
+    "A future explicit Moved to Trash badge per disabled row would distinguish successful removal more clearly than disabled styling alone; current result totals remain clear.",
+    "Consider adding an accessibility label to confirmation and error path text views, and announcing completed removal once, without repeated progress announcements."
+  ],
+  "limits": ["Reviewer did not independently execute destructive actions; supplied runtime used synthetic fixtures only", "No human VoiceOver traversal", "No full keyboard-tab-loop exercise by reviewer", "Native multi-selection open panel was source-inspected rather than driven", "No numeric color-contrast measurement", "Review does not replace filesystem safety/security review"]
+}

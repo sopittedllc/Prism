@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "plugin-products",
+  "gate": "code_review",
+  "status": "passed",
+  "revision": "content:2a5e5d3e8b8442a82e2a9d5d215654123e77234f1ef0cf48afd7e77170827bc1",
+  "timestamp": "2026-09-25T19:10:35.468245+00:00",
+  "producer": "reviewer",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "code_review-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/plugin-products/source-review-report.json",
+        "sha256": "500178859c745c96ef0e2613302da6fb06d0187304e59c5176b0bd53c5d0295d"
+      }
+    }
+  ]
+}

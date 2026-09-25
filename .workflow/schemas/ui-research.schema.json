@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["task_id", "question", "official_sources", "comparable_cases", "synthesis", "decision", "validation"],
+  "properties": {
+    "task_id": {"type": "string"},
+    "question": {"type": "string", "minLength": 5},
+    "official_sources": {"type": "array", "minItems": 1, "items": {"type": "object", "required": ["title", "url", "finding"]}},
+    "comparable_cases": {
+      "type": "array",
+      "minItems": 3,
+      "items": {"type": "object", "required": ["name", "user_context", "task", "pattern", "success", "failure", "transferability"]}
+    },
+    "synthesis": {"type": "object", "required": ["requirements", "recurring_patterns", "project_inferences", "hypotheses"]},
+    "decision": {"type": "string"},
+    "validation": {"type": "array", "minItems": 1}
+  }
+}

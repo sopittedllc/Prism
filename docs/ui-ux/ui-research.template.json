@@ -1,0 +1,15 @@
+{
+  "$schema": "../../.workflow/schemas/ui-research.schema.json",
+  "task_id": "replace-me",
+  "question": "What interaction or design question is unresolved?",
+  "official_sources": [],
+  "comparable_cases": [],
+  "synthesis": {
+    "requirements": [],
+    "recurring_patterns": [],
+    "project_inferences": [],
+    "hypotheses": []
+  },
+  "decision": "",
+  "validation": []
+}

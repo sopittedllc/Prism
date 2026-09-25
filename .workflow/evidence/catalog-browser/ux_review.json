@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "catalog-browser",
+  "gate": "ux_review",
+  "status": "passed",
+  "revision": "content:f3fab40a433cd4a4284cc4224ada9c099450c72c36dfa78997020903271efbca",
+  "timestamp": "2026-09-24T23:42:05.069999+00:00",
+  "producer": "codex-report-backed-validation",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "ux_review-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/catalog-browser/final-review-report.json",
+        "sha256": "7fd69b0b847e88d1f13a61d85f550529092070a0c92738765b09aca9f66e7c69"
+      }
+    }
+  ]
+}

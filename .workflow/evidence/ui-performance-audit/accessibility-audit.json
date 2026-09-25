@@ -1,0 +1,67 @@
+{
+  "schema_version": 1,
+  "role": "accessibility-tester",
+  "client": "codex",
+  "mode": "read-only source and existing capture review",
+  "status": "findings",
+  "evidence_grade": "E1",
+  "limits": ["No fresh runtime interaction or VoiceOver traversal performed by this reviewer", "Existing smoke verifies labels and Command-F, not complete keyboard traversal", "Existing setup captures use fixed 740 by 602 panel; long names and enlarged typography are not covered"],
+  "positive_observations": ["Native search, table, buttons, progress and detail text provide standard AppKit semantics", "Search, sorting, table and inspector have accessibility labels", "Detail text is selectable and vertically scrollable", "Folder selection is discardable until accepted; Back preserves choices", "Elapsed duration and phase text supplement scan animation"],
+  "findings": [
+    {
+      "id": "A11Y-01", "severity": "high",
+      "finding": "First scan blocks access to every discovered item until all project inspection and matching finish; no Stop action exists.",
+      "source": ["Sources/SimplifyCatalog/CatalogModel.swift:89-110", "Sources/SimplifyCatalog/CatalogWindow.swift:151-160"],
+      "root_mechanism": "A single detached operation publishes only its final report; the window disables scan and setup actions and leaves the first catalog empty.",
+      "consumers": ["First scan after onboarding", "Manual rescan", "Offline or slow folder scans"],
+      "governing_fix": "Publish bounded basic inventory batches and enrich references in the background. Provide cooperative Stop with partial-state wording and retain already visible results.",
+      "required_evidence": "Time first visible usable results and search/selection responsiveness on representative large collections; slow-IO test must show usable results or explicit bounded partial state before 60 seconds. Exercise Stop during discovery and detailed work, without stale callbacks replacing the newer state."
+    },
+    {
+      "id": "A11Y-02", "severity": "medium",
+      "finding": "Collection text hugs the top of 38-point rows instead of being vertically centered.",
+      "source": ["Sources/SimplifyCatalog/CatalogWindow.swift:89", "Sources/SimplifyCatalog/CatalogWindow.swift:208-219", "captures/catalog/sample-reference-dark-compact.png"],
+      "root_mechanism": "The table returns a raw label as its cell view; no reusable cell container defines baseline, inset or center alignment.",
+      "consumers": ["Plugin table", "Sample table", "Library table"],
+      "governing_fix": "Use one reusable native table cell wrapper with explicit centerY and horizontal text inset, preserving full accessible value and tooltip.",
+      "required_evidence": "Light and dark minimum-width populated tables with multiword and long names; assert text frame centerY and safe inset relative to row bounds."
+    },
+    {
+      "id": "A11Y-03", "severity": "medium",
+      "finding": "A single selected folder appears at the bottom of a list viewport after an unnecessary blank gap.",
+      "source": ["Sources/SimplifyCatalog/SetupWindow.swift:96-107", "captures/catalog/setup-sounds.png", "captures/catalog/setup-projects.png"],
+      "root_mechanism": "The root list uses a stack as the scroll document without an explicit flipped, minimum-height document layout contract.",
+      "consumers": ["Custom plugin roots", "Sample roots", "Library roots", "Project roots"],
+      "governing_fix": "Give root lists a shared top-aligned document container and predictable row height/inset; keep folder text and Remove within the visible viewport.",
+      "required_evidence": "Capture zero, one and ten roots, long paths and multiple same-basename roots; keyboard traverse and scroll to every Remove control."
+    },
+    {
+      "id": "A11Y-04", "severity": "medium",
+      "finding": "Adding or removing a folder forcibly moves keyboard focus to Continue.",
+      "source": ["Sources/SimplifyCatalog/SetupWindow.swift:83", "Sources/SimplifyCatalog/SetupWindow.swift:110-118"],
+      "root_mechanism": "Every render rebuilds the body then unconditionally makes nextButton first responder, even when staying on the same step.",
+      "consumers": ["Every onboarding folder list", "Manage locations edits"],
+      "governing_fix": "Distinguish step transitions from same-step updates; restore focus to the initiating Add control or adjacent surviving Remove control.",
+      "required_evidence": "Keyboard-only add-return and repeated removal sequences; assert first responder after each rerender. Full tab traversal under keyboard navigation should include list actions and Back/Continue/Skip."
+    },
+    {
+      "id": "A11Y-05", "severity": "medium",
+      "finding": "Unbounded inspector title text sits outside the scroll area and can consume space needed by details/actions for extremely long asset names.",
+      "source": ["Sources/SimplifyCatalog/CatalogWindow.swift:29-30", "Sources/SimplifyCatalog/CatalogWindow.swift:123-126", "Sources/SimplifyCatalog/CatalogWindow.swift:197"],
+      "root_mechanism": "Shared label helper creates wrapping labels, while fixed-width inspector lacks a bounded title line policy and has a required 180-point detail region.",
+      "consumers": ["Selected plugin", "Selected sample", "Selected library"],
+      "governing_fix": "Bound inspector title lines with a complete accessible name and tooltip or put the whole detail composition into one scrollable region.",
+      "required_evidence": "Minimum window with a 255-character filename and long extensionless library name; validate no broken constraints, clipped actions or hidden evidence."
+    },
+    {
+      "id": "A11Y-06", "severity": "medium",
+      "finding": "The existing smoke test is not sufficient evidence for keyboard and screen-reader equivalence.",
+      "source": ["Sources/SimplifyApp/main.swift:158-169", "captures/catalog/runtime.json", "Sources/SimplifyCatalog/CatalogWindow.swift:108", "Sources/SimplifyCatalog/SetupWindow.swift:100"],
+      "root_mechanism": "Tests inspect four labels and Command-F only. Scan status uses a constant accessibility label while changing stringValue, phase announcements are absent, and Remove labels identify only basename.",
+      "consumers": ["Scan progress", "Same-basename folder roots", "Category selection", "Setup tab order"],
+      "governing_fix": "Test full keyboard loop and accessible values/state; expose phase and percentage with restrained phase-transition announcements; disambiguate duplicate folder names by path in accessibility help.",
+      "required_evidence": "Native accessibility property inspection and VoiceOver traversal if available; report limitations explicitly otherwise. Do not claim missing announcements prove VoiceOver failure without runtime exercise."
+    }
+  ],
+  "regression_prevention": ["Shared row and scroll-document components govern all semantic peers", "Capture long-name and many-root cases in both themes at minimum width", "Geometry assertions supplement screenshots", "First-results and input latency budgets complement total scan duration"]
+}

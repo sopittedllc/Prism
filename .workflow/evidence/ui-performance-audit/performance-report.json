@@ -1,0 +1,73 @@
+{
+  "before": {
+    "runs": [
+      {
+        "wallSeconds": 1.08740475,
+        "scannerSeconds": 1.0524370670318604,
+        "assets": 5500,
+        "projects": 12,
+        "issues": 0
+      },
+      {
+        "wallSeconds": 1.0913153750000002,
+        "scannerSeconds": 1.056738018989563,
+        "assets": 5500,
+        "projects": 12,
+        "issues": 0
+      },
+      {
+        "wallSeconds": 1.102557542,
+        "scannerSeconds": 1.0666810274124146,
+        "assets": 5500,
+        "projects": 12,
+        "issues": 0
+      }
+    ],
+    "medianScannerSeconds": 1.056738018989563,
+    "medianWallSeconds": 1.0913153750000002
+  },
+  "after": {
+    "runs": [
+      {
+        "wallSeconds": 0.7846218329999997,
+        "scannerSeconds": 0.7512860298156738,
+        "assets": 5500,
+        "projects": 12,
+        "issues": 0
+      },
+      {
+        "wallSeconds": 0.77589475,
+        "scannerSeconds": 0.7413870096206665,
+        "assets": 5500,
+        "projects": 12,
+        "issues": 0
+      },
+      {
+        "wallSeconds": 0.7652529580000005,
+        "scannerSeconds": 0.7316839694976807,
+        "assets": 5500,
+        "projects": 12,
+        "issues": 0
+      }
+    ],
+    "medianScannerSeconds": 0.7413870096206665,
+    "medianWallSeconds": 0.77589475
+  },
+  "progressive": {
+    "assets": 5500,
+    "basicInventorySeconds": 0.16097009181976318,
+    "durationSeconds": 0.7480469942092896,
+    "firstInventorySeconds": 0.08165299892425537,
+    "issues": 0,
+    "projects": 12
+  },
+  "installedPlugins": {
+    "assets": 3065,
+    "basicInventorySeconds": 0.12709403038024902,
+    "durationSeconds": 0.5324950218200684,
+    "firstInventorySeconds": 0.07234597206115723,
+    "issues": 2,
+    "projects": 0
+  },
+  "fixture": "5000 samples, 500 plugin bundles, 12 RPP files each 100000 opaque lines; warm local disk; three sequential runs per release binary"
+}

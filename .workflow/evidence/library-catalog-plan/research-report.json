@@ -1,0 +1,27 @@
+{
+  "task": "library-catalog-plan",
+  "deliverable": "Research and implementation plan only; no app behavior changes",
+  "sources": [
+    "https://docs.native-instruments.com/ni-tech-manuals/kontakt-manual/en/browser-and-presets",
+    "https://orchestraltools.helpscoutdocs.com/article/372-metropolis-ark-2-notes",
+    "https://support.splice.com/en/articles/8652594-finding-sounds",
+    "https://www.pluginstation.app/",
+    "https://github.com/julianworden/PluginStation",
+    "https://developer.apple.com/documentation/coreservices/kmditemlastuseddate",
+    "https://helpcenter.steinberg.de/hc/en-us/articles/32371744743826-Usage-Logging"
+  ],
+  "findings": [
+    "Hierarchy and logical identity must precede presentation changes",
+    "Library footprint must follow unique physical membership",
+    "First-seen baseline is not install time",
+    "User overrides must suppress regenerated/inherited tags",
+    "PluginStation last-used implementation not verified in available public text",
+    "Spotlight last-used reflects LaunchServices opens, not documented universal DAW loading"
+  ],
+  "limitations": [
+    "Public FAQ contents partly collapsed in available text",
+    "No hands-on competitor usage-tracker validation",
+    "No new controlled DAW sessions created in this planning pass",
+    "Independent Codex plan critique; alternate client unavailable"
+  ]
+}

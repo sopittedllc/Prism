@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["version", "required_concerns", "allowed_decisions", "exclusion_requires_reason", "stable_ids_required"],
+  "properties": {
+    "version": {"type": "integer", "minimum": 1},
+    "required_concerns": {"type": "array", "minItems": 1, "items": {"type": "string"}, "uniqueItems": true},
+    "allowed_decisions": {"type": "array", "minItems": 1, "items": {"type": "string"}, "uniqueItems": true},
+    "exclusion_requires_reason": {"type": "boolean"},
+    "stable_ids_required": {"type": "boolean"},
+    "preset_unknown_field_policy_required": {"type": "boolean"},
+    "released_fixture_per_schema_version": {"type": "boolean"}
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "symptom": "Long scans expose no intermediate progress",
+  "semantic_role": "Scan lifecycle feedback",
+  "authority": "Scanner progress contract and CatalogWindow progress banner",
+  "searches": [
+    "All scan entry points: button and onboarding",
+    "Core traversal/metadata/matching loops",
+    "Model completion and view reload path"
+  ],
+  "included_consumers": [
+    "First scan",
+    "Rescan",
+    "All collection categories",
+    "Onboarding completion scan"
+  ],
+  "excluded_consumers": [
+    "CLI progress presentation; JSON report unchanged",
+    "Cancellation and background service",
+    "User settings/persistence; progress is derived"
+  ],
+  "system_changes": [
+    "Single bounded discovery pass queues candidate work",
+    "Unknown-total counts followed by named stage percentages",
+    "Throttled Sendable events and separate main-actor progress UI",
+    "Elapsed timer and selected item context"
+  ],
+  "representative_tests": [
+    "31 Swift tests passed incl two progress invariant tests",
+    "Native scan capture with3000samples and12large synthetic projects",
+    "Regressions: search/category/selection/setup/coverage"
+  ],
+  "regression_prevention": [
+    "No fabricated discovery denominator",
+    "Completion preserves truncation/unavailable issues",
+    "Token and sequence reject stale/out-of-order UI updates",
+    "Progress rendering does not sort/reload catalog"
+  ]
+}

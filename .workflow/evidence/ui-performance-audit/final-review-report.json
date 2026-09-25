@@ -1,0 +1,36 @@
+{
+  "status": "passed",
+  "acting_client": "codex",
+  "role": "independent-reviewer",
+  "scope": [
+    "Final source constraint activation and progressive inventory changes",
+    "Native release smoke runtime.json",
+    "Requested five final visual captures"
+  ],
+  "verified": [
+    "Width constraints now activate only after views share ancestor; previous setup transition crash source fixed",
+    "Reading-progress shows3000 browseable rows and explicit pending reference state during53percent project reading; fill agrees numerically",
+    "Padded centered cells and bounded inspector heading appear correctly in compact and long-plugin captures",
+    "Save error remains visible with session-only recovery and navigation controls",
+    "Original alpha logo retained; no RGB reconstruction",
+    "Long folders truncate within bounded740point setup sheet; Remove and navigation remain visible",
+    "Sidebar controls explicitly enabled with semantic label tint and native smoke assertion"
+  ],
+  "limitations": [
+    "Coordinator reports32 tests and final release native smoke passing; reviewer inspected source and artifacts without independently executing them",
+    "Current Mac only; manual VoiceOver and native open-panel interaction not performed",
+    "No universal scan-time guarantee for stalled external/network storage"
+  ],
+  "resolved_findings": [
+    {
+      "severity": "P2",
+      "file": "Sources/SimplifyCatalog/SetupWindow.swift",
+      "line": 103,
+      "title": "Long root paths enlarge setup sheet beyond parent window",
+      "evidence": "captures/catalog/setup-long-folders.png shows setup sheet spanning entire capture, substantially wider than its parent, unlike normal740pt sheet. Paths are allowed to drive fitting width despite middle truncation.",
+      "repair": "Bound sheet/content width and lower path-field horizontal compression resistance while retaining Remove button width; assert long-folder sheet width remains bounded and rerun capture.",
+      "resolution": "Setup content constrained to740points; root path compression lowered and Remove width protected. Fresh setup-long-folders capture remains within parent; native smoke asserts width<=741."
+    }
+  ],
+  "findings": []
+}

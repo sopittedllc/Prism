@@ -1,0 +1,42 @@
+{
+  "symptom": "Table/sidebar padding, bottom-aligned folders, style carryover, long-path overflow and all-or-nothing inventory",
+  "semantic_role": "Collection text geometry and progressive discovery",
+  "authority": "CatalogTheme shared cells/navigation/track; SetupWindow folder component; Scanner/CatalogModel inventory boundary",
+  "searches": [
+    "All table viewFor consumers and sidebar cells",
+    "All setup folder lists/card widths/focus paths",
+    "Inventory construction, scan progress, model sort and inclusion lookups"
+  ],
+  "included_consumers": [
+    "Plugins",
+    "Samples",
+    "Libraries",
+    "All four setup steps",
+    "Inspector selected/empty",
+    "Progress banner"
+  ],
+  "excluded_consumers": [
+    "Projector reference app is read-only",
+    "No new DAW formats or removal actions"
+  ],
+  "system_changes": [
+    "8pt inset centered cells and10pt navigation inset",
+    "Flipped folder document, bounded740pt sheet, compressible paths",
+    "Explicit inspector styles and3-line heading cap",
+    "Throttled basics-before-projects inventory; cached model rows/indexes",
+    "Static accessible determinate progress"
+  ],
+  "representative_tests": [
+    "32 Swift tests",
+    "Native release smoke with3k browseable samples during reading",
+    "Long root overflow/focus and save-error screenshots",
+    "Compact dark inspector and light table geometry",
+    "Release benchmarks5000 samples500 plugins12 heavy projects"
+  ],
+  "regression_prevention": [
+    "Native text alignment and sheet width assertions",
+    "Core inventory boundary test",
+    "Pending references in native smoke",
+    "Independent read-only final source/visual/accessibility review"
+  ]
+}

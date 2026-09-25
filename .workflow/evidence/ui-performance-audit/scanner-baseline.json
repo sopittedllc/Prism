@@ -1,0 +1,29 @@
+{
+  "fixture": "Synthetic 10000 tiny sample candidates; 100 structurally valid RPP projects with 100 references each. Local temporary storage. Warm filesystem caches likely; no audio read.",
+  "binary_sha256": "7778bdf5d4247f36570edb721baac2546499b352bd68876f7e3f4998b4e84f78",
+  "results": [
+    {
+      "scenario": "10000_samples",
+      "exit_code": 0,
+      "wall_seconds": 0.9936,
+      "scanner_seconds": 0.9307550191879272,
+      "assets": 10000,
+      "projects": 0,
+      "issues": 0
+    },
+    {
+      "scenario": "10000_samples_100_projects_100_references_each",
+      "exit_code": 0,
+      "wall_seconds": 1.3175,
+      "scanner_seconds": 1.2264010906219482,
+      "assets": 10000,
+      "projects": 100,
+      "issues": 0
+    }
+  ],
+  "limitations": [
+    "Existing debug executable baseline; no cold-cache, external-drive, network-volume or real-user data measurement.",
+    "CLI wall time includes encoding and startup. Core time excludes UI sorting/rendering.",
+    "Two samples are directional only, not a statistically established speed claim."
+  ]
+}

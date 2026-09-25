@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "library-ownership",
+  "gate": "implementation",
+  "status": "passed",
+  "revision": "content:ae4c9f6a211945492f8a25a15ca83d6f3cb6227f9d03770d2ffd911353d45ab8",
+  "timestamp": "2026-09-25T22:08:43.488160+00:00",
+  "producer": "implementer",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "implementation-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/library-ownership/implementation-report.json",
+        "sha256": "bd51b75e073d57e09a6da56722b22227128491dab09c46670469df9dd4f48f5d"
+      }
+    }
+  ]
+}

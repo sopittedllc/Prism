@@ -13,6 +13,7 @@ public enum CatalogSort: String, CaseIterable, Sendable { case name = "Name", si
     public var sort: CatalogSort = .name { didSet { cachedVisible = nil } }
     public var standardPlugins = true
     public private(set) var roots: [RootKind: [URL]] = [:]
+    /// Legacy API name: holds Asset.selectionKey, not necessarily a filesystem path.
     public var selectedPath: String?
     public private(set) var report: ScanReport? { didSet { rebuildIndexes() } }
     public private(set) var isScanning = false
@@ -40,7 +41,7 @@ public enum CatalogSort: String, CaseIterable, Sendable { case name = "Name", si
     private func rebuildIndexes() {
         cachedVisible = nil; assetsByKey = [:]; inclusionsByPath = [:]; categoryCounts = [:]
         for asset in report?.assets ?? [] {
-            assetsByKey[asset.kind.rawValue + ":" + asset.path] = asset
+            assetsByKey[asset.kind.rawValue + ":" + asset.selectionKey] = asset
             categoryCounts[asset.kind, default: 0] += 1
         }
         for inclusion in report?.sampleInclusions ?? [] { inclusionsByPath[inclusion.samplePath] = inclusion }
@@ -66,9 +67,10 @@ public enum CatalogSort: String, CaseIterable, Sendable { case name = "Name", si
     public private(set) var onboardingCompleted = false
     public private(set) var setupNotice: String?
     private let store: SetupStore?
+    private let sineDatabase: URL
 
-    public init(store: SetupStore? = nil) {
-        self.store = store
+    public init(store: SetupStore? = nil, sineDatabase: URL = LibraryMetadataReader.sineDatabase) {
+        self.store = store; self.sineDatabase = sineDatabase
         do {
             if let values = try store?.load() {
                 standardPlugins = values["standard_plugins"] as? Bool ?? true
@@ -81,7 +83,7 @@ public enum CatalogSort: String, CaseIterable, Sendable { case name = "Name", si
     }
 
     public func setupDraft() -> CatalogModel {
-        let draft = CatalogModel()
+        let draft = CatalogModel(sineDatabase: sineDatabase)
         draft.standardPlugins = standardPlugins; draft.roots = roots
         return draft
     }
@@ -141,10 +143,10 @@ public enum CatalogSort: String, CaseIterable, Sendable { case name = "Name", si
             self.isBackgroundScanning = true; self.onChange?()
         }
         isScanning = true; onChange?()
-        let snapshot = request
+        let snapshot = request; let database = sineDatabase
         scanTask = Task { [weak self] in
             let result = await Task.detached(priority: .utility) { [weak self] in
-                Scanner().scan(snapshot, inventory: { [weak self] update in
+                Scanner(sineDatabase: database).scan(snapshot, inventory: { [weak self] update in
                     Task { @MainActor [weak self] in
                         guard let owner = self, owner.isScanning, owner.scanIdentifier == identifier,
                               update.sequence > owner.inventorySequence else { return }
@@ -164,7 +166,7 @@ public enum CatalogSort: String, CaseIterable, Sendable { case name = "Name", si
             }.value
             guard let self else { return }
             self.report = result; self.isScanning = false; self.configurationChanged = false; self.isBackgroundScanning = false; self.basicInventoryComplete = true; self.foregroundTask?.cancel()
-            if let selected = self.selectedPath, !result.assets.contains(where: { $0.path == selected && $0.kind == self.category }) {
+            if let selected = self.selectedPath, !result.assets.contains(where: { $0.selectionKey == selected && $0.kind == self.category }) {
                 self.selectedPath = nil
             }
             self.onChange?()
@@ -185,7 +187,7 @@ public enum CatalogSort: String, CaseIterable, Sendable { case name = "Name", si
                 if a != b { return (a ?? .distantPast) > (b ?? .distantPast) }
             }
             let comparison = left.name.localizedStandardCompare(right.name)
-            return comparison == .orderedSame ? left.path < right.path : comparison == .orderedAscending
+            return comparison == .orderedSame ? left.selectionKey < right.selectionKey : comparison == .orderedAscending
         }
         cachedVisible = result
         return result

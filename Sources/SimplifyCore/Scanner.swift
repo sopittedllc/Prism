@@ -7,7 +7,9 @@ public final class Scanner {
     private let pluginExtensions: Set<String> = ["component", "vst", "vst3", "aaxplugin", "clap"]
     private let sampleExtensions: Set<String> = ["wav", "aif", "aiff", "flac", "mp3", "m4a", "caf", "ogg"]
 
-    public init() {}
+    private let sineDatabase: URL
+    /// Optional read-only vendor catalog location; injectable for fixture validation.
+    public init(sineDatabase: URL = LibraryMetadataReader.sineDatabase) { self.sineDatabase = sineDatabase }
 
     public func scan(_ request: ScanRequest, inventory: (@Sendable (InventorySnapshot) -> Void)? = nil, progress: (@Sendable (ScanProgress) -> Void)? = nil) -> ScanReport {
         let start = Date()
@@ -143,8 +145,8 @@ public final class Scanner {
                 walk(root, mode: mode, depth: 0)
             }
         }
-        for asset in LibraryDiscovery.scan(request, issues: &issues) {
-            assets["library:" + asset.path] = asset
+        for asset in LibraryDiscovery.scan(request, sineDatabase: sineDatabase, issues: &issues) {
+            assets["library:" + asset.selectionKey] = asset
             publishInventory()
         }
         publishInventory(complete: true, force: true)
@@ -162,7 +164,7 @@ public final class Scanner {
             }
             publish(.inspecting, index + 1, candidates.count, candidate.url.path, force: index + 1 == candidates.count)
         }
-        let orderedAssets = assets.values.sorted { ($0.kind.rawValue, $0.path) < ($1.kind.rawValue, $1.path) }
+        let orderedAssets = assets.values.sorted { ($0.kind.rawValue, $0.path, $0.selectionKey) < ($1.kind.rawValue, $1.path, $1.selectionKey) }
         let orderedProjects = projects.values.sorted { $0.path < $1.path }
         let samples = orderedAssets.filter { $0.kind == .sample }
         let matchingTotal = orderedProjects.count + samples.count

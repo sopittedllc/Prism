@@ -1,0 +1,24 @@
+{
+  "client": "codex",
+  "role": "qa",
+  "status": "passed",
+  "checks": [
+    {
+      "command": "python3 scripts/build_app.py",
+      "result": "Packaged release app, ad-hoc signature verified"
+    },
+    {
+      "command": "build/Simplify.app/Contents/MacOS/Simplify --ui-smoke captures/catalog",
+      "result": "UI smoke: PASS; synthetic inputs only"
+    },
+    {
+      "report": ".workflow/evidence/library-ownership/local-runtime-report.json",
+      "result": "Read-only installed library check: CAGE Winds one group, five patches; all 9871 previous instrument entries retained; 20 distinct SINE collections."
+    }
+  ],
+  "limitations": [
+    "Local full scan remains partial: sample entry cap, library entry/depth cap, one unreadable Kontakt manifest.",
+    "No complete DAW usage or scan-performance claim.",
+    "No new outline UI implemented in this increment."
+  ]
+}

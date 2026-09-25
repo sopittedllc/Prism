@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "library-ownership",
+  "gate": "research",
+  "status": "passed",
+  "revision": "content:ae4c9f6a211945492f8a25a15ca83d6f3cb6227f9d03770d2ffd911353d45ab8",
+  "timestamp": "2026-09-25T22:08:43.359369+00:00",
+  "producer": "researcher",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "research-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/library-ownership/research-report.json",
+        "sha256": "519dccb73bc00e1380884651d1602d3f900c1ee628d408cf4b8effed2ec131f8"
+      }
+    }
+  ]
+}

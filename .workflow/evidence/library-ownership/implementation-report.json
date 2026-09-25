@@ -1,0 +1,15 @@
+{
+  "client": "codex",
+  "role": "implementer",
+  "status": "passed",
+  "changes": [
+    "Kontakt structural ownership and explicit proposed/unresolved evidence; manifest ambiguity and malformed nested boundary handling.",
+    "Additive legacy-compatible identity and known physical membership fields; instrument inheritance excludes sibling tags.",
+    "SINE namespaced vendor IDs and complete scoped microphone memberships carried through scanner/model/table selection.",
+    "Golden core and model fixtures, four-required-host validation matrix."
+  ],
+  "scope_limits": [
+    "No persistent catalog, new hierarchy UI, storage totals, tag editing, usage adapters or removal of library/sample files.",
+    "Installation roots and member paths are evidence, not deletion authority."
+  ]
+}

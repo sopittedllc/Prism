@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "library-ownership",
+  "gate": "plan_review",
+  "status": "passed",
+  "revision": "content:ae4c9f6a211945492f8a25a15ca83d6f3cb6227f9d03770d2ffd911353d45ab8",
+  "timestamp": "2026-09-25T22:08:43.424616+00:00",
+  "producer": "critic",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "plan_review-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/library-ownership/plan-review-report.json",
+        "sha256": "d996c15141413b2c86a0e177322a4ab2963785eed7e252aa4a8dfdeda6ce6dea"
+      }
+    }
+  ]
+}

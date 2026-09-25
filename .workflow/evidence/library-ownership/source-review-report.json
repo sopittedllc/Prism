@@ -1,0 +1,49 @@
+{
+  "status": "passed",
+  "acting_client": "codex",
+  "role": "independent-reviewer",
+  "reviewed_at": "2026-09-25T21:59:19.425043+00:00",
+  "scope": [
+    "LibraryMetadata.swift diff",
+    "LibraryDiscovery.swift diff",
+    "LibraryOwnershipTests.swift",
+    "Scanner/CatalogModel identity consumers",
+    "Asset.selectionKey",
+    "CatalogWindow selection adapter",
+    "CatalogTests shared-container async fixture"
+  ],
+  "findings": [],
+  "observations": [
+    "Optional additive fields preserve legacy decode in the provided tests.",
+    "SINE aggregation unions installed microphone metadata/archive membership by namespaced vendor instrument ID; deterministic ordering is explicit.",
+    "Context inheritance excludes sibling aggregate instrument tags."
+  ],
+  "limitations": [
+    "Source re-review passed; coordinator reports 54 Swift tests passing. Tests not independently rerun.",
+    "No native UI runtime rerun by reviewer. Selection plumbing changed; visual presentation and persistence remain unchanged.",
+    "No holdout access.",
+    "SQLite residual path-reopen race remains documented from previous review."
+  ],
+  "previous_findings": [
+    {
+      "id": "O1",
+      "severity": "high",
+      "file": "Sources/SimplifyCore/Scanner.swift",
+      "line": 147,
+      "finding": "LibraryDiscovery retains SINE collections by productID but Scanner immediately rekeys by physical asset.path. Distinct products sharing their representative metadata path collapse in the exported ScanReport. The new Ark2/Ark3 fixture itself has this shape but only tests the reader. CatalogModel path indexing/selection likewise cannot distinguish them.",
+      "repair": "Carry logical library identity through ScanReport assembly and identity consumers; keep physical locator separate. Add integration coverage that two different vendor products sharing a physical locator survive inventory/final report and selection."
+    },
+    {
+      "id": "O2",
+      "severity": "high",
+      "file": "Sources/SimplifyCore/LibraryDiscovery.swift",
+      "line": 61,
+      "finding": "An unreadable/malformed nested NICNT emits an issue but leaves inherited owner intact. Its patches are then assigned as members of the outer manifest-identified product, despite evidence of a separate unresolved product boundary.",
+      "repair": "Clear inherited ownership on failed nested manifest; classify the nested content as proposed/unresolved and add a parent manifest + invalid child manifest fixture."
+    }
+  ],
+  "resolved": [
+    "O1 Asset.selectionKey carries logical SINE product identity through Scanner inventory/final dictionaries, deterministic ordering, CatalogModel indexes and selection retention, and native table selection. Physical path remains locator. Scanner and asynchronous model shared-container fixtures cover separate products.",
+    "O2 Failed nested NICNT clears inherited ownership; parent Piano/nested Banjo regression verifies separation."
+  ]
+}

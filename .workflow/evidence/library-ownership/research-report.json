@@ -1,0 +1,16 @@
+{
+  "client": "codex",
+  "role": "researcher",
+  "status": "passed",
+  "basis": [
+    ".work/active/library-catalog-redesign.md",
+    "docs/research/library-identification.md",
+    "docs/research/daw-activity-history.md"
+  ],
+  "findings": [
+    "Manifest/catalog identities outrank structural proposals. Kontakt Instruments + sample content proposes a boundary only.",
+    "SINE local vendor IDs identify products and instruments; every installed microphone metadata/archive pair must be retained.",
+    "Project inclusion and observed loading remain separate evidence kinds; no universal timestamp established."
+  ],
+  "new_document": "docs/research/usage-validation-matrix.md"
+}

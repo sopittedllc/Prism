@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "library-ownership",
+  "gate": "code_review",
+  "status": "passed",
+  "revision": "content:ae4c9f6a211945492f8a25a15ca83d6f3cb6227f9d03770d2ffd911353d45ab8",
+  "timestamp": "2026-09-25T22:08:43.551108+00:00",
+  "producer": "reviewer",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "code_review-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/library-ownership/source-review-report.json",
+        "sha256": "33c410580b216c453bbc07bf57068681beaf7b11e5fa103d593813727fe39f8d"
+      }
+    }
+  ]
+}

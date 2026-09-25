@@ -1,7 +1,7 @@
 # Simplify: library catalog and collection workflows
 
-Status: researched implementation plan, 2026-09-25. This document does not claim
-implementation or major-DAW compatibility. Acting client: Codex. Plan critique:
+Status: implementation started, 2026-09-25. Library ownership foundation delivered
+as the first increment; remaining phases are outstanding. The full redesign and major-DAW compatibility remain outstanding. Acting client: Codex. Plan critique:
 independent Codex reviewer; alternate client unavailable in this session.
 
 ## Product outcome
@@ -340,5 +340,9 @@ No real user files deleted, no vendor metadata modified, and no raw projects/log
   docs/research/library-identification.md. Those documents explicitly separate research
   routes from validated adapters. This plan supersedes their flat inferred-library UI.
 
-Resume: implement only against this hierarchy/identity contract. This turn's deliverable
-is the researched plan and critique, not implementation of the proposed redesign.
+Resume: continue with SQLite graph/state and migration design before replacing the
+flat table with a native outline. See library-ownership.md for the first increment:
+Kontakt proposed product boundaries, SINE logical IDs and all microphone memberships,
+scanner/model selection identity propagation, golden fixtures and four-host matrix.
+Persistent metadata, editable tags, hierarchy UI, storage accounting, recent additions
+and validated usage adapters remain outstanding. No unused-cleanup claim is enabled.

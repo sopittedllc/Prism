@@ -13,6 +13,11 @@ public struct Asset: Codable, Sendable {
     public let classification: String
     public var libraryMetadata: LibraryMetadata? = nil
     public var fileIdentity: PluginFileIdentity? = nil
+    /// Session catalog key. Vendor-backed libraries use product identity even when
+    /// their physical content is shared or moves. Other assets retain path identity.
+    public var selectionKey: String {
+        kind == .library ? (libraryMetadata?.identity?.productID ?? path) : path
+    }
 }
 
 public struct ScanIssue: Codable, Sendable {

@@ -1,10 +1,26 @@
 import Foundation
 import CSQLite
 
+/// Adapter evidence, not permission to remove files. A proposed folder boundary
+/// must be confirmed before it becomes an authoritative library installation.
+public struct LibraryIdentity: Codable, Sendable, Equatable {
+    public enum Evidence: String, Codable, Sendable { case vendorCatalog, manifest, proposed, unresolved }
+    public let evidence: Evidence
+    /// Namespaced vendor ID when actually present; never synthesized from a title/path.
+    public let productID: String?
+    /// Candidate installation directory for folder-based products, not a deletion target.
+    /// SINE collections can span directories and therefore leave this nil.
+    public let installationRoot: String?
+}
+
 public struct LibraryInstrument: Codable, Sendable {
     public let name: String
     public let path: String
     public let tags: [String]
+    public var vendorID: String? = nil
+    /// Known physical members only, not a claim of exhaustive dependencies or ownership.
+    /// SINE includes each installed mic's metadata and archive; nil means not established.
+    public var contentPaths: [String]? = nil
 }
 public struct LibraryMetadata: Codable, Sendable {
     public let player: String
@@ -13,6 +29,14 @@ public struct LibraryMetadata: Codable, Sendable {
     public var instruments: [LibraryInstrument]
     public var tags: [String]
     public let source: String
+    public var identity: LibraryIdentity? = nil
+    /// Safe inheritance: aggregate instrument tags belong to search, not to siblings.
+    public var contextTags: [String] {
+        maker == "Unknown maker" || maker.isEmpty ? [] : [maker]
+    }
+    public func tags(for instrument: LibraryInstrument, productName: String) -> [String] {
+        Array(Set(contextTags + [productName] + instrument.tags)).sorted()
+    }
     public var searchText: String { ([player, maker, summary] + tags + instruments.flatMap { [$0.name] + $0.tags }).joined(separator: " ") }
 }
 
@@ -106,10 +130,24 @@ public enum LibraryMetadataReader {
                    (try? archive.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true {
                     let id = value(0), name = value(6)
                     var collection = collections[id] ?? Collection(title: value(1), maker: value(3).isEmpty ? "Orchestral Tools" : value(3), summary: value(2), tags: tags(value(4)), instruments: [:])
-                    if collection.instruments.count < 2000 {
-                        collection.instruments[value(5)] = LibraryInstrument(name: name, path: file.path, tags: tags(name + " " + value(7)))
+                    let instrumentID = value(5)
+                    guard !id.isEmpty, !instrumentID.isEmpty, !collection.title.isEmpty, !name.isEmpty else {
+                        if truncated.insert("missingIdentity").inserted {
+                            issues.append(ScanIssue(path: database.path, reason: "SINE row missing product or instrument identity"))
+                        }
+                        status = sqlite3_step(statement); continue
                     }
-                    if collection.instruments.count >= 2000, truncated.insert(id).inserted {
+                    if let previous = collection.instruments[instrumentID] {
+                        let paths = Array(Set((previous.contentPaths ?? []) + [file.path, archive.path])).sorted()
+                        collection.instruments[instrumentID] = LibraryInstrument(name: previous.name,
+                            path: min(previous.path, file.path), tags: Array(Set(previous.tags + tags(name + " " + value(7)))).sorted(),
+                            vendorID: previous.vendorID, contentPaths: paths)
+                    } else if collection.instruments.count < 2000 {
+                        collection.instruments[instrumentID] = LibraryInstrument(name: name, path: file.path,
+                            tags: tags(name + " " + value(7)),
+                            vendorID: "sine:collection:\(id):instrument:\(instrumentID)",
+                            contentPaths: [file.path, archive.path].sorted())
+                    } else if truncated.insert(id).inserted {
                         issues.append(ScanIssue(path: database.path, reason: "SINE instrument metadata limited to 2,000 entries per collection"))
                     }
                     collections[id] = collection
@@ -118,11 +156,12 @@ public enum LibraryMetadataReader {
             status = sqlite3_step(statement)
         }
         if status != SQLITE_DONE { issues.append(ScanIssue(path: database.path, reason: "SINE metadata incomplete: query work or row limit, or catalog read failed")) }
-        return collections.values.map { collection in
-            let instruments = collection.instruments.values.sorted { $0.name < $1.name }
+        return collections.keys.sorted().compactMap { id in
+            guard let collection = collections[id], !collection.instruments.isEmpty else { return nil }
+            let instruments = collection.instruments.values.sorted { ($0.name, $0.vendorID ?? "") < ($1.name, $1.vendorID ?? "") }
             let allTags = Array(Set(collection.tags + instruments.flatMap(\.tags))).sorted()
             var asset = Asset(kind: .library, path: instruments[0].path, name: collection.title, format: "SINE", bundleIdentifier: nil, logicalBytes: nil, classification: "identifiedLibrary")
-            asset.libraryMetadata = LibraryMetadata(player: "SINE", maker: collection.maker, summary: collection.summary, instruments: instruments, tags: allTags, source: "SINE local catalog + existing metadata and sample archives; tags from catalog/instrument names. Content completeness and usage not established.")
+            asset.libraryMetadata = LibraryMetadata(player: "SINE", maker: collection.maker, summary: collection.summary, instruments: instruments, tags: allTags, source: "SINE local catalog + existing metadata and sample archives; tags from catalog/instrument names. Content completeness and usage not established.", identity: LibraryIdentity(evidence: .vendorCatalog, productID: "sine:collection:\(id)", installationRoot: nil))
             return asset
         }
     }

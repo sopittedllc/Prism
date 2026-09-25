@@ -2,67 +2,60 @@
   "schema_version": 1,
   "risk_tier": 2,
   "base_revision": "content:e2744b65b627ba2bd2e085a99d29d10b7ee07b6f46ece909ba288443c6ea38ad",
-  "domains": [
-    "ui-ux"
-  ],
-  "task_id": "catalog-identity",
-  "title": "Real product and library identity, supplied JPG branding and honest usage",
+  "domains": [],
+  "task_id": "library-ownership",
+  "title": "Library ownership and identity foundation",
   "state": "complete",
   "product_decisions_needed": [],
   "acceptance_criteria": [
     {
       "id": "AC1",
-      "statement": "Exact supplied JPG and rendered branding",
+      "statement": "Kontakt product ownership",
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/catalog-identity/delivery-report.json",
-        ".workflow/evidence/catalog-identity/local-identity-check.json",
-        ".workflow/evidence/catalog-identity/native-runtime-report.json",
-        ".workflow/evidence/catalog-identity/source-review-report.json"
+        ".workflow/evidence/library-ownership/implementation-report.json",
+        ".workflow/evidence/library-ownership/source-review-report.json",
+        ".workflow/evidence/library-ownership/runtime-report.json"
       ]
     },
     {
       "id": "AC2",
-      "statement": "Real vendor format grouping and simple plugin list",
+      "statement": "Scope and manifest ambiguity",
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/catalog-identity/delivery-report.json",
-        ".workflow/evidence/catalog-identity/local-identity-check.json",
-        ".workflow/evidence/catalog-identity/native-runtime-report.json",
-        ".workflow/evidence/catalog-identity/source-review-report.json"
+        ".workflow/evidence/library-ownership/implementation-report.json",
+        ".workflow/evidence/library-ownership/source-review-report.json",
+        ".workflow/evidence/library-ownership/runtime-report.json"
       ]
     },
     {
       "id": "AC3",
-      "statement": "Manifest/catalog library identity and instrument search",
+      "statement": "SINE stable IDs and all mic files",
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/catalog-identity/delivery-report.json",
-        ".workflow/evidence/catalog-identity/local-identity-check.json",
-        ".workflow/evidence/catalog-identity/native-runtime-report.json",
-        ".workflow/evidence/catalog-identity/source-review-report.json"
+        ".workflow/evidence/library-ownership/implementation-report.json",
+        ".workflow/evidence/library-ownership/source-review-report.json",
+        ".workflow/evidence/library-ownership/runtime-report.json"
       ]
     },
     {
       "id": "AC4",
-      "statement": "Truthful setup/coverage and observed Ableton descriptor candidates",
+      "statement": "Context tags and compatible reports",
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/catalog-identity/delivery-report.json",
-        ".workflow/evidence/catalog-identity/local-identity-check.json",
-        ".workflow/evidence/catalog-identity/native-runtime-report.json",
-        ".workflow/evidence/catalog-identity/source-review-report.json"
+        ".workflow/evidence/library-ownership/implementation-report.json",
+        ".workflow/evidence/library-ownership/source-review-report.json",
+        ".workflow/evidence/library-ownership/runtime-report.json"
       ]
     },
     {
       "id": "AC5",
-      "statement": "Regression and independent native review",
+      "statement": "Four-host matrix and regressions",
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/catalog-identity/delivery-report.json",
-        ".workflow/evidence/catalog-identity/local-identity-check.json",
-        ".workflow/evidence/catalog-identity/native-runtime-report.json",
-        ".workflow/evidence/catalog-identity/source-review-report.json"
+        ".workflow/evidence/library-ownership/implementation-report.json",
+        ".workflow/evidence/library-ownership/source-review-report.json",
+        ".workflow/evidence/library-ownership/runtime-report.json"
       ]
     }
   ],
@@ -70,91 +63,51 @@
     "research": {
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/catalog-identity/research.json"
+        ".workflow/evidence/library-ownership/research.json"
       ],
-      "revision": "content:25deaa711e6c5e71edf5ca63150c2dcf670e8105c5184bd1280cf67c317d736e",
+      "revision": "content:ae4c9f6a211945492f8a25a15ca83d6f3cb6227f9d03770d2ffd911353d45ab8",
       "agent": "researcher"
     },
     "plan_review": {
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/catalog-identity/plan_review.json"
+        ".workflow/evidence/library-ownership/plan_review.json"
       ],
-      "revision": "content:25deaa711e6c5e71edf5ca63150c2dcf670e8105c5184bd1280cf67c317d736e",
+      "revision": "content:ae4c9f6a211945492f8a25a15ca83d6f3cb6227f9d03770d2ffd911353d45ab8",
       "agent": "critic"
     },
     "implementation": {
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/catalog-identity/implementation.json"
+        ".workflow/evidence/library-ownership/implementation.json"
       ],
-      "revision": "content:25deaa711e6c5e71edf5ca63150c2dcf670e8105c5184bd1280cf67c317d736e",
+      "revision": "content:ae4c9f6a211945492f8a25a15ca83d6f3cb6227f9d03770d2ffd911353d45ab8",
       "agent": "implementer"
     },
     "automated_tests": {
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/catalog-identity/automated_tests.json"
+        ".workflow/evidence/library-ownership/automated_tests.json"
       ],
-      "revision": "content:25deaa711e6c5e71edf5ca63150c2dcf670e8105c5184bd1280cf67c317d736e",
+      "revision": "content:ae4c9f6a211945492f8a25a15ca83d6f3cb6227f9d03770d2ffd911353d45ab8",
       "agent": "scripts/run_check.py"
     },
     "code_review": {
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/catalog-identity/code_review.json"
+        ".workflow/evidence/library-ownership/code_review.json"
       ],
-      "revision": "content:25deaa711e6c5e71edf5ca63150c2dcf670e8105c5184bd1280cf67c317d736e",
+      "revision": "content:ae4c9f6a211945492f8a25a15ca83d6f3cb6227f9d03770d2ffd911353d45ab8",
       "agent": "reviewer"
     },
     "runtime_tests": {
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/catalog-identity/runtime_tests.json"
+        ".workflow/evidence/library-ownership/runtime_tests.json"
       ],
-      "revision": "content:25deaa711e6c5e71edf5ca63150c2dcf670e8105c5184bd1280cf67c317d736e",
+      "revision": "content:ae4c9f6a211945492f8a25a15ca83d6f3cb6227f9d03770d2ffd911353d45ab8",
       "agent": "qa"
-    },
-    "ui_research": {
-      "status": "passed",
-      "evidence": [
-        ".workflow/evidence/catalog-identity/ui_research.json"
-      ],
-      "revision": "content:25deaa711e6c5e71edf5ca63150c2dcf670e8105c5184bd1280cf67c317d736e",
-      "agent": "ux-architect"
-    },
-    "design_system_audit": {
-      "status": "passed",
-      "evidence": [
-        ".workflow/evidence/catalog-identity/design_system_audit.json"
-      ],
-      "revision": "content:25deaa711e6c5e71edf5ca63150c2dcf670e8105c5184bd1280cf67c317d736e",
-      "agent": "ux-reviewer"
-    },
-    "accessibility": {
-      "status": "passed",
-      "evidence": [
-        ".workflow/evidence/catalog-identity/accessibility.json"
-      ],
-      "revision": "content:25deaa711e6c5e71edf5ca63150c2dcf670e8105c5184bd1280cf67c317d736e",
-      "agent": "accessibility-tester"
-    },
-    "visual_regression": {
-      "status": "passed",
-      "evidence": [
-        ".workflow/evidence/catalog-identity/visual_regression.json"
-      ],
-      "revision": "content:25deaa711e6c5e71edf5ca63150c2dcf670e8105c5184bd1280cf67c317d736e",
-      "agent": "visual-regression-tester"
-    },
-    "ux_review": {
-      "status": "passed",
-      "evidence": [
-        ".workflow/evidence/catalog-identity/ux_review.json"
-      ],
-      "revision": "content:25deaa711e6c5e71edf5ca63150c2dcf670e8105c5184bd1280cf67c317d736e",
-      "agent": "ux-reviewer"
     }
   },
-  "current_revision": "content:25deaa711e6c5e71edf5ca63150c2dcf670e8105c5184bd1280cf67c317d736e"
+  "current_revision": "content:ae4c9f6a211945492f8a25a15ca83d6f3cb6227f9d03770d2ffd911353d45ab8"
 }

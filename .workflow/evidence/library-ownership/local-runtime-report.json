@@ -1,0 +1,14 @@
+{
+  "exitCode": 2,
+  "durationSeconds": 11.317835927009583,
+  "libraries": 379,
+  "instruments": 9871,
+  "sineCollections": 20,
+  "sineUniqueVendorIDs": 20,
+  "cageWindsGroups": 1,
+  "cageWindsInstruments": [
+    5
+  ],
+  "sinePhysicalMemberships": 2486,
+  "issues": 3
+}

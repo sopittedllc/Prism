@@ -1,4 +1,5 @@
 import Foundation
+import CSQLite
 import Darwin
 import Testing
 @testable import SimplifyCatalog
@@ -232,4 +233,42 @@ private final class CatalogFixture {
     model.query = "Accordion"; #expect(model.visibleAssets.first?.name == "Example World Collection")
     model.query = "Banjo"; #expect(model.visibleAssets.count == 1)
     model.query = "Trumpet"; #expect(model.visibleAssets.isEmpty)
+}
+
+@Test @MainActor func sharedLibraryContainerDoesNotMergeSelection() async throws {
+    let f = try CatalogFixture()
+    let meta = try f.file("Content/Shared.otmeta")
+    try f.file("Content/Shared.otarc")
+    let database = f.root.appendingPathComponent("vendor.db")
+    var db: OpaquePointer?
+    #expect(sqlite3_open(database.path, &db) == SQLITE_OK)
+    defer { sqlite3_close(db) }
+    let schema = """
+    CREATE TABLE t_collection(collection_key,collection_id,title,subtitle,developer,keywords);
+    CREATE TABLE t_instrument(instrument_key,instrument_collection,instrument_id,title,keywords);
+    CREATE TABLE t_micPosition(micposition_instrument,filePath);
+    INSERT INTO t_collection VALUES(1,'ark2','Ark 2','','Orchestral Tools',''),(2,'ark3','Ark 3','','Orchestral Tools','');
+    INSERT INTO t_instrument VALUES(1,1,'low','Low Strings','strings'),(2,2,'low','Low Strings','strings');
+    """
+    #expect(sqlite3_exec(db, schema, nil, nil, nil) == SQLITE_OK)
+    for id: Int32 in [1, 2] {
+        var stmt: OpaquePointer?
+        sqlite3_prepare_v2(db, "INSERT INTO t_micPosition VALUES(?,?)", -1, &stmt, nil)
+        sqlite3_bind_int(stmt, 1, id)
+        (meta.path + "/virtual.otmf").withCString {
+            sqlite3_bind_text(stmt, 2, $0, -1, nil); #expect(sqlite3_step(stmt) == SQLITE_DONE)
+        }
+        sqlite3_finalize(stmt)
+    }
+    let model = CatalogModel(sineDatabase: database); model.standardPlugins = false
+    model.addRoots([f.root.appendingPathComponent("Content")], kind: .libraries)
+    model.category = .library; model.scan(); try await finish(model)
+    #expect(model.visibleAssets.count == 2)
+    for asset in model.visibleAssets {
+        model.selectedPath = asset.selectionKey
+        #expect(model.selectedAsset?.name == asset.name)
+        #expect(model.selectedAsset?.path == meta.path)
+    }
+    model.scan(); try await finish(model)
+    #expect(model.selectedAsset?.name == "Ark 3")
 }

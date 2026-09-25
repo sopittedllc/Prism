@@ -90,3 +90,15 @@ rescan/reset and are excluded from settings persistence, presets, migration, und
 automation, sync, and telemetry. Explicit probe JSON includes this metadata and local
 paths; no network transmission is performed. Search consumes these fields without a
 second persisted taxonomy. Editable user tags and web enrichment are not implemented.
+
+Library ownership foundation adds optional derived evidence, vendor IDs and known
+content-member paths to scan metadata. Missing fields decode as nil for older reports;
+no settings schema or persistence change. Context-tag inheritance excludes aggregate
+sibling tags. Product ID is nil where no vendor ID is available; installationRoot
+is a proposed locator, never deletion authorization. These follow the existing
+session-only metadata policies above; no new mutable user state is introduced.
+
+Session selection uses Asset.selectionKey (vendor product ID where available,
+otherwise path). The existing selection registry/default/reset/persistence policy is
+unchanged. Finder operations still use the physical path. Scanner/catalog fixtures
+prove two products sharing one physical file retain separate selection.

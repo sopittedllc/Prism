@@ -140,7 +140,7 @@ import SimplifyCore
     public func refresh() {
         refreshing = true; defer { refreshing = false }
         rows = model.visibleAssets; table.reloadData()
-        if let selected = model.selectedPath, let index = rows.firstIndex(where: { $0.path == selected }) { table.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false) } else { table.deselectAll(nil) }
+        if let selected = model.selectedPath, let index = rows.firstIndex(where: { $0.selectionKey == selected }) { table.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false) } else { table.deselectAll(nil) }
         let index = [AssetKind.plugin, .sample, .library].firstIndex(of: model.category) ?? 0
         for (i, button) in categoryButtons.enumerated() {
             button.state = i == index ? .on : .off
@@ -240,7 +240,7 @@ import SimplifyCore
         }
         return CatalogCell(value: value, primary: column?.identifier.rawValue == "name")
     }
-    public func tableViewSelectionDidChange(_ notification: Notification) { guard !refreshing else { return }; model.selectedPath = rows.indices.contains(table.selectedRow) ? rows[table.selectedRow].path : nil; updateInspector() }
+    public func tableViewSelectionDidChange(_ notification: Notification) { guard !refreshing else { return }; model.selectedPath = rows.indices.contains(table.selectedRow) ? rows[table.selectedRow].selectionKey : nil; updateInspector() }
     public func controlTextDidChange(_ notification: Notification) { model.query = search.stringValue; refresh() }
     @objc public func scan() { model.scan() }
     @objc public func focusSearch(_ sender: Any?) { window?.makeFirstResponder(search) }

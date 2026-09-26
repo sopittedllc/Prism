@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "catalog-hierarchy",
+  "gate": "design_system_audit",
+  "status": "passed",
+  "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+  "timestamp": "2026-09-26T00:49:09.731177+00:00",
+  "producer": "codex-qa",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "design_system_audit-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/catalog-hierarchy/systemic-impact-report.json",
+        "sha256": "ea7a7e3f9eef82176c3c47422d1016de18e859a364d8c98c3616cf106843f3d0"
+      }
+    }
+  ]
+}

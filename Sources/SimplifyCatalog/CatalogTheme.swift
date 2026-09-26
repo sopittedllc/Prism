@@ -76,17 +76,32 @@ import AppKit
 
 /// Shared table geometry: comfortable horizontal inset and baseline-independent centering.
 @MainActor final class CatalogCell: NSTableCellView {
-    init(value: String, primary: Bool) {
+    init(value: String, primary: Bool, subtitle: String? = nil, query: String = "", context: String? = nil) {
         super.init(frame: .zero)
         let text = NSTextField(labelWithString: value)
         text.font = .systemFont(ofSize: 12, weight: primary ? .medium : .regular)
         text.textColor = primary ? .labelColor : .secondaryLabelColor
-        text.lineBreakMode = .byTruncatingMiddle; text.toolTip = value
-        text.setAccessibilityLabel(value); textField = text
+        text.lineBreakMode = .byTruncatingMiddle; text.toolTip = [value, subtitle, context].compactMap { $0 }.joined(separator: "\n")
+        text.setAccessibilityLabel([value, context].compactMap { $0 }.joined(separator: " · ")); textField = text
+        if !query.isEmpty {
+            let attributed = NSMutableAttributedString(string: value, attributes: [.font: text.font!, .foregroundColor: text.textColor!])
+            let match = (value as NSString).range(of: query, options: [.caseInsensitive, .diacriticInsensitive])
+            if match.location != NSNotFound { attributed.addAttribute(.font, value: NSFont.systemFont(ofSize: 12, weight: .bold), range: match) }
+            text.attributedStringValue = attributed
+        }
         text.translatesAutoresizingMaskIntoConstraints = false; addSubview(text)
         NSLayoutConstraint.activate([text.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
             text.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
-            text.centerYAnchor.constraint(equalTo: centerYAnchor)])
+            text.centerYAnchor.constraint(equalTo: centerYAnchor, constant: subtitle == nil ? 0 : -7)])
+        if let subtitle {
+            let secondary = NSTextField(labelWithString: subtitle)
+            secondary.font = .systemFont(ofSize: 10); secondary.textColor = .secondaryLabelColor
+            secondary.lineBreakMode = .byTruncatingMiddle; secondary.toolTip = subtitle
+            secondary.translatesAutoresizingMaskIntoConstraints = false; addSubview(secondary)
+            NSLayoutConstraint.activate([secondary.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8),
+                secondary.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
+                secondary.topAnchor.constraint(equalTo: text.bottomAnchor, constant: 1)])
+        }
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
 }

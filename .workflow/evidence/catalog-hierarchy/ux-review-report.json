@@ -1,0 +1,77 @@
+{
+  "status": "passed",
+  "acting_client": "codex",
+  "role": "independent-ux-and-visual-reviewer",
+  "reviewed_at": "2026-09-26T00:49:19.852239+00:00",
+  "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+  "observations": [
+    "Final expanded capture displays Accordion and Piano; search prunes Piano with truthful singular instrument count.",
+    "Final sample roots distinguish Samples \u00b7 One and Samples \u00b7 Two; compact flat search retains distinct prefixes and full inspector breadcrumbs/paths.",
+    "Stale labels and saved collection status remain explicit; size and usage are unknown/shared rather than invented.",
+    "Plugin format guards and Trash confirmation, empty/loading/no-match/error neighbors visually retain established behavior.",
+    "Final metadata-only result truthfully shows 1 library and 0 matching instruments, contains no invented children, uses shared two-line cell, and instructs Clear search to browse. Zero indexed instruments no longer receive disclosure guidance."
+  ],
+  "evidence_grade": "E2 screenshot matrix plus E3 supplied passing native smoke; reviewer inspected images and code but did not operate app",
+  "limitations": [
+    "VoiceOver not operated; native outline role/labels/arrow checks are automated, not full assistive technology certification.",
+    "No older OS/Intel, increased contrast, reduced transparency, localization/RTL, alternative display scale, maximum window or million-file testing claimed.",
+    "No previous pixel-diff certification; synthetic fixture IDs/paths vary between runs.",
+    "No holdout accessed; no source edited."
+  ],
+  "resolved_findings": [
+    {
+      "severity": "blocking",
+      "reference": "Sources/SimplifyCatalog/CatalogWindow.swift:261",
+      "evidence": "captures/catalog/library-metadata-search.png",
+      "description": "Metadata-only library result has no disclosure/children but inspector instructs Expand this library to browse. Tell user to clear search instead.",
+      "status": "resolved",
+      "resolution": "Verified repaired native capture: title/subtitle remain within row and inspector instructs Clear search to browse."
+    },
+    {
+      "severity": "blocking",
+      "reference": "Sources/SimplifyCatalog/CatalogWindow.swift:321",
+      "evidence": "captures/catalog/library-metadata-search.png",
+      "description": "Appended Library metadata match makes primary row label wrap to three lines and touch/clip the fixed row boundary. Use the shared two-line title/subtitle presentation.",
+      "status": "resolved",
+      "resolution": "Verified repaired native capture: title/subtitle remain within row and inspector instructs Clear search to browse."
+    }
+  ],
+  "findings": [],
+  "warnings": [
+    "At compact width, long sample breadcrumbs and Library metadata match subtitle abbreviate in-row; full selected details and tooltips remain available. No workflow blocker.",
+    "Empty inspector repeats selection guidance; preexisting composition debt outside this increment."
+  ],
+  "semantic_coverage": [
+    "Plugins, Libraries and Individual Samples collection shells",
+    "Maker/library/instrument and root/folder/sample rows",
+    "Instrument match and metadata-only match; no match/clear recovery",
+    "Typical/compact and light/dark assembled compositions",
+    "Selected and unselected details, shared/unknown size and usage labels",
+    "Saved collection, stale/offline, save error and loading",
+    "Native outline role and arrow-key interaction, per-category/search restoration from supplied automated runtime",
+    "Plugin format guards and synthetic Trash review regression"
+  ],
+  "inspected_images": [
+    "library-expanded-dark",
+    "library-instrument-search",
+    "library-metadata-search",
+    "library-hierarchy-light-compact",
+    "sample-folder-tree",
+    "sample-search-breadcrumbs",
+    "stale-library",
+    "cached-collection-light-compact",
+    "cached-plugin-formats",
+    "stale-plugin-formats",
+    "plugins-dark",
+    "plugin-removal-review",
+    "no-match-dark",
+    "catalog-save-error",
+    "loading-light",
+    "empty-light"
+  ],
+  "final_delta_image_sha256": {
+    "library-metadata-search": "15bba7dae6d24393594e9ae9ffaa02af256e80347bf48ff9c51ec6be6b2693a1"
+  },
+  "runtime_evidence": ".workflow/evidence/catalog-hierarchy/runtime_tests.json; captures/catalog/runtime.json",
+  "review_method": "Independent read-only source/visual pass; inspected original matrix, repaired hierarchy/sample captures, and final metadata-only repair. Coordinator ran native smoke. No source edits, build, launch, screenshot update, or holdout access by reviewer."
+}

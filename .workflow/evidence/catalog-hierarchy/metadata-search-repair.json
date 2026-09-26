@@ -1,0 +1,17 @@
+{
+  "status": "passed",
+  "client": "codex",
+  "source": "independent UX review of library-metadata-search.png",
+  "findings": [
+    "Metadata-only row label wrapped beyond fixed row height.",
+    "Inspector suggested expansion while filtered result has no children."
+  ],
+  "repair": [
+    "Reuse shared two-line CatalogCell subtitle.",
+    "Explain Clear search to browse; no indexed instruments state has no expansion instruction.",
+    "Native assertion checks actionable guidance."
+  ],
+  "scope": "CatalogWindow and synthetic native smoke only",
+  "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+  "verification": "69 tests and packaged native smoke pass; fresh screenshot shows shared two-line cell and truthful Clear search guidance."
+}

@@ -1,12 +1,12 @@
 import AppKit
 import SimplifyCore
 
-@MainActor public final class CatalogWindow: NSWindowController, NSTableViewDataSource, NSTableViewDelegate, NSSearchFieldDelegate {
+@MainActor public final class CatalogWindow: NSWindowController, NSOutlineViewDataSource, NSOutlineViewDelegate, NSSearchFieldDelegate {
     public let model: CatalogModel
-    public let categoryButtons = [NSButton(title: "Plugins", target: nil, action: nil), NSButton(title: "Samples", target: nil, action: nil), NSButton(title: "Libraries", target: nil, action: nil)]
+    public let categoryButtons = [NSButton(title: "Plugins", target: nil, action: nil), NSButton(title: "Individual Samples", target: nil, action: nil), NSButton(title: "Libraries", target: nil, action: nil)]
     public let scanButton = NSButton(title: "Scan", target: nil, action: nil)
     public let search = NSSearchField()
-    public let table = NSTableView()
+    public let table = NSOutlineView()
     public let detail = NSTextView()
     public private(set) var setup: SetupWindow?
     public private(set) var formatsWindow: PluginFormatsWindow?
@@ -32,7 +32,9 @@ import SimplifyCore
     private let inspectorMeta = label("Select an item to explore its details.", size: 12, secondary: true)
     private let revealButton = NSButton(title: "Show in Finder", target: nil, action: nil)
     private let collectionScroll = NSScrollView()
-    private var rows: [Asset] = []
+    private var outline = CatalogOutline(roots: [])
+    private var presentationContext = ""
+    public var selectedNode: CatalogOutlineNode? { table.item(atRow: table.selectedRow) as? CatalogOutlineNode }
     private var coverageWindow: NSWindow?
     private var refreshing = false
 
@@ -90,6 +92,8 @@ import SimplifyCore
             let col = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id)); col.title = title; col.width = width; col.minWidth = id == "name" ? 155 : 65; table.addTableColumn(col)
         }
         table.dataSource = self; table.delegate = self; table.rowHeight = 38; table.style = .inset
+        table.outlineTableColumn = table.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("name"))
+        table.indentationPerLevel = 16; table.autoresizesOutlineColumn = false
         table.usesAlternatingRowBackgroundColors = false; table.columnAutoresizingStyle = .firstColumnOnlyAutoresizingStyle
         table.setAccessibilityLabel("Audio collection")
         collectionScroll.documentView = table; collectionScroll.hasVerticalScroller = true; collectionScroll.hasHorizontalScroller = true
@@ -139,20 +143,43 @@ import SimplifyCore
 
     public func refresh() {
         refreshing = true; defer { refreshing = false }
-        rows = model.visibleAssets; table.reloadData()
-        if let selected = model.selectedPath, let index = rows.firstIndex(where: { $0.selectionKey == selected }) { table.selectRowIndexes(IndexSet(integer: index), byExtendingSelection: false) } else { table.deselectAll(nil) }
+        outline = model.outline; table.reloadData(); table.collapseItem(nil, collapseChildren: true)
+        func expand(_ nodes: [CatalogOutlineNode]) {
+            for node in nodes where !node.children.isEmpty && model.outlineState.isExpanded(node, category: model.category, query: model.query) {
+                table.expandItem(node); expand(node.children)
+            }
+        }
+        expand(outline.roots)
+        let selectedID = model.outlineState.selectedID(category: model.category, query: model.query)
+        let selected = selectedID.flatMap { outline.byID[$0] }
+        let row = selected.map { table.row(forItem: $0) } ?? -1
+        if row >= 0 { table.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false) }
+        else { table.deselectAll(nil) }
+        model.selectedPath = selectedNode?.asset?.selectionKey
+        let context = model.category.rawValue + ":" + model.query
+        if context != presentationContext, row >= 0 { table.scrollRowToVisible(row) }
+        presentationContext = context
         let index = [AssetKind.plugin, .sample, .library].firstIndex(of: model.category) ?? 0
         for (i, button) in categoryButtons.enumerated() {
             button.state = i == index ? .on : .off
             button.layer?.backgroundColor = (i == index ? CatalogTheme.accent.withAlphaComponent(0.14) : NSColor.clear).cgColor
         }
-        let title = ["Plugins", "Samples", "Libraries"][index]; titleLabel.stringValue = title; search.placeholderString = "Search \(title.lowercased())"
-        countLabel.stringValue = model.report == nil ? ["Your audio tools, together.", "Small sounds. Endless possibilities.", "A home for your instruments."][index] : "\(rows.count.formatted()) \(index == 0 ? (rows.count == 1 ? "plugin" : "plugins") : rows.count == 1 ? "item" : "items")\(model.query.isEmpty ? "" : " matching your search")"
+        let title = ["Plugins", "Individual Samples", "Libraries"][index]; titleLabel.stringValue = title
+        search.placeholderString = model.category == .library ? "Search libraries and instruments" : "Search \(model.category == .sample ? "samples" : "plugins")"
+        search.stringValue = model.query
+        let count = outline.nodes.filter { $0.kind == .plugin || $0.kind == .library || $0.kind == .sample }.count
+        let instruments = outline.nodes.filter { $0.kind == .instrument }.count
+        let noun = model.category == .plugin ? (count == 1 ? "plugin" : "plugins") : model.category == .sample ? (count == 1 ? "sample" : "samples") : (count == 1 ? "library" : "libraries")
+        countLabel.stringValue = model.report == nil ? ["Your audio tools, together.", "Small sounds. Endless possibilities.", "A home for your instruments."][index] : "\(count.formatted()) \(noun)" + (model.category == .library ? " · \(instruments.formatted()) \(instruments == 1 ? "instrument" : "instruments")" : "") + (model.query.isEmpty ? "" : " matching your search")
         if !model.isScanning, model.report?.issues.contains(where: { $0.reason.contains("Entry limit") }) == true { countLabel.stringValue += " · partial scan" }
-        table.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("reference"))?.isHidden = model.category == .library
-        table.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("reference"))?.title = model.category == .plugin ? "Last used" : "Project recency"
+        table.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("reference"))?.isHidden = false
+        table.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("reference"))?.title = model.category == .sample ? "Project recency" : "Last used"
+        table.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("size"))?.title = model.category == .library ? "Installed size" : "Size"
+        table.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("size"))?.width = model.category == .library ? 135 : 90
+        table.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("format"))?.title = model.category == .library ? "Player / format" : "Format"
+        table.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("format"))?.width = model.category == .library ? 105 : 75
         for id in ["format", "size"] { table.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier(id))?.isHidden = model.category == .plugin }
-        sortMenu.item(at: 1)?.isEnabled = model.category != .plugin
+        sortMenu.item(at: 1)?.isEnabled = model.category == .sample
         sortMenu.item(at: 2)?.isEnabled = model.category == .sample
         sortMenu.selectItem(withTitle: model.sort.rawValue)
         scanButton.isEnabled = !model.isBusy; folderButton.isEnabled = !model.isBusy
@@ -161,7 +188,7 @@ import SimplifyCore
         refreshProgress()
         statusLabel.stringValue = model.isRemoving ? "Moving selected installations to Trash…" : model.catalogNotice ?? model.setupNotice ?? (model.usingSavedCatalog && !model.isScanning ? "Saved collection · Scan to refresh" : model.isScanning ? (model.isBackgroundScanning ? "Updating in background · browse as results arrive" : "Finding your collection…") : model.configurationChanged ? "Locations changed. Scan to update." : model.report == nil ? "Ready when you are." : "\(model.report!.projects.count) projects · \(model.report!.issues.count) scan issue\(model.report!.issues.count == 1 ? "" : "s")")
         statusLabel.toolTip = model.status
-        emptyContainer.isHidden = !rows.isEmpty; collectionScroll.isHidden = rows.isEmpty
+        emptyContainer.isHidden = !outline.roots.isEmpty; collectionScroll.isHidden = outline.roots.isEmpty
         emptyTitle.stringValue = model.isScanning ? (model.isBackgroundScanning ? "Your collection is open." : "Finding your sounds…") : model.report == nil ? "Meet your collection." : model.query.isEmpty ? "No items found." : "No matches."
         emptyBody.stringValue = model.isScanning ? "Items appear as they are found. You can switch collections and search while project references are checked in the background." : model.report == nil ? model.locationSummary : model.query.isEmpty ? model.locationSummary : "Try another name or clear your search to see the collection."
         emptyButton.title = model.query.isEmpty ? "Set up locations…" : "Clear search"; emptyButton.isEnabled = !model.isScanning || !model.query.isEmpty
@@ -198,15 +225,52 @@ import SimplifyCore
         scanProgressDetail.toolTip = update?.currentPath
     }
     private func updateInspector() {
-        formatsButton.isHidden = model.selectedPlugin == nil
+        let node = selectedNode
+        formatsButton.isHidden = node?.kind != .plugin || model.selectedPlugin == nil
         formatsButton.isEnabled = !model.isBusy
-        inspectorTitle.toolTip = model.selectedAsset?.name
+        inspectorTitle.toolTip = node?.breadcrumb.joined(separator: " › ")
         detail.textStorage?.setAttributedString(NSAttributedString(string: "", attributes: [.font: NSFont.systemFont(ofSize: 12), .foregroundColor: NSColor.secondaryLabelColor]))
         detail.typingAttributes = [.font: NSFont.systemFont(ofSize: 12), .foregroundColor: NSColor.secondaryLabelColor]
-        guard let asset = model.selectedAsset else {
+        guard let node else {
             inspectorTitle.stringValue = "A closer look"; inspectorMeta.stringValue = "Select an item to see its location and project references."; detail.string = "Choose an item to see its formats, locations, and available project evidence."; revealButton.isEnabled = false; return
         }
-        inspectorTitle.stringValue = asset.name + (asset.catalogStale == true ? " · Not observed" : "")
+        inspectorTitle.stringValue = node.displayName
+        revealButton.isEnabled = node.location != nil
+        if node.isGroup {
+            inspectorMeta.stringValue = node.kind == .maker ? "Maker" : node.kind == .unidentified ? "Unverified library identities" : "Sample folder"
+            detail.string = node.breadcrumb.joined(separator: " › ") + "\n\n\(node.children.count.formatted()) entries in this group."
+            if node.kind == .unidentified { detail.string += "\n\nThese library boundaries are proposed or unresolved. They are not vendor-confirmed products." }
+            if let path = node.location {
+                let parts = URL(fileURLWithPath: path).pathComponents
+                let volume = parts.count > 2 && parts[1] == "Volumes" ? parts[2] : "Startup volume"
+                detail.string += "\n\nVOLUME\n\(volume)\n\nLOCATION\n\(path)\n\nFolders reflect discovered samples. No files are moved by this view."
+            }
+            return
+        }
+        guard let asset = node.asset else { return }
+        if node.kind == .library || node.kind == .instrument {
+            let metadata = asset.libraryMetadata
+            inspectorMeta.stringValue = node.kind == .instrument ? "Instrument · \(metadata?.player ?? asset.format)" : "Library · \(metadata?.player ?? asset.format)"
+            let tags = node.instrument.map { metadata?.tags(for: $0, productName: asset.name) ?? $0.tags } ?? metadata?.tags ?? []
+            var sections = [node.breadcrumb.joined(separator: " › ")]
+            if node.metadataOnlyMatch { sections.append("Library metadata match. No individual installed instrument matched this search.") }
+            if let summary = metadata?.summary, !summary.isEmpty { sections.append(summary) }
+            if node.kind == .instrument {
+                sections.append("PARENT LIBRARY\n\(asset.name)\nInstalled size: Not measured\nInstrument storage: Shared with library")
+            } else {
+                let count = metadata?.instruments.count ?? 0
+                let guidance = count == 0 ? "No indexed instruments." : node.metadataOnlyMatch ? "Clear search to browse." : "Expand this library to browse."
+                sections.append("INSTALLED SIZE\nNot measured\n\nINSTRUMENTS\n\(count) indexed · \(guidance)")
+            }
+            if !tags.isEmpty { sections.append("TAGS\n" + tags.joined(separator: ", ")) }
+            sections.append("USAGE\nUnknown. Instrument discovery does not establish project inclusion.")
+            if node.stale { sections.append("AVAILABILITY\nNot observed in the latest scan. This retained entry may be offline or moved.") }
+            sections.append("IDENTIFICATION\n\(metadata?.source ?? asset.classification)")
+            if let location = node.location { sections.append("LOCATION\n" + location) }
+            detail.string = sections.joined(separator: "\n\n")
+            highlightSearch()
+            return
+        }
         inspectorMeta.stringValue = "\(asset.format.isEmpty ? "Folder" : asset.format.uppercased())  ·  \(asset.logicalBytes.map { ByteCountFormatter.string(fromByteCount: Int64($0), countStyle: .file) } ?? "Size not measured")"
         if let product = model.selectedPlugin {
             inspectorMeta.stringValue = "\(product.installations.count) installation(s) · \(product.formats)"
@@ -214,45 +278,80 @@ import SimplifyCore
             revealButton.isEnabled = true
             return
         }
-        if let metadata = asset.libraryMetadata {
-            inspectorMeta.stringValue = metadata.player + " · " + metadata.maker
-            let instruments = metadata.instruments.filter { model.query.isEmpty || ($0.name + " " + $0.tags.joined(separator: " ")).localizedCaseInsensitiveContains(model.query) }
-            detail.string = [metadata.summary, "TAGS", metadata.tags.joined(separator: ", "), "INSTRUMENTS", instruments.prefix(100).map { $0.name + ($0.catalogStale == true ? " (Not observed)" : "") }.joined(separator: "\n"), instruments.count > 100 ? "Showing 100 of \(instruments.count) instruments. Narrow your search." : "", "IDENTIFICATION", metadata.source, "Usage history: unknown. Instrument discovery does not establish project inclusion.", "LOCATION", asset.path].filter { !$0.isEmpty }.joined(separator: "\n\n")
-            revealButton.isEnabled = true; return
-        }
         let reference = model.detail.components(separatedBy: "\n\n").dropFirst(3).joined(separator: "\n\n")
-        detail.string = "LOCATION\n\n\(asset.path)\n\nPROJECT REFERENCES\n\n\(reference)"
+        detail.string = node.breadcrumb.joined(separator: " › ") + "\n\nAudio file\n\nLOCATION\n\n\(asset.path)\n\nPROJECT REFERENCES\n\n\(reference)"
         let string = NSMutableAttributedString(string: detail.string, attributes: [.font: NSFont.systemFont(ofSize: 12), .foregroundColor: NSColor.secondaryLabelColor])
         for title in ["LOCATION", "PROJECT REFERENCES"] {
             string.addAttributes([.font: NSFont.systemFont(ofSize: 10, weight: .semibold), .foregroundColor: NSColor.labelColor], range: (string.string as NSString).range(of: title))
         }
         detail.textStorage?.setAttributedString(string); revealButton.isEnabled = true
+        highlightSearch()
     }
-    public func numberOfRows(in tableView: NSTableView) -> Int { rows.count }
-    public func tableView(_ tableView: NSTableView, viewFor column: NSTableColumn?, row: Int) -> NSView? {
-        guard rows.indices.contains(row) else { return nil }; let asset = rows[row]
+    private func highlightSearch() {
+        guard !model.query.isEmpty, let storage = detail.textStorage else { return }
+        let text = storage.string as NSString
+        var remaining = NSRange(location: 0, length: text.length)
+        while remaining.length > 0 {
+            let match = text.range(of: model.query, options: [.caseInsensitive, .diacriticInsensitive], range: remaining)
+            guard match.location != NSNotFound else { break }
+            storage.addAttributes([.font: NSFont.systemFont(ofSize: 12, weight: .semibold), .foregroundColor: NSColor.labelColor], range: match)
+            remaining = NSRange(location: NSMaxRange(match), length: text.length - NSMaxRange(match))
+        }
+    }
+    public func outlineView(_ outlineView: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
+        (item as? CatalogOutlineNode)?.children.count ?? outline.roots.count
+    }
+    public func outlineView(_ outlineView: NSOutlineView, child index: Int, ofItem item: Any?) -> Any {
+        ((item as? CatalogOutlineNode)?.children ?? outline.roots)[index]
+    }
+    public func outlineView(_ outlineView: NSOutlineView, isItemExpandable item: Any) -> Bool {
+        !(item as! CatalogOutlineNode).children.isEmpty
+    }
+    public func outlineView(_ outlineView: NSOutlineView, viewFor column: NSTableColumn?, item: Any) -> NSView? {
+        guard let node = item as? CatalogOutlineNode else { return nil }
         let value: String
         switch column?.identifier.rawValue {
-        case "format": value = model.product(for: asset)?.formats ?? (asset.format.isEmpty ? "Folder" : asset.format.uppercased())
-        case "size": value = asset.logicalBytes.map { ByteCountFormatter.string(fromByteCount: Int64($0), countStyle: .file) } ?? "—"
-        case "reference": value = model.referenceText(asset)
+        case "format":
+            value = node.instrument.map { URL(fileURLWithPath: $0.path).pathExtension.uppercased() }
+                .flatMap { $0.isEmpty ? nil : $0 } ?? node.asset.map { $0.libraryMetadata?.player ?? $0.format.uppercased() } ?? ""
+        case "size": value = node.isGroup ? "" : node.sizeText
+        case "reference":
+            value = node.isGroup ? "" : node.kind == .library || node.kind == .instrument ? "Unknown" : node.asset.map(model.referenceText) ?? ""
         default:
-            let stale = model.product(for: asset).map { $0.installations.allSatisfy { $0.catalogStale == true } } ?? (asset.catalogStale == true)
-            value = (model.product(for: asset)?.name ?? asset.name) + (stale ? " · Not observed" : "")
+            let product = node.asset.flatMap(model.product)
+            let stale = product.map { $0.installations.allSatisfy { $0.catalogStale == true } } ?? node.stale
+            value = (product?.name ?? node.title) + (stale ? " · Not observed" : "")
         }
-        return CatalogCell(value: value, primary: column?.identifier.rawValue == "name")
+        let subtitle: String?
+        if column?.identifier.rawValue == "name", node.metadataOnlyMatch {
+            subtitle = "Library metadata match"
+        } else if column?.identifier.rawValue == "name", !model.query.isEmpty, node.kind == .sample {
+            subtitle = node.breadcrumb.dropLast().joined(separator: " › ")
+        } else { subtitle = nil }
+        return CatalogCell(value: value, primary: column?.identifier.rawValue == "name", subtitle: subtitle,
+                           query: model.query, context: [node.kind == .sample ? "Audio file" : nil, node.breadcrumb.joined(separator: " › "), node.location].compactMap { $0 }.joined(separator: " · "))
     }
-    public func tableViewSelectionDidChange(_ notification: Notification) { guard !refreshing else { return }; model.selectedPath = rows.indices.contains(table.selectedRow) ? rows[table.selectedRow].selectionKey : nil; updateInspector() }
+    public func outlineViewSelectionDidChange(_ notification: Notification) {
+        guard !refreshing else { return }
+        model.outlineState.select(selectedNode?.id, category: model.category, query: model.query)
+        model.selectedPath = selectedNode?.asset?.selectionKey; updateInspector()
+    }
+    public func outlineViewItemDidExpand(_ notification: Notification) { recordExpansion(notification, expanded: true) }
+    public func outlineViewItemDidCollapse(_ notification: Notification) { recordExpansion(notification, expanded: false) }
+    private func recordExpansion(_ notification: Notification, expanded: Bool) {
+        guard !refreshing, let node = notification.userInfo?["NSObject"] as? CatalogOutlineNode else { return }
+        model.outlineState.setExpanded(expanded, node: node, category: model.category, query: model.query)
+    }
     public func controlTextDidChange(_ notification: Notification) { model.query = search.stringValue; refresh() }
     @objc public func scan() { model.scan() }
     @objc public func focusSearch(_ sender: Any?) { window?.makeFirstResponder(search) }
     @objc public func changeCategory(_ sender: NSButton) {
         model.category = [AssetKind.plugin, .sample, .library][sender.tag]; model.selectedPath = nil
-        if model.category != .sample && model.sort == .recency { model.sort = .name }; refresh()
+        if model.category != .sample { model.sort = .name }; refresh()
     }
     @objc private func changeSort() { model.sort = CatalogSort.allCases[sortMenu.indexOfSelectedItem]; refresh() }
     @objc private func emptyAction() { if !model.query.isEmpty { search.stringValue = ""; model.query = ""; refresh() } else { showSetup() } }
-    @objc private func reveal() { guard let asset = model.selectedAsset else { return }; NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: asset.path)]) }
+    @objc private func reveal() { guard let path = selectedNode?.location else { return }; NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)]) }
     @objc public func showSetup() {
         guard !model.isBusy, window?.attachedSheet == nil else { return }
         setup = SetupWindow(model: model)

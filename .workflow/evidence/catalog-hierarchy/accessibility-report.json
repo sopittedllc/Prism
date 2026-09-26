@@ -1,0 +1,23 @@
+{
+  "client": "codex",
+  "role": "qa-native-accessibility-checks",
+  "status": "passed",
+  "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+  "scope": "Incremental native outline semantics and keyboard controls; not full assistive-technology certification",
+  "evidence": [
+    "runtime-report.json",
+    "ux-review-report.json"
+  ],
+  "verified": [
+    "Native NSOutlineView accessibility role.",
+    "Native right/left arrow expansion and collapse.",
+    "Search Command-F focus and collection labels.",
+    "Accessible result context includes kind, breadcrumb and full location.",
+    "Shared/unknown storage, stale and metadata-only states use visible text.",
+    "Existing cached/stale removal controls remain disabled."
+  ],
+  "limits": [
+    "VoiceOver user testing not performed.",
+    "Full keyboard-only workflow, increased contrast, RTL, older OS and Intel not tested."
+  ]
+}

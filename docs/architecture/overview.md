@@ -37,3 +37,13 @@ snapshots, and one in-flight operation. CatalogStateRegistry and feature-registr
 define view controls and setup persistence participation. SetupStore atomically stores only roots, the standard-plugin toggle and onboarding completion in version 1. Other view state is session-only. Bounded reads reject corrupt, oversized, nonregular and unsupported-version files; the wizard can use a draft for one session if saving fails. There is no preset serializer.
 The launcher can preselect an explicitly supplied --project-root without scanning it.
 CatalogTheme adapts Projector typography/spacing/panel/accent roles.
+
+CatalogOutline projects inventory into immutable presentation nodes on the main actor,
+without filesystem reads. The model caches base trees until inventory, roots or sorting
+changes, then filters cached trees for queries. Libraries group by evidenced maker/product
+and preserve each installation and instrument; samples derive directories from discovered
+paths under the most specific configured root. NSOutlineView uses stable presentation IDs
+and registry-backed session navigation state for expansion and selection. Search contexts
+are separate from browse contexts. The inspector reads the selected node's payload rather
+than treating every child as the whole library. Plugin operations still resolve through
+the existing current-scan model and never through group/outline identities.

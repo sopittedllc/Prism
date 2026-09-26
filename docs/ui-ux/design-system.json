@@ -175,6 +175,30 @@
         "native synthetic Trash",
         "catalog stale review rejection"
       ]
+    },
+    {
+      "semantic_role": "hierarchical collection",
+      "authority": "CatalogOutline / CatalogOutlineState / CatalogWindow NSOutlineView / CatalogCell",
+      "states": [
+        "maker and root expanded",
+        "library and folder collapsed",
+        "selected instrument",
+        "contextual search",
+        "metadata-only match",
+        "flat sample search",
+        "restored browse",
+        "offline stale"
+      ],
+      "examples": [
+        "Libraries maker/product/instrument",
+        "Individual Samples root/directory/file",
+        "Plugins product leaves"
+      ],
+      "tests": [
+        "CatalogOutlineTests",
+        "catalog-runtime",
+        "catalog-state"
+      ]
     }
   ],
   "patterns": [
@@ -184,7 +208,10 @@
     "No numeric cleanup/savings claims from incomplete evidence",
     "Table text is centered vertically inside 38pt rows with 8pt horizontal inset.",
     "Folder lists use a flipped document with top-anchored rows; edits focus the same category folder chooser.",
-    "Stream inventory before project analysis; pending references remain explicit. Determinate progress has no animation lag."
+    "Stream inventory before project analysis; pending references remain explicit. Determinate progress has no animation lag.",
+    "Native outline uses 16pt indentation with the shared 38pt row and 8pt text inset.",
+    "Search keeps matching patch ancestors; flat sample results show a root-relative breadcrumb and distinguish equal root names.",
+    "Unmeasured library footprint remains Not measured; instrument storage is Shared with library."
   ],
   "exceptions": [
     {

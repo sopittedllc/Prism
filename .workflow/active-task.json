@@ -1,64 +1,69 @@
 {
   "schema_version": 1,
+  "task_id": "catalog-hierarchy",
+  "title": "Hierarchical library and sample browsing with contextual search",
   "risk_tier": 2,
-  "base_revision": "content:e2744b65b627ba2bd2e085a99d29d10b7ee07b6f46ece909ba288443c6ea38ad",
   "domains": [
-    "stateful-feature",
-    "ui-ux"
+    "ui-ux",
+    "stateful-feature"
   ],
-  "task_id": "persistent-catalog",
-  "title": "Persistent inventory catalog and immediate cached browsing",
   "state": "complete",
+  "base_revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
   "product_decisions_needed": [],
   "acceptance_criteria": [
     {
       "id": "AC1",
-      "statement": "Durable graph and identity",
+      "statement": "Golden library hierarchy",
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/persistent-catalog/automated_tests.json",
-        ".workflow/evidence/persistent-catalog/runtime_tests.json",
-        ".workflow/evidence/persistent-catalog/state-report.json"
+        ".workflow/evidence/catalog-hierarchy/automated_tests.json",
+        ".workflow/evidence/catalog-hierarchy/runtime_tests.json",
+        ".workflow/evidence/catalog-hierarchy/source-review-report.json",
+        ".workflow/evidence/catalog-hierarchy/ux-review-report.json"
       ]
     },
     {
       "id": "AC2",
-      "statement": "Partial/offline and removal safety",
+      "statement": "Contextual search and restoration",
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/persistent-catalog/automated_tests.json",
-        ".workflow/evidence/persistent-catalog/runtime_tests.json",
-        ".workflow/evidence/persistent-catalog/state-report.json"
+        ".workflow/evidence/catalog-hierarchy/automated_tests.json",
+        ".workflow/evidence/catalog-hierarchy/runtime_tests.json",
+        ".workflow/evidence/catalog-hierarchy/source-review-report.json",
+        ".workflow/evidence/catalog-hierarchy/ux-review-report.json"
       ]
     },
     {
       "id": "AC3",
-      "statement": "Atomic schema and backup",
+      "statement": "Sample root/folder hierarchy",
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/persistent-catalog/automated_tests.json",
-        ".workflow/evidence/persistent-catalog/runtime_tests.json",
-        ".workflow/evidence/persistent-catalog/state-report.json"
+        ".workflow/evidence/catalog-hierarchy/automated_tests.json",
+        ".workflow/evidence/catalog-hierarchy/runtime_tests.json",
+        ".workflow/evidence/catalog-hierarchy/source-review-report.json",
+        ".workflow/evidence/catalog-hierarchy/ux-review-report.json"
       ]
     },
     {
       "id": "AC4",
-      "statement": "Async model integration",
+      "statement": "Native interaction and truthful details",
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/persistent-catalog/automated_tests.json",
-        ".workflow/evidence/persistent-catalog/runtime_tests.json",
-        ".workflow/evidence/persistent-catalog/state-report.json"
+        ".workflow/evidence/catalog-hierarchy/automated_tests.json",
+        ".workflow/evidence/catalog-hierarchy/runtime_tests.json",
+        ".workflow/evidence/catalog-hierarchy/source-review-report.json",
+        ".workflow/evidence/catalog-hierarchy/ux-review-report.json"
       ]
     },
     {
       "id": "AC5",
-      "statement": "State coverage and validation",
+      "statement": "State coverage and verification",
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/persistent-catalog/automated_tests.json",
-        ".workflow/evidence/persistent-catalog/runtime_tests.json",
-        ".workflow/evidence/persistent-catalog/state-report.json"
+        ".workflow/evidence/catalog-hierarchy/automated_tests.json",
+        ".workflow/evidence/catalog-hierarchy/runtime_tests.json",
+        ".workflow/evidence/catalog-hierarchy/source-review-report.json",
+        ".workflow/evidence/catalog-hierarchy/ux-review-report.json"
       ]
     }
   ],
@@ -66,123 +71,123 @@
     "research": {
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/persistent-catalog/research.json"
+        ".workflow/evidence/catalog-hierarchy/research.json"
       ],
-      "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
-      "agent": "codex-report-verification"
+      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+      "agent": "codex-researcher"
     },
     "plan_review": {
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/persistent-catalog/plan_review.json"
+        ".workflow/evidence/catalog-hierarchy/plan_review.json"
       ],
-      "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
-      "agent": "codex-report-verification"
+      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+      "agent": "independent-codex-critic"
     },
     "implementation": {
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/persistent-catalog/implementation.json"
+        ".workflow/evidence/catalog-hierarchy/implementation.json"
       ],
-      "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
-      "agent": "codex-report-verification"
+      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+      "agent": "codex-qa"
     },
     "automated_tests": {
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/persistent-catalog/automated_tests.json"
+        ".workflow/evidence/catalog-hierarchy/automated_tests.json"
       ],
-      "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
+      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
       "agent": "scripts/run_check.py"
     },
     "code_review": {
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/persistent-catalog/code_review.json"
+        ".workflow/evidence/catalog-hierarchy/code_review.json"
       ],
-      "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
-      "agent": "codex-report-verification"
+      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+      "agent": "independent-codex-reviewer"
     },
     "runtime_tests": {
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/persistent-catalog/runtime_tests.json"
+        ".workflow/evidence/catalog-hierarchy/runtime_tests.json"
       ],
-      "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
+      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
       "agent": "scripts/run_check.py"
     },
     "state_coverage": {
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/persistent-catalog/state_coverage.json"
+        ".workflow/evidence/catalog-hierarchy/state_coverage.json"
       ],
-      "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
-      "agent": "codex-report-verification"
+      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+      "agent": "codex-qa"
     },
     "preset_roundtrip": {
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/persistent-catalog/preset_roundtrip.json"
+        ".workflow/evidence/catalog-hierarchy/preset_roundtrip.json"
       ],
-      "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
-      "agent": "codex-report-verification"
+      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+      "agent": "codex-qa"
     },
     "state_migration": {
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/persistent-catalog/state_migration.json"
+        ".workflow/evidence/catalog-hierarchy/state_migration.json"
       ],
-      "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
-      "agent": "codex-report-verification"
+      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+      "agent": "codex-qa"
     },
     "state_integration": {
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/persistent-catalog/state_integration.json"
+        ".workflow/evidence/catalog-hierarchy/state_integration.json"
       ],
-      "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
-      "agent": "codex-report-verification"
+      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+      "agent": "codex-qa"
     },
     "ui_research": {
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/persistent-catalog/ui_research.json"
+        ".workflow/evidence/catalog-hierarchy/ui_research.json"
       ],
-      "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
-      "agent": "codex-report-verification"
+      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+      "agent": "codex-ux-researcher"
     },
     "design_system_audit": {
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/persistent-catalog/design_system_audit.json"
+        ".workflow/evidence/catalog-hierarchy/design_system_audit.json"
       ],
-      "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
-      "agent": "codex-report-verification"
+      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+      "agent": "codex-qa"
     },
     "accessibility": {
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/persistent-catalog/accessibility.json"
+        ".workflow/evidence/catalog-hierarchy/accessibility.json"
       ],
-      "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
-      "agent": "codex-report-verification"
+      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+      "agent": "codex-qa"
     },
     "visual_regression": {
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/persistent-catalog/visual_regression.json"
+        ".workflow/evidence/catalog-hierarchy/visual_regression.json"
       ],
-      "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
-      "agent": "codex-report-verification"
+      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+      "agent": "independent-codex-ux-reviewer"
     },
     "ux_review": {
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/persistent-catalog/ux_review.json"
+        ".workflow/evidence/catalog-hierarchy/ux_review.json"
       ],
-      "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
-      "agent": "codex-report-verification"
+      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+      "agent": "independent-codex-ux-reviewer"
     }
   },
-  "current_revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2"
+  "current_revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522"
 }

@@ -1,0 +1,45 @@
+{
+  "role": "implementer-systemic-audit",
+  "symptom": "Flat library and sample rows hide instrument and folder context.",
+  "semantic_role": "Collection navigation and contextual result identity",
+  "authority": [
+    "docs/ui-ux/design-system.json",
+    "docs/ui-ux/COLLECTION_AND_SETUP.md"
+  ],
+  "searches": [
+    "Inspected CatalogWindow table data source, selection, details and category/search refresh consumers.",
+    "Inspected CatalogModel invalidation, plugin grouping/removal and catalog identity boundaries.",
+    "Inspected native smoke and catalog tests for shared rendering/state consumers."
+  ],
+  "included_consumers": [
+    "Libraries",
+    "Individual Samples",
+    "Plugins",
+    "Search and empty results",
+    "Inspector and Finder reveal",
+    "Saved/stale/error states"
+  ],
+  "excluded_consumers": [
+    "Setup folder list retains its distinct configuration role.",
+    "Plugin format removal remains its existing dedicated control."
+  ],
+  "system_changes": [
+    "Immutable hierarchy projection with stable physical installation identity.",
+    "Native outline with one registry-backed navigation state and separate browse/search contexts.",
+    "Shared query emphasis, contextual accessible cells and disambiguated sample root labels.",
+    "Truthful library footprint and shared instrument storage text."
+  ],
+  "representative_tests": [
+    "CatalogOutlineTests: 5 hierarchy, identity, search, root and state tests.",
+    "Native hierarchy/search/keyboard/category/rescan and removal regression in catalog-runtime.",
+    "Light/dark/compact hierarchy, sample and adjacent state captures."
+  ],
+  "regression_prevention": [
+    "Updated architecture/state policies and design system.",
+    "Exact registry/default/reset/schema checks.",
+    "Independent source and UX review with revision-bound evidence."
+  ],
+  "client": "codex",
+  "status": "passed",
+  "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522"
+}

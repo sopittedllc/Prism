@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "catalog-hierarchy",
+  "gate": "state_integration",
+  "status": "passed",
+  "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+  "timestamp": "2026-09-26T00:49:09.563045+00:00",
+  "producer": "codex-qa",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "state_integration-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/catalog-hierarchy/state-report.json",
+        "sha256": "fae56511fe724dddeb58d27523cfad3a83629a1058305c9e39c2351f47caf99f"
+      }
+    }
+  ]
+}

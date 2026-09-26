@@ -44,6 +44,24 @@ enum SmokeError: Error { case failed(String) }
 }
 
 @MainActor func smoke(_ controller: CatalogWindow, output: URL, store: SetupStore) async throws {
+    func visible(_ controller: CatalogWindow, kind: CatalogOutlineNode.Kind) -> [CatalogOutlineNode] {
+        (0..<controller.table.numberOfRows).compactMap { controller.table.item(atRow: $0) as? CatalogOutlineNode }.filter { $0.kind == kind }
+    }
+    @discardableResult func select(_ controller: CatalogWindow, kind: CatalogOutlineNode.Kind, title: String? = nil) throws -> CatalogOutlineNode {
+        guard let node = visible(controller, kind: kind).first(where: { title == nil || $0.title == title }) else {
+            throw SmokeError.failed("Missing visible \(kind.rawValue) \(title ?? "")")
+        }
+        controller.table.selectRowIndexes(IndexSet(integer: controller.table.row(forItem: node)), byExtendingSelection: false)
+        return node
+    }
+    func arrow(_ controller: CatalogWindow, right: Bool) throws {
+        controller.window?.makeFirstResponder(controller.table)
+        let event = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [.function, .numericPad],
+            timestamp: 0, windowNumber: controller.window!.windowNumber, context: nil,
+            characters: right ? "\u{F703}" : "\u{F702}", charactersIgnoringModifiers: right ? "\u{F703}" : "\u{F702}",
+            isARepeat: false, keyCode: right ? 124 : 123)!
+        controller.table.keyDown(with: event)
+    }
     func activate(_ button: NSButton) {
         // Dispatch the native control action without a nested synthetic mouse-tracking loop.
         if let action = button.action { NSApp.sendAction(action, to: button.target, from: button) }
@@ -62,7 +80,14 @@ enum SmokeError: Error { case failed(String) }
     try file("Plugins/Studio Compressor – " + String(repeating: "Extended Edition ", count: 9) + ".vst3/Contents/Info.plist", "<plist version=\"1.0\"><dict><key>CFBundleIdentifier</key><string>com.fixture.studiocompressor.vst3</string></dict></plist>")
     try file("Plugins/Studio Compressor – " + String(repeating: "Extended Edition ", count: 9) + ".component/Contents/Info.plist", "<plist version=\"1.0\"><dict><key>CFBundleIdentifier</key><string>com.fixture.studiocompressor.au</string></dict></plist>")
     try file("Libraries/Chamber Strings/Samples/C3.wav")
-    try file("Libraries/Chamber Strings/Accordion.nki")
+    try file("Libraries/Chamber Strings/Legato Strings.nki")
+    try file("Libraries/Chamber Strings/Strings.nicnt", "<ProductHints><Product><Name>Chamber Strings</Name><Company>Example Audio</Company></Product></ProductHints>")
+    try file("Libraries/Folk Colors/Folk.nicnt", "<ProductHints><Product><Name>Folk Colors</Name><Company>Example Audio</Company></Product></ProductHints>")
+    try file("Libraries/Folk Colors/Instruments/Accordion.nki")
+    try file("Libraries/Folk Colors/Instruments/Piano.nki")
+    try file("Libraries/Folk Colors/Samples/C3.wav")
+    try file("Libraries/Mystery Box/Instruments/Unknown.nki")
+    try file("Libraries/Mystery Box/Samples/C3.wav")
     try file("Projects/Fixture.rpp", "<REAPER_PROJECT\n<TRACK\n<ITEM\n<SOURCE WAVE\nFILE \"../Samples/Percussion 0.wav\"\n>\n>\n>\n>")
     try file("Projects/Unsupported.ptx")
     let longProject = "<REAPER_PROJECT\n" + String(repeating: "# synthetic metadata\n", count: 100_000) + ">\n"
@@ -71,6 +96,8 @@ enum SmokeError: Error { case failed(String) }
     var screenshots: [String] = []
     func capture(_ name: String, target: NSWindow? = nil) async throws {
         let window = target ?? window
+        // Native outline disclosure animates. Capture the settled composition.
+        try await Task.sleep(for: .milliseconds(350))
         window.contentView?.layoutSubtreeIfNeeded(); window.displayIfNeeded()
         // Window-server capture includes native composited controls, unlike view caching.
         let number = window.windowNumber
@@ -123,8 +150,8 @@ enum SmokeError: Error { case failed(String) }
                     try await Task.sleep(for: .milliseconds(150))
                     try require(model.isScanning && !controller.scanProgressBar.isHidden, "Reading uses a measured progress bar")
                     activate(controller.categoryButtons[1])
-                    try require(model.basicInventoryComplete && controller.table.numberOfRows == 3000, "Basic inventory is browseable before project analysis finishes")
-                    controller.table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+                    try require(model.basicInventoryComplete && visible(controller, kind: .sample).count == 3000, "Basic inventory is browseable before project analysis finishes")
+                    try select(controller, kind: .sample)
                     try require(controller.detail.string.contains("being checked"), "References remain pending during analysis")
                     try await capture("reading-progress"); capturedProgress = true
                 } catch { progressCaptureError = String(describing: error) }
@@ -164,7 +191,7 @@ enum SmokeError: Error { case failed(String) }
     cachedWindow.window?.setContentSize(NSSize(width: 1040, height: 658))
     try await capture("cached-collection-light-compact", target: cachedWindow.window)
     cachedWindow.close(); window.makeKeyAndOrderFront(nil)
-    try require(controller.table.numberOfRows == 3000, "All samples visible")
+    try require(visible(controller, kind: .sample).count == 3000, "All samples visible")
     window.contentView?.layoutSubtreeIfNeeded()
     if let cell = controller.table.view(atColumn: 0, row: 0, makeIfNecessary: true) as? NSTableCellView, let text = cell.textField {
         try require(abs(text.frame.midY - cell.bounds.midY) < 1, "Table text is vertically centered")
@@ -194,17 +221,47 @@ enum SmokeError: Error { case failed(String) }
     controller.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
     for segment in [0, 2] {
         activate(controller.categoryButtons[segment])
-        try require(controller.table.numberOfRows == 1, "Other category")
-        controller.table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
-        try require(controller.detail.string.contains(segment == 0 ? "unknown" : "Usage"), "No false plugin/library reference")
+        try require(visible(controller, kind: segment == 0 ? .plugin : .library).count == (segment == 0 ? 1 : 3), "Other category")
+        try select(controller, kind: segment == 0 ? .plugin : .library)
+        try require(controller.detail.string.localizedCaseInsensitiveContains("unknown"), "No false plugin/library reference")
         try await capture(segment == 0 ? "plugins-dark" : "libraries-dark")
     }
+    let folk = try select(controller, kind: .library, title: "Folk Colors")
+    try require(!controller.table.isItemExpanded(folk), "Libraries start collapsed")
+    try arrow(controller, right: true)
+    try require(controller.table.isItemExpanded(folk), "Native right arrow expands library")
+    let piano = try select(controller, kind: .instrument, title: "Piano")
+    try require(controller.detail.string.contains("Folk Colors") && controller.detail.string.contains("Shared with library"), "Instrument retains parent and shared storage context")
+    try await capture("library-expanded-dark")
+    controller.refresh()
+    try require(controller.selectedNode?.id == piano.id && controller.table.isItemExpanded(folk), "Refresh preserves patch and expansion")
     controller.search.stringValue = "Accordion"
     controller.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
-    try require(controller.table.numberOfRows == 1, "Library search matches instrument name")
+    try require(visible(controller, kind: .instrument).map(\.title) == ["Accordion"], "Library search prunes unrelated instruments")
+    try select(controller, kind: .instrument, title: "Accordion")
+    try require(controller.detail.string.contains("Example Audio › Folk Colors › Accordion"), "Search retains matching instrument breadcrumb")
     try await capture("library-instrument-search")
+    activate(controller.categoryButtons[1]); activate(controller.categoryButtons[2])
+    try require(controller.selectedNode?.title == "Accordion", "Category roundtrip retains search selection")
+    controller.search.stringValue = "no such instrument"; controller.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
+    try require(controller.table.numberOfRows == 0, "Unmatched library search is empty")
     controller.search.stringValue = ""
     controller.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
+    try require(controller.selectedNode?.id == piano.id && controller.table.isItemExpanded(folk), "Clear search restores prior browse selection and expansion")
+    controller.search.stringValue = "Folk Colors"; controller.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
+    try require(visible(controller, kind: .instrument).isEmpty, "Library-only query does not invent matching patches")
+    try select(controller, kind: .library, title: "Folk Colors")
+    try require(controller.detail.string.contains("Library metadata match") && controller.detail.string.contains("Clear search to browse.") && !controller.detail.string.contains("Expand this library"), "Metadata-only match explains how to return to installed instruments")
+    try await capture("library-metadata-search")
+    controller.search.stringValue = ""; controller.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
+    try select(controller, kind: .library, title: "Folk Colors")
+    try arrow(controller, right: false)
+    try require(!controller.table.isItemExpanded(folk), "Native left arrow collapses library")
+    controller.refresh()
+    try require(!controller.table.isItemExpanded(folk), "Explicit collapsed state survives refresh")
+    window.appearance = NSAppearance(named: .aqua)
+    try await capture("library-hierarchy-light-compact")
+    window.appearance = NSAppearance(named: .darkAqua)
     // Only generated plugin fixtures are ever passed to the real Trash service.
     activate(controller.categoryButtons[0])
     controller.table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
@@ -320,7 +377,9 @@ enum SmokeError: Error { case failed(String) }
     let stateWindow = CatalogWindow(model: stateModel); stateWindow.showWindow(nil)
     stateWindow.window?.appearance = NSAppearance(named: .darkAqua)
     stateModel.category = .library; stateWindow.refresh()
-    stateWindow.table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+    let staleLibrary = try select(stateWindow, kind: .library)
+    stateWindow.table.expandItem(staleLibrary)
+    try select(stateWindow, kind: .instrument)
     try require(stateWindow.detail.string.contains("Not observed"), "Unobserved library instrument is labeled")
     try await capture("stale-library", target: stateWindow.window)
     stateModel.category = .plugin; stateWindow.refresh()
@@ -338,13 +397,48 @@ enum SmokeError: Error { case failed(String) }
     errorWindow.window?.appearance = NSAppearance(named: .aqua)
     errorWindow.window?.setContentSize(NSSize(width: 1040, height: 658))
     errorModel.category = .sample; errorWindow.refresh()
-    try require(errorModel.catalogNotice != nil && errorWindow.table.numberOfRows == 1 && errorWindow.scanButton.isEnabled, "Catalog save failure retains browsable live results and retry")
+    try require(errorModel.catalogNotice != nil && visible(errorWindow, kind: .sample).count == 1 && errorWindow.scanButton.isEnabled, "Catalog save failure retains browsable live results and retry")
     let corruptContents = try String(contentsOf: stateRoot.appendingPathComponent("broken.sqlite"), encoding: .utf8)
     try require(corruptContents == "preserve this corrupt fixture", "Corrupt catalog remains unchanged")
     try await capture("catalog-save-error", target: errorWindow.window)
     errorWindow.close()
+
+    try file("Hierarchy/One/Samples/Percussion/Kick.wav")
+    try file("Hierarchy/Two/Samples/Percussion/Kick.wav", "a larger synthetic sample")
+    try file("Hierarchy/One/Samples/Orchestral/Accordion.wav")
+    let sampleModel = CatalogModel(); sampleModel.setStandardPlugins(false)
+    let sampleRoots = ["One/Samples", "Two/Samples", "One/Samples/Orchestral"].map { fixture.appendingPathComponent("Hierarchy/" + $0) }
+    sampleModel.addRoots(sampleRoots, kind: .samples)
+    try await finishStateScan(sampleModel)
+    sampleModel.category = .sample
+    let sampleWindow = CatalogWindow(model: sampleModel); sampleWindow.showWindow(nil)
+    sampleWindow.window?.appearance = NSAppearance(named: .aqua)
+    try require(sampleWindow.table.accessibilityRole() == .outline, "Native accessibility outline role")
+    try require(visible(sampleWindow, kind: .root).count == 3 && sampleModel.totalCount == 3, "Overlapping roots stay distinct without duplicating samples")
+    let folder = try select(sampleWindow, kind: .folder, title: "Percussion")
+    try arrow(sampleWindow, right: true)
+    try require(sampleWindow.table.isItemExpanded(folder), "Native right arrow expands sample folder")
+    let kick = try select(sampleWindow, kind: .sample, title: "Kick")
+    try require(sampleWindow.detail.string.contains("Samples · One › Percussion › Kick"), "Sample details preserve distinguishable root and folder context")
+    try await capture("sample-folder-tree", target: sampleWindow.window)
+    sampleWindow.search.stringValue = "Kick"; sampleWindow.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
+    sampleModel.sort = .size; sampleWindow.refresh()
+    try require(sampleWindow.table.numberOfRows == 2 && visible(sampleWindow, kind: .sample).count == 2, "Sample search is flat and preserves both roots")
+    try select(sampleWindow, kind: .sample, title: "Kick")
+    try require(sampleWindow.selectedNode?.location?.contains("/Two/") == true, "Flat sample search sorts across root boundaries")
+    sampleWindow.window?.setContentSize(NSSize(width: 1040, height: 658))
+    sampleWindow.window?.appearance = NSAppearance(named: .darkAqua)
+    try await capture("sample-search-breadcrumbs", target: sampleWindow.window)
+    sampleWindow.search.stringValue = ""; sampleWindow.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
+    try require(sampleWindow.selectedNode?.id == kick.id, "Clearing sample search restores browse selection")
+    sampleModel.category = .plugin; sampleWindow.refresh()
+    sampleModel.category = .sample; sampleWindow.refresh()
+    try require(sampleWindow.selectedNode?.id == kick.id, "Switching categories preserves sample browsing")
+    try await finishStateScan(sampleModel)
+    try require(sampleWindow.selectedNode?.id == kick.id, "Rescan preserves sample selection and ancestors")
+    sampleWindow.close()
     let result: [String: Any] = ["status": "passed", "fixture_samples": 3000, "cached_restore_seconds": restoreSeconds, "screenshots": screenshots,
-                                "checks": ["setup next/back/skip/finish controls", "draft cancellation", "setup reopen restores accepted roots", "explicit first scan", "actual scan/category controls", "async completion", "discovery counts and determinate reading progress", "search", "selection retention", "sample provenance", "unavailable matching", "coverage issues", "accessibility labels", "keyboard search focus", "centered padded cells", "inventory browsing before analysis completes", "long folder removal focus", "save error recovery", "grouped plugin formats", "cancel removal keeps all", "real Trash of synthetic fixtures only", "selective and whole-product removal", "durable catalog reopening", "cached removal disabled", "removed plugins stay absent after reopen", "offline library and instrument labels", "stale removal disabled", "catalog save failure retains live browsing", "corrupt catalog preserved"],
+                                "checks": ["setup next/back/skip/finish controls", "draft cancellation", "setup reopen restores accepted roots", "explicit first scan", "actual scan/category controls", "async completion", "discovery counts and determinate reading progress", "search", "selection retention", "sample provenance", "unavailable matching", "coverage issues", "accessibility labels", "keyboard search focus", "centered padded cells", "inventory browsing before analysis completes", "long folder removal focus", "save error recovery", "grouped plugin formats", "cancel removal keeps all", "real Trash of synthetic fixtures only", "selective and whole-product removal", "durable catalog reopening", "cached removal disabled", "removed plugins stay absent after reopen", "offline library and instrument labels", "stale removal disabled", "catalog save failure retains live browsing", "corrupt catalog preserved", "native outline accessibility role", "native arrow expand and collapse", "library maker and instrument hierarchy", "search prunes unrelated patches", "search clear and category restoration", "metadata-only matches explicit", "distinct overlapping sample roots", "flat sample search and cross-root sort", "sample rescan selection restoration"],
                                 "limits": ["VoiceOver user testing not performed", "native open panel interaction not automated", "current Mac only", "first visual baseline, no previous image diff"]]
     try JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted, .sortedKeys]).write(to: output.appendingPathComponent("runtime.json"))
     print("UI smoke: PASS")

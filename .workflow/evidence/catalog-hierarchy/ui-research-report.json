@@ -1,0 +1,74 @@
+{
+  "client": "codex",
+  "role": "ux-researcher",
+  "status": "passed",
+  "official_sources": [
+    "https://developer.apple.com/documentation/appkit/nsoutlineview",
+    "https://support.apple.com/en-kg/guide/mac-help/mchldaafb302/mac",
+    "https://docs.native-instruments.com/ni-tech-manuals/kontakt-manual/en/browser-and-presets",
+    "https://help.ableton.com/hc/en-us/articles/360000268570-Using-Collections"
+  ],
+  "local_api_verification": "Installed macOS SDK NSOutlineView.h: NSOutlineView conforms to NSAccessibilityOutline; outlineTableColumn, indentationPerLevel, row/item mapping, child datasource and delegate expand/collapse notifications verified. Current Apple documentation returns a JavaScript shell.",
+  "comparable_cases": [
+    {
+      "name": "Finder list and preview",
+      "user_context": "Mac users browsing files across directories",
+      "task": "Locate a file and inspect context",
+      "pattern": "List columns plus contextual selection details",
+      "success": "Inference: retains orientation and familiar comparison",
+      "failure": "Inference: reproducing the entire filesystem would overwhelm this scoped catalog",
+      "transferability": "Real sample roots/directories and explicit detail locators"
+    },
+    {
+      "name": "Kontakt browser",
+      "user_context": "Composers selecting instruments in installed products",
+      "task": "Find an instrument by product, sound type or text",
+      "pattern": "Product and sound-type filters with instrument results",
+      "success": "Inference: product context disambiguates instruments",
+      "failure": "Inference: matching product metadata alone does not prove a particular installed patch",
+      "transferability": "Maker/product context and instrument-level matching; label library metadata matches"
+    },
+    {
+      "name": "Ableton Collections",
+      "user_context": "Musicians organizing browser entries",
+      "task": "Find sounds and reusable items",
+      "pattern": "Browser item organization independent of physical file moves",
+      "success": "Inference: logical browsing avoids altering source storage",
+      "failure": "Inference: collections do not establish safe removal ownership",
+      "transferability": "Virtual library hierarchy over unchanged physical locations"
+    }
+  ],
+  "synthesis": {
+    "requirements": [
+      "Use native hierarchical disclosure and keyboard semantics",
+      "Retain parent context in instrument search",
+      "Separate unverified product identity",
+      "Do not invent storage/usage evidence"
+    ],
+    "recurring_patterns": [
+      "Stable parent context",
+      "Scoped search",
+      "Selection-specific details"
+    ],
+    "project_inferences": [
+      "Maker/library/instrument tree for Libraries; filesystem-relative tree for Individual Samples",
+      "Search keeps only matching instrument branches; library metadata-only matches stay explicit",
+      "Separate search and browse navigation snapshots"
+    ],
+    "hypotheses": [
+      "Native outline reduces flat-folder confusion",
+      "Sample search remains efficient on existing 3000-file fixture; larger indexed scaling is a later deliverable"
+    ]
+  },
+  "decision": "Implement the approved hierarchical browser using NSOutlineView and existing catalog evidence, preserving plugin operations and local-only metadata.",
+  "validation": [
+    "Golden hierarchy/search/root fixtures",
+    "Native arrow/disclosure interactions and restoring browse selection",
+    "Light/dark compact and typical screenshot matrix",
+    "Registry/reset/schema checks and independent review"
+  ],
+  "limits": [
+    "Comparable workflows reviewed through official documentation, not independently run.",
+    "No VoiceOver certification or million-item scaling claim."
+  ]
+}

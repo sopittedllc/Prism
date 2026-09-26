@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "catalog-hierarchy",
+  "gate": "accessibility",
+  "status": "passed",
+  "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+  "timestamp": "2026-09-26T00:49:09.647093+00:00",
+  "producer": "codex-qa",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "accessibility-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/catalog-hierarchy/accessibility-report.json",
+        "sha256": "d0b8e0deaa97627461b6e37c6e6af9ae35f847f7e3b4165da20b8ca6b1a33428"
+      }
+    }
+  ]
+}

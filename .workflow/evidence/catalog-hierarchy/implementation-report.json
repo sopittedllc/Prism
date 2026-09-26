@@ -1,0 +1,19 @@
+{
+  "role": "implementer",
+  "scope": "Maker/library/instrument and root/folder/sample hierarchy with contextual search.",
+  "evidence": [
+    "automated_tests.json",
+    "runtime_tests.json",
+    "source-review-report.json",
+    "ux-review-report.json"
+  ],
+  "boundaries": [
+    "No new discovery adapters or filesystem work in presentation.",
+    "Plugin removal safety remains authoritative in existing model.",
+    "Library and sample removal, editable metadata and measured storage remain separate increments."
+  ],
+  "verification": "69 Swift tests plus documented integration/template/adapter/state checks and packaged native synthetic-fixture smoke.",
+  "client": "codex",
+  "status": "passed",
+  "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522"
+}

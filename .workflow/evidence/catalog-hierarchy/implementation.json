@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "catalog-hierarchy",
+  "gate": "implementation",
+  "status": "passed",
+  "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+  "timestamp": "2026-09-26T00:49:09.226477+00:00",
+  "producer": "codex-qa",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "implementation-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/catalog-hierarchy/implementation-report.json",
+        "sha256": "d865e8c22d5a2e072b6634ff807ba728fa3f580543685d67958184fa18286295"
+      }
+    }
+  ]
+}

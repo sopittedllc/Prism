@@ -144,3 +144,18 @@ never restored. Durable removal intent is written before filesystem action; if t
 fails, nothing is moved. A failed removal may remain hidden in saved inventory until a
 fresh scan reobserves it; live results still show failed items. User audio is never changed
 by the catalog store. Private files default to directory 0700/database 0600.
+
+## Hierarchical navigation (session-only)
+CatalogStateRegistry adds outline_state, an object with empty default. CatalogOutlineState
+owns per-category browse expansion/collapse and selection, plus one temporary search
+context per category. Clearing search restores browse context; switching collections does
+not overwrite another collection's navigation. Reset clears every context. Selection IDs
+are presentation identities, not file paths or removal authority. On first persistence,
+an exact kind/path/product locator reconciles IDs with assigned catalog observation IDs.
+Verified catalog IDs survive later same-volume moves; unproven instrument moves do not.
+
+Preset, project persistence, migration, undo, automation, structured clipboard, sync,
+analytics and export/import are explicitly excluded as navigation-only state. Local
+privacy and native accessibility are included. Existing setup and catalog schemas do
+not change. Derived outline nodes/indexes are recomputable caches, invalidated by report
+or ordering changes; search projects a filtered tree without filesystem reads.

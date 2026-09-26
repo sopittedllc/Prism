@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "catalog-hierarchy",
+  "gate": "ui_research",
+  "status": "passed",
+  "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+  "timestamp": "2026-09-26T00:48:04.529541+00:00",
+  "producer": "codex-ux-researcher",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "ui_research-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/catalog-hierarchy/ui-research-report.json",
+        "sha256": "04b2f67ef3d65484c404554db23474c95e048544601bbf527675ee480c97e82f"
+      }
+    }
+  ]
+}

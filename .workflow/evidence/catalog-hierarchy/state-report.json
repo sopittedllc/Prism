@@ -1,0 +1,21 @@
+{
+  "role": "qa",
+  "evidence": [
+    "automated_tests.json",
+    "runtime_tests.json",
+    "source-review-report.json"
+  ],
+  "checks": {
+    "state_coverage": "outline_state is the sole added registry ID with empty-object default and explicit policies. catalog-state checks exact runtime IDs, defaults and types; independent reviewer ran feature_coverage validate.",
+    "preset_roundtrip": "Session navigation is explicitly excluded from presets and setup persistence. Registry-selected persistence list and existing setup roundtrip tests pass; no new preset format.",
+    "state_migration": "No setup or catalog schema change. Existing frozen schema-v1, unsupported/corrupt database and setup compatibility fixtures pass.",
+    "state_integration": "69 tests include category/query isolation, nondefault reset, identity assignment reconciliation, plugin representative stability, stale patches, duplicate installations, root overlap and flat search sorting. Native smoke exercises disclosure, search clear, category change and rescan restoration."
+  },
+  "limits": [
+    "Navigation is session-only; no scroll-offset persistence.",
+    "No million-file benchmark or power-loss injection."
+  ],
+  "client": "codex",
+  "status": "passed",
+  "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522"
+}

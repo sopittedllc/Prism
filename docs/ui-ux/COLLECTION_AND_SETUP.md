@@ -49,10 +49,32 @@ in text, never color alone. Existing native table, search, inspector and source 
 remain usable during restore and background scans. Catalog failures appear in the
 footer and leave live results available. Cached/stale plugin-format checkboxes and
 removal actions are disabled with a scan-to-verify explanation; viewing paths remains
-available. No extra setup step or account is required. The hierarchy redesign is still
-pending; this increment uses the established table and spacing system.
+available. No extra setup step or account is required. The native hierarchy uses the established collection shell and spacing system.
 Setup review describes local setup and collection persistence. Format summaries separate
 selected, kept, needs-scan and removed installations; unverified cached entries never
 appear as zero retained entries or as proven unavailable. Native persistence cases cover
 cached light/compact browsing, offline library/instrument labels, disabled stale plugin
 removal and corrupt-catalog save failure with live results retained.
+
+## Hierarchical collection browsing
+The shared collection component is a native NSOutlineView. Plugins remain product leaves.
+Libraries show maker → library installation → instrument; makers start expanded and
+libraries collapsed. Proposed or unresolved product boundaries live in Needs identification.
+Separate installations and distinct vendor products sharing a container remain distinct.
+Individual Samples shows configured root → real relative directories → discovered audio
+file, with only the most specific selected root owning each sample. Empty directories are
+not enumerated by this presentation layer. Equal root names include a distinguishing parent suffix. Root details retain full path and volume context.
+
+Disclosure uses native controls and arrow keys. Rows keep the shared 38pt height and 8pt
+text inset; each depth adds 16pt native indentation. Maker/folder selection describes the
+group; maker groups have no Finder action. Instrument details retain maker/library
+breadcrumb, inherited context tags, exact locator and Unknown usage. Library installed
+size stays Not measured until measured storage accounting lands; instrument size is Shared
+with library. Name ordering is available for libraries; sample size/recency reorder siblings.
+
+Library search retains only matching instruments and their ancestors; metadata-only library
+hits explicitly say Library metadata match and do not invent installed patches. Query text
+is emphasized in names/details. Sample search is flat with a root-relative breadcrumb line; format and details identify audio files.
+sorting applies across roots. Full location remains in details/tooltips. Search has separate
+navigation state, so no-match → clear and category roundtrips preserve browsing position.
+View state is session-only and resets on a new launch; inventory remains durable.

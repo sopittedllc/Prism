@@ -1,0 +1,7 @@
+{
+  "status": "failed",
+  "revision": "content:2e162f16655e1321c1cda1967c38283391e80a578962122290c78ba21bdb81ef",
+  "failure": "Window screenshot unavailable: macOS could not create image from window",
+  "action": "Repeat identical packaged native gate; no source repair without evidence of product defect.",
+  "resolution": "Identical final revision passed complete native run after display capture recovered."
+}

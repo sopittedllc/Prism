@@ -8,9 +8,9 @@ public enum CatalogSort: String, CaseIterable, Sendable { case name = "Name", si
 
 /// Browsing is session-only; accepted scan setup can be stored locally.
 @MainActor public final class CatalogModel {
-    public var category: AssetKind = .plugin { didSet { cachedVisible = nil } }
-    public var query = "" { didSet { cachedVisible = nil } }
-    public var sort: CatalogSort = .name { didSet { cachedVisible = nil } }
+    public var category: AssetKind = .plugin { didSet { cachedVisible = nil; cachedOutline = nil } }
+    public var query = "" { didSet { cachedVisible = nil; cachedOutline = nil } }
+    public var sort: CatalogSort = .name { didSet { if oldValue != sort { cachedVisible = nil; invalidateOutline() } } }
     public var standardPlugins = true
     public private(set) var roots: [RootKind: [URL]] = [:]
     /// Legacy API name: holds Asset.selectionKey, not necessarily a filesystem path.
@@ -30,6 +30,10 @@ public enum CatalogSort: String, CaseIterable, Sendable { case name = "Name", si
     private var inventorySequence = 0
     private var acceptingInventory = false
     private var cachedVisible: [Asset]?
+    private var cachedOutline: CatalogOutline?
+    private var outlineBases: [AssetKind: CatalogOutline] = [:]
+    private var previousOutlineBases: [AssetKind: CatalogOutline] = [:]
+    public let outlineState = CatalogOutlineState()
     private var assetsByKey: [String: Asset] = [:]
     private var inclusionsByPath: [String: SampleInclusion] = [:]
     public private(set) var pluginProducts: [PluginProduct] = []
@@ -40,6 +44,7 @@ public enum CatalogSort: String, CaseIterable, Sendable { case name = "Name", si
     private var categoryCounts: [AssetKind: Int] = [:]
 
     private func rebuildIndexes() {
+        invalidateOutline()
         cachedVisible = nil; assetsByKey = [:]; inclusionsByPath = [:]; categoryCounts = [:]
         for asset in report?.assets ?? [] {
             assetsByKey[asset.kind.rawValue + ":" + asset.selectionKey] = asset
@@ -60,6 +65,29 @@ public enum CatalogSort: String, CaseIterable, Sendable { case name = "Name", si
             }
             for id in ids { candidateProjects[id, default: []].append(project) }
         }
+    }
+    private func invalidateOutline() {
+        for (category, outline) in outlineBases { previousOutlineBases[category] = outline }
+        outlineBases = [:]; cachedOutline = nil
+    }
+    public var outline: CatalogOutline {
+        if let cachedOutline { return cachedOutline }
+        let base: CatalogOutline
+        if let existing = outlineBases[category] { base = existing }
+        else {
+            base = CatalogOutline.build(
+                assets: category == .plugin ? pluginProducts.map(\.representative) : (report?.assets ?? []),
+                category: category, sampleRoots: roots[.samples] ?? [], sort: sort,
+                recency: inclusionsByPath.compactMapValues(\.latestReferencingProjectModifiedAt),
+                pluginProductIDs: Dictionary(uniqueKeysWithValues: pluginProducts.map { ($0.representative.path, $0.id) }))
+            outlineState.reconcile(previous: previousOutlineBases[category], current: base, category: category)
+            previousOutlineBases[category] = nil; outlineBases[category] = base
+        }
+        let result = base.filtered(query: query, sort: sort,
+                                  recency: inclusionsByPath.compactMapValues(\.latestReferencingProjectModifiedAt),
+                                  pluginMatches: matchesRow)
+        cachedOutline = result
+        return result
     }
     private func matchesQuery(_ asset: Asset) -> Bool {
         query.isEmpty || [asset.name, asset.path, asset.format, PluginProduct.formatName(asset.format), asset.classification, asset.libraryMetadata?.searchText ?? ""].contains { $0.localizedCaseInsensitiveContains(query) }
@@ -101,6 +129,7 @@ public enum CatalogSort: String, CaseIterable, Sendable { case name = "Name", si
         var values = draft.stateSnapshot; values["onboarding_completed"] = true
         if remember { try store?.save(values) }
         standardPlugins = draft.standardPlugins; roots = draft.roots
+        invalidateOutline()
         onboardingCompleted = true; configurationChanged = report != nil
         setupNotice = remember ? nil : "Setup is being used for this session only."
         onChange?()
@@ -109,6 +138,7 @@ public enum CatalogSort: String, CaseIterable, Sendable { case name = "Name", si
     public func reset() {
         guard !isBusy else { return }
         scanIdentifier = UUID(); usingSavedCatalog = false; savedCatalogDate = nil; catalogObservations = [:]; catalogNotice = nil
+        outlineState.reset(); outlineBases = [:]; previousOutlineBases = [:]; cachedOutline = nil
         category = .plugin; query = ""; sort = .name; standardPlugins = true
         roots = [:]; selectedPath = nil; report = nil; configurationChanged = false; onboardingCompleted = false; setupNotice = nil; scanProgress = nil; scanStartedAt = nil; basicInventoryComplete = false; isBackgroundScanning = false
         onChange?()
@@ -120,6 +150,7 @@ public enum CatalogSort: String, CaseIterable, Sendable { case name = "Name", si
             let url = raw.standardizedFileURL
             if !(roots[kind] ?? []).contains(url) { roots[kind, default: []].append(url) }
         }
+        invalidateOutline()
         configurationChanged = report != nil
         onChange?()
     }
@@ -127,6 +158,7 @@ public enum CatalogSort: String, CaseIterable, Sendable { case name = "Name", si
     public func removeRoot(_ url: URL, kind: RootKind) {
         guard !isBusy else { return }
         roots[kind]?.removeAll { $0 == url }
+        invalidateOutline()
         configurationChanged = report != nil
         onChange?()
     }
@@ -365,7 +397,8 @@ public enum CatalogSort: String, CaseIterable, Sendable { case name = "Name", si
     public var stateSnapshot: [String: Any] {
         ["category": category.rawValue, "query": query, "sort": sort.rawValue,
          "standard_plugins": standardPlugins, "roots": Dictionary(uniqueKeysWithValues: roots.map { ($0.key.rawValue, $0.value.map(\.path)) }),
-         "selection": selectedPath as Any? ?? NSNull(), "onboarding_completed": onboardingCompleted]
+         "selection": selectedPath as Any? ?? NSNull(), "onboarding_completed": onboardingCompleted,
+         "outline_state": outlineState.snapshot]
     }
 }
 
@@ -379,5 +412,6 @@ public enum CatalogSort: String, CaseIterable, Sendable { case name = "Name", si
         ["id": "roots", "value_type": "object", "default": [String: [String]](), "persisted": true],
         ["id": "onboarding_completed", "value_type": "boolean", "default": false, "persisted": true],
         ["id": "selection", "value_type": "string", "default": NSNull()],
+        ["id": "outline_state", "value_type": "object", "default": [String: Any]()],
     ]
 }

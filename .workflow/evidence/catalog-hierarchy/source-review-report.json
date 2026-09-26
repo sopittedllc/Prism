@@ -1,0 +1,77 @@
+{
+  "status": "passed",
+  "acting_client": "codex",
+  "role": "independent-source-and-completeness-reviewer",
+  "reviewed_at": "2026-09-26T00:47:43.125841+00:00",
+  "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+  "reviewed_files_sha256": {
+    "Sources/SimplifyCatalog/CatalogOutline.swift": "096ba569c71d5bbdf402b158ddc4484ae47cfda4bc7ddbddd5c687650122067f",
+    "Sources/SimplifyCatalog/CatalogModel.swift": "b824a6a0bc8a46b9b5c4bdbe1458f51ad78fcd516ef669f258c86366a1f9817b",
+    "Sources/SimplifyCatalog/CatalogWindow.swift": "af1f91a52a9d2a6f3dc8b291bf51cb69ce1344e2ca33eb492b48a1970e1c1138",
+    "Sources/SimplifyCatalog/CatalogTheme.swift": "ba7197c0bb83c668ae3da215fbbb764a97ce014837ae99d6c1db2171c5a8f749",
+    "Sources/SimplifyApp/main.swift": "73761f4d52c52751822a8e7925853a56e6d993d660c34995d71ec106b8063a70",
+    "tests/SimplifyCatalogTests/CatalogOutlineTests.swift": "cfab76fa4737f79dcdc65ceff7996fb80cb633674117bcbcdd6757d3511c10b8",
+    "docs/architecture/feature-registry.json": "7a417dbaebdd6048fc332a25d598cbc0ea01736c85f5e51a70057d08118c1270",
+    "docs/architecture/STATE_COMPLETENESS.md": "bde816043fcb457d940331a65adafcdeb796ef7bd3cdad83be75e3f21428e276",
+    "docs/architecture/overview.md": "b90706992d3fa2228fcf20c2e9a0bc2bbde5a1733fd32c1288c1fe0679ac7559",
+    "docs/ui-ux/COLLECTION_AND_SETUP.md": "a8d5f8bea2cf7e5fad256a3afe51360f056cc3c17f28b4d3b5e509b54411c4f6",
+    "docs/ui-ux/design-system.json": "1ee9a84b698ff0cb9faad6f4edcc75f8d08152fe45d969cd5c694aebf866b84f"
+  },
+  "findings": [],
+  "observations": [
+    "Structured library identity combines catalog observation identity or physical path plus vendor product identity; instrument identity is scoped to its installation and uses vendor identity or path. Shared metadata containers and separate installations remain distinct.",
+    "Sample root matching respects path component boundaries and chooses the most specific configured root; directory projection uses discovered paths only. Name, size and reference-recency sorting apply to sample siblings and flat search results.",
+    "Library filtering matches individual patch names/tags separately from aggregate library metadata; matching ancestors retain context and library-only matches carry explicit metadata-only labels.",
+    "Per-category browse state is separate from temporary query state. Cached base projection survives query changes, invalidates on inventory/root/sort changes, and reconciles locator identities when persistence first assigns catalog IDs.",
+    "Native refresh suppresses callback recording while rebuilding outline rows, restores explicit/default expansion and visible selection, and clears legacy selectedPath for group selections.",
+    "Library/instrument storage and usage text remains unknown/shared; cached/stale labels persist. Finder uses actual recorded paths and maker/unidentified groups have no target. Plugin removal authority checks remain in the existing model and format-management boundary.",
+    "outline_state has one runtime registry definition, explicit policies for all concerns, empty default and nondefault reset coverage. Setup serialization uses registry-selected persisted IDs and excludes outline navigation without a schema change."
+  ],
+  "checks": [
+    {
+      "name": "feature registry completeness",
+      "command": "python3 scripts/feature_coverage.py validate",
+      "status": "passed",
+      "exit_code": 0
+    },
+    {
+      "name": "native exact ID/default and persistence coverage",
+      "command": "python3 scripts/catalog_state_check.py",
+      "status": "passed",
+      "exit_code": 0
+    }
+  ],
+  "limitations": [
+    "Read-only source review; no builds, Swift tests, native runtime interaction or visual validation were independently run. Coordinator owns those gates.",
+    "Focused tests cover shared-container products, duplicate instrument titles with distinct IDs, separate installations, search sibling pruning, overlapping sample roots, sorting, navigation remapping and stale state. Native smoke adds disclosure keys, search/category restoration and plugin-removal regression; its execution result is not asserted here.",
+    "Full VoiceOver, older OS/Intel targets, million-file performance and scroll-offset restoration are not claimed.",
+    "Cross-client alternate reviewer was reported unauthenticated; this is an independent Codex review, not cross-client agreement.",
+    "Durable design/state documentation inspected in final delta review. No holdout criteria were accessed and only this report was written."
+  ],
+  "final_delta_review": {
+    "status": "passed",
+    "findings": [],
+    "observations": [
+      "Duplicate root basenames receive distinguishing parent suffixes chosen at a sufficient common depth; this changes display labels/breadcrumbs only and preserves physical locators and stable node IDs.",
+      "Flat sample search displays distinguishable root-relative breadcrumbs; accessibility context includes Audio file, full breadcrumb and location. Full locator remains available even when row text truncates.",
+      "Capture helper awaits 350 ms before final layout/display and window-server capture, allowing native disclosure animation to settle without blocking the main actor.",
+      "Native smoke now asserts that library-name queries contain no matching patch rows and explicitly identify the metadata-only match in inspector, then captures that state.",
+      "Instrument count pluralization is correct for zero, one and multiple items. Durable architecture/state/design docs now describe session-only navigation, root disambiguation, hierarchy/search semantics and unknown/shared storage truthfully."
+    ],
+    "limits": [
+      "Focused delta inspection only; automated and native execution remain coordinator-owned. No concurrent native/template commands run."
+    ]
+  },
+  "metadata_guidance_delta_review": {
+    "status": "passed",
+    "findings": [],
+    "observations": [
+      "Library inspector now distinguishes zero indexed instruments, metadata-only search hits requiring Clear search to browse, and expandable browsing rows. It no longer instructs expansion of filtered leaf rows.",
+      "Metadata-only label uses the existing shared two-line subtitle presentation while preserving the library name as primary text. Full explanation remains in inspector.",
+      "Native smoke assertion checks both Clear search guidance and absence of Expand this library for metadata-only matches."
+    ],
+    "limitations": [
+      "Focused source inspection only. Native visual/accessibility and automated execution remain coordinator-owned; no verification commands run."
+    ]
+  }
+}

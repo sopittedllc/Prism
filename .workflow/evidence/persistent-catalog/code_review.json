@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "persistent-catalog",
+  "gate": "code_review",
+  "status": "passed",
+  "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
+  "timestamp": "2026-09-26T00:06:40.086476+00:00",
+  "producer": "codex-report-verification",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "code_review-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/persistent-catalog/resumed-source-review-report.json",
+        "sha256": "c3706ba3b1bbfaecca293a3c1162c410a20e82be3f9a156e644002d46297a167"
+      }
+    }
+  ]
+}

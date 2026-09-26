@@ -1,0 +1,22 @@
+{
+  "client": "codex",
+  "role": "qa",
+  "status": "passed",
+  "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
+  "evidence": [
+    ".workflow/evidence/persistent-catalog/automated_tests.json",
+    ".workflow/evidence/persistent-catalog/runtime_tests.json",
+    ".workflow/evidence/persistent-catalog/resumed-source-review-report.json"
+  ],
+  "checks": {
+    "state_coverage": "catalog-state verifies exact runtime catalog IDs/defaults/types/versions and explicit cross-cutting policies. Independent source review also ran feature_coverage validate.",
+    "preset_roundtrip": "No audio preset serializer exists. catalog-state verifies an empty native preset-ID list and explicit registry exclusions; setup roundtrip tests still pass. No invented catalog preset format.",
+    "state_migration": "Frozen schema-v1 fixture loads; populated schema-0, future version and corrupt database remain unchanged; transaction abort preserves previous snapshot; backup reopens. This is initial schema, not a v2 migration.",
+    "state_integration": "64 Swift tests pass, including catalog/store reopen, physical rename, duplicate installations, per-scope baseline, partial member retention, removed plugin exclusion, live-save failure and pending restore guards. Native app verifies reopen, stale/offline labels, disabled removal and corruption feedback."
+  },
+  "limits": [
+    "No process-kill/power-loss injection test.",
+    "No million-item benchmark.",
+    "Editable tags, imports and new DAW adapters remain future work."
+  ]
+}

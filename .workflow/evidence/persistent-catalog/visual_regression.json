@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "persistent-catalog",
+  "gate": "visual_regression",
+  "status": "passed",
+  "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
+  "timestamp": "2026-09-26T00:06:40.756502+00:00",
+  "producer": "codex-report-verification",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "visual_regression-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/persistent-catalog/resumed-ux-report.json",
+        "sha256": "8d219543b6e272f6ff15a8395ea708995063cad02a281ef97741febc6193f00b"
+      }
+    }
+  ]
+}

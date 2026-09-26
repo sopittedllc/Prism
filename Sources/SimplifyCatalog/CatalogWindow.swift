@@ -159,7 +159,7 @@ import SimplifyCore
         issuesButton.isEnabled = model.report != nil
         if model.isScanning { progress.startAnimation(nil) } else { progress.stopAnimation(nil) }
         refreshProgress()
-        statusLabel.stringValue = model.isRemoving ? "Moving selected installations to Trash…" : model.setupNotice ?? (model.isScanning ? (model.isBackgroundScanning ? "Updating in background · browse as results arrive" : "Finding your collection…") : model.configurationChanged ? "Locations changed. Scan to update." : model.report == nil ? "Ready when you are." : "\(model.report!.projects.count) projects · \(model.report!.issues.count) scan issue\(model.report!.issues.count == 1 ? "" : "s")")
+        statusLabel.stringValue = model.isRemoving ? "Moving selected installations to Trash…" : model.catalogNotice ?? model.setupNotice ?? (model.usingSavedCatalog && !model.isScanning ? "Saved collection · Scan to refresh" : model.isScanning ? (model.isBackgroundScanning ? "Updating in background · browse as results arrive" : "Finding your collection…") : model.configurationChanged ? "Locations changed. Scan to update." : model.report == nil ? "Ready when you are." : "\(model.report!.projects.count) projects · \(model.report!.issues.count) scan issue\(model.report!.issues.count == 1 ? "" : "s")")
         statusLabel.toolTip = model.status
         emptyContainer.isHidden = !rows.isEmpty; collectionScroll.isHidden = rows.isEmpty
         emptyTitle.stringValue = model.isScanning ? (model.isBackgroundScanning ? "Your collection is open." : "Finding your sounds…") : model.report == nil ? "Meet your collection." : model.query.isEmpty ? "No items found." : "No matches."
@@ -206,7 +206,7 @@ import SimplifyCore
         guard let asset = model.selectedAsset else {
             inspectorTitle.stringValue = "A closer look"; inspectorMeta.stringValue = "Select an item to see its location and project references."; detail.string = "Choose an item to see its formats, locations, and available project evidence."; revealButton.isEnabled = false; return
         }
-        inspectorTitle.stringValue = asset.name
+        inspectorTitle.stringValue = asset.name + (asset.catalogStale == true ? " · Not observed" : "")
         inspectorMeta.stringValue = "\(asset.format.isEmpty ? "Folder" : asset.format.uppercased())  ·  \(asset.logicalBytes.map { ByteCountFormatter.string(fromByteCount: Int64($0), countStyle: .file) } ?? "Size not measured")"
         if let product = model.selectedPlugin {
             inspectorMeta.stringValue = "\(product.installations.count) installation(s) · \(product.formats)"
@@ -217,7 +217,7 @@ import SimplifyCore
         if let metadata = asset.libraryMetadata {
             inspectorMeta.stringValue = metadata.player + " · " + metadata.maker
             let instruments = metadata.instruments.filter { model.query.isEmpty || ($0.name + " " + $0.tags.joined(separator: " ")).localizedCaseInsensitiveContains(model.query) }
-            detail.string = [metadata.summary, "TAGS", metadata.tags.joined(separator: ", "), "INSTRUMENTS", instruments.prefix(100).map { $0.name }.joined(separator: "\n"), instruments.count > 100 ? "Showing 100 of \(instruments.count) instruments. Narrow your search." : "", "IDENTIFICATION", metadata.source, "Usage history: unknown. Instrument discovery does not establish project inclusion.", "LOCATION", asset.path].filter { !$0.isEmpty }.joined(separator: "\n\n")
+            detail.string = [metadata.summary, "TAGS", metadata.tags.joined(separator: ", "), "INSTRUMENTS", instruments.prefix(100).map { $0.name + ($0.catalogStale == true ? " (Not observed)" : "") }.joined(separator: "\n"), instruments.count > 100 ? "Showing 100 of \(instruments.count) instruments. Narrow your search." : "", "IDENTIFICATION", metadata.source, "Usage history: unknown. Instrument discovery does not establish project inclusion.", "LOCATION", asset.path].filter { !$0.isEmpty }.joined(separator: "\n\n")
             revealButton.isEnabled = true; return
         }
         let reference = model.detail.components(separatedBy: "\n\n").dropFirst(3).joined(separator: "\n\n")
@@ -236,7 +236,9 @@ import SimplifyCore
         case "format": value = model.product(for: asset)?.formats ?? (asset.format.isEmpty ? "Folder" : asset.format.uppercased())
         case "size": value = asset.logicalBytes.map { ByteCountFormatter.string(fromByteCount: Int64($0), countStyle: .file) } ?? "—"
         case "reference": value = model.referenceText(asset)
-        default: value = model.product(for: asset)?.name ?? asset.name
+        default:
+            let stale = model.product(for: asset).map { $0.installations.allSatisfy { $0.catalogStale == true } } ?? (asset.catalogStale == true)
+            value = (model.product(for: asset)?.name ?? asset.name) + (stale ? " · Not observed" : "")
         }
         return CatalogCell(value: value, primary: column?.identifier.rawValue == "name")
     }

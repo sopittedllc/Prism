@@ -1,0 +1,87 @@
+{
+  "official_sources": [
+    "https://developer.apple.com/design/human-interface-guidelines/onboarding?changes=_7",
+    "https://developer.apple.com/design/human-interface-guidelines/sidebars?changes=_11",
+    "https://developer.apple.com/design/human-interface-guidelines/lists-and-tables?changes=_5",
+    "https://developer.apple.com/design/human-interface-guidelines/accessibility?changes=latest_maj_6_3&language=objc",
+    "https://developer.apple.com/design/human-interface-guidelines/keyboards",
+    "https://developer.apple.com/design/human-interface-guidelines/color?changes=_5_2",
+    "https://developer.apple.com/design/human-interface-guidelines/app-icons?country=63"
+  ],
+  "comparable_cases": [
+    {
+      "name": "Finder list and preview views",
+      "url": "https://support.apple.com/en-kg/guide/mac-help/mchldaafb302/mac",
+      "user_context": "Mac users inspecting large file collections",
+      "task": "Find a file, compare attributes, inspect a selection",
+      "pattern": "Stable navigation alongside a list with named sortable columns and selection-specific details",
+      "interaction": "Column headings sort; selection exposes details; different views support different browsing tasks",
+      "hierarchy": "Navigation, collection, selected object",
+      "states": "Selected/unselected item and alternate view modes documented",
+      "accessibility": "Transfer native table selection and system focus; official support article does not independently establish VoiceOver quality",
+      "success": "Inference: familiar separation lets users orient and compare many rows without repeating explanatory text",
+      "failure": "Inference: a full filesystem tree or view-mode chooser would add scope Simplify does not need",
+      "transferability": "Use collection sidebar, sortable/resizable table and compact inspector; retain native keyboard selection"
+    },
+    {
+      "name": "XLN Audio XO sample folders",
+      "url": "https://support.xlnaudio.com/hc/en-us/articles/16920660349085-Adding-your-own-samples",
+      "user_context": "Musicians with samples distributed across folders",
+      "task": "Include personal sample collections in an audio browser",
+      "pattern": "Add folders through picker or drop, then explicit Scan & Refresh; changed-folder indicator prompts rescan",
+      "interaction": "Sample Folders control opens roots; add folders then scan",
+      "hierarchy": "Collection browser versus folder configuration",
+      "states": "Configured roots, scan request, changed content requiring refresh",
+      "accessibility": "Borrow explicit text labels; a color-only change dot needs a text equivalent in Simplify",
+      "success": "Inference: folder setup directly produces useful content rather than teaching abstract settings",
+      "failure": "Inference: change detection is not implemented in Simplify and must not be implied by visual indicators",
+      "transferability": "Make source selection the central onboarding task; use local Splice folder as an example, not account integration"
+    },
+    {
+      "name": "DaisyDisk disk and folder scanning",
+      "url": "https://daisydiskapp.com/guide/1/en/DisksOverview/",
+      "user_context": "Mac users investigating storage on multiple volumes",
+      "task": "Choose a scope and begin inspection",
+      "pattern": "Visible scan targets with direct Scan actions; specific folder selection available",
+      "interaction": "Scan a volume or choose a folder before results are produced",
+      "hierarchy": "Scope overview precedes result exploration",
+      "states": "Unscanned target, scanning, available results",
+      "accessibility": "Transfer labeled controls and state text; official guide does not establish accessibility performance",
+      "success": "Inference: clear scope gives users confidence about what a scan will include",
+      "failure": "Inference: a storage treemap would distract from Simplify's filename and project-evidence comparison task",
+      "transferability": "Show chosen folder categories and ready-to-scan summary; avoid claiming logical sizes equal reclaimable disk space"
+    }
+  ],
+  "client": "codex",
+  "role": "ux-researcher",
+  "status": "passed",
+  "basis": ".workflow/evidence/onboarding-redesign/ui-research-report.json",
+  "source_limitations": "Reuses the documented native collection design research. No new comparable applications were run. Apple HIG live fetch returned a JavaScript shell. This increment changes state feedback and disabled removal availability within existing native components.",
+  "synthesis": {
+    "requirements": [
+      "Saved inventory must be labeled as cached, with a refresh action.",
+      "Unobserved rows and instruments use visible words, not color alone.",
+      "Cached removal controls must be disabled with an explanation.",
+      "Saving failures preserve live browsing and provide visible feedback."
+    ],
+    "recurring_patterns": [
+      "Stable collection navigation and selection details (Finder)",
+      "Explicit scope and scan/refresh (XO)",
+      "Scope and scan-state clarity (DaisyDisk)"
+    ],
+    "project_inferences": [
+      "Retain the current table/sidebar/inspector system while the database foundation is completed.",
+      "Use the existing footer for saved/error states and existing format sheet for removal availability."
+    ],
+    "hypotheses": [
+      "Immediate cached browsing reduces repeated scanning friction; 3000-sample restore target is under two seconds on the current Mac."
+    ]
+  },
+  "decision": "Extend existing state feedback and removal controls for durable inventory; no new navigation or onboarding step.",
+  "validation": [
+    "Native cached browse and removal-disabled assertions",
+    "Native reopen after generated fixture removal",
+    "Swift corruption/offline/partial/restore-race tests",
+    "Independent screenshot and UX review; report assistive-technology limits separately"
+  ]
+}

@@ -272,3 +272,104 @@ private final class CatalogFixture {
     model.scan(); try await finish(model)
     #expect(model.selectedAsset?.name == "Ark 3")
 }
+
+@Test @MainActor func persistentCatalogReopensAndRejectsCachedRemoval() async throws {
+    let f = try CatalogFixture()
+    try f.file("Plugins/Example.vst3/Contents/marker")
+    try f.file("Samples/Banjo.wav")
+    let catalog = CatalogStore(url: f.root.appendingPathComponent("Private/catalog.sqlite"))
+    func configured() -> CatalogModel {
+        let model = CatalogModel(catalogStore: catalog); model.standardPlugins = false
+        model.addRoots([f.root.appendingPathComponent("Plugins")], kind: .plugins)
+        model.addRoots([f.root.appendingPathComponent("Samples")], kind: .samples)
+        return model
+    }
+    let original = configured(); original.scan(); try await finish(original)
+    #expect(original.catalogNotice == nil)
+    #expect(original.savedCatalogDate != nil)
+    let reopened = configured(); await reopened.restoreSavedCatalog()
+    #expect(reopened.usingSavedCatalog)
+    #expect(reopened.report?.assets.count == 2)
+    #expect(reopened.status.contains("Saved collection"))
+    let plugins = reopened.report?.assets.filter { $0.kind == .plugin } ?? []
+    #expect(await reopened.trashPlugins(plugins).isEmpty)
+    #expect(FileManager.default.fileExists(atPath: f.root.appendingPathComponent("Plugins/Example.vst3").path))
+    reopened.scan(); try await finish(reopened)
+    #expect(!reopened.usingSavedCatalog)
+    #expect(reopened.report?.assets.first { $0.kind == .plugin }?.fileIdentity != nil)
+    // A disconnected source remains present but stale after a new final scan.
+    try FileManager.default.moveItem(at: f.root.appendingPathComponent("Samples"), to: f.root.appendingPathComponent("OfflineSamples"))
+    reopened.scan(); try await finish(reopened)
+    #expect(reopened.report?.assets.first { $0.kind == .sample }?.catalogStale == true)
+    let another = configured(); await another.restoreSavedCatalog()
+    #expect(another.report?.assets.count == 2)
+    #expect(another.report?.assets.first { $0.kind == .sample }?.catalogStale == true)
+}
+
+@Test @MainActor func persistenceFailureKeepsLiveResultsAndResetIgnoresLateRestore() async throws {
+    let f = try CatalogFixture(); try f.file("Samples/Accordion.wav")
+    let url = try f.file("Private/broken.sqlite", "not sqlite")
+    let model = CatalogModel(catalogStore: CatalogStore(url: url)); model.standardPlugins = false
+    model.addRoots([f.root.appendingPathComponent("Samples")], kind: .samples)
+    model.scan(); try await finish(model)
+    #expect(model.report?.assets.count == 1)
+    #expect(model.catalogNotice != nil)
+    #expect(try String(contentsOf: url, encoding: .utf8) == "not sqlite")
+
+    let valid = f.root.appendingPathComponent("Private/valid.sqlite")
+    let store = CatalogStore(url: valid)
+    var request = ScanRequest(); request.samples = [f.root.appendingPathComponent("Samples")]
+    _ = try await store.ingest(Scanner().scan(request), scope: CatalogScope(request))
+    var db: OpaquePointer?; #expect(sqlite3_open(valid.path, &db) == SQLITE_OK)
+    defer { sqlite3_exec(db, "ROLLBACK", nil, nil, nil); sqlite3_close(db) }
+    #expect(sqlite3_exec(db, "BEGIN EXCLUSIVE", nil, nil, nil) == SQLITE_OK)
+    let restored = CatalogModel(catalogStore: store); restored.standardPlugins = false
+    restored.addRoots(request.samples, kind: .samples)
+    let pending = Task { await restored.restoreSavedCatalog() }
+    try await Task.sleep(for: .milliseconds(20))
+    #expect(restored.isRestoringCatalog)
+    restored.reset()
+    await pending.value
+    #expect(restored.report == nil)
+    #expect(restored.catalogNotice == nil)
+    #expect(restored.roots.isEmpty)
+}
+
+@Test @MainActor func successfulLateRestoreCannotReplaceChangedScopeOrFreshScan() async throws {
+    let f = try CatalogFixture()
+    try f.file("Samples/Accordion.wav")
+    let database = f.root.appendingPathComponent("Private/catalog.sqlite")
+    let store = CatalogStore(url: database)
+    var request = ScanRequest(); request.samples = [f.root.appendingPathComponent("Samples")]
+    _ = try await store.ingest(Scanner().scan(request), scope: CatalogScope(request))
+    for changeScope in [true, false] {
+        let model = CatalogModel(catalogStore: store); model.standardPlugins = false
+        model.addRoots(request.samples, kind: .samples)
+        var db: OpaquePointer?
+        #expect(sqlite3_open(database.path, &db) == SQLITE_OK)
+        defer { sqlite3_exec(db, "ROLLBACK", nil, nil, nil); sqlite3_close(db) }
+        #expect(sqlite3_exec(db, "BEGIN EXCLUSIVE", nil, nil, nil) == SQLITE_OK)
+        let pending = Task { await model.restoreSavedCatalog() }
+        // The main-actor flag proves restore captured the original scope/token and
+        // yielded to the store. Change intent before allowing the read to complete.
+        while !model.isRestoringCatalog { await Task.yield() }
+        if changeScope {
+            model.addRoots([f.root.appendingPathComponent("Other")], kind: .samples)
+        } else {
+            try f.file("Samples/New.wav")
+            model.scan()
+        }
+        #expect(sqlite3_exec(db, "ROLLBACK", nil, nil, nil) == SQLITE_OK)
+        await pending.value
+        if changeScope {
+            #expect(model.report == nil)
+            #expect(model.roots[.samples]?.count == 2)
+        } else {
+            try await finish(model)
+            #expect(model.report?.assets.count == 2)
+            #expect(model.report?.assets.contains { $0.path == f.root.appendingPathComponent("Samples/New.wav").path } == true)
+        }
+        #expect(!model.usingSavedCatalog)
+        #expect(model.catalogNotice == nil)
+    }
+}

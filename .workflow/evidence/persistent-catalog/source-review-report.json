@@ -1,0 +1,58 @@
+{
+  "status": "passed",
+  "acting_client": "codex",
+  "role": "independent-source-and-completeness-reviewer",
+  "reviewed_at": "2026-09-25T22:37:14.164673+00:00",
+  "scope": [
+    "persistent-catalog plan",
+    "CatalogStore.swift",
+    "CatalogPersistenceRegistry.swift",
+    "Models/LibraryMetadata additive fields",
+    "CatalogModel restore/ingest/removal lifecycle",
+    "App startup",
+    "CatalogWindow stale indicators",
+    "CatalogStoreTests and CatalogTests",
+    "catalog_state_check and feature registry",
+    "PluginFormatsWindow cached/stale toggles and buttons",
+    "Updated initial v1 schema fixture",
+    "newlyIndexedScopeHasItsOwnBaselineAndPartialMembersRemainVisible"
+  ],
+  "findings": [],
+  "observations": [
+    "Transactions cover ingestion and snapshot reads; rollback and future/corrupt schema cases have focused tests.",
+    "Cache restoration checks scan token and exact scope; final scan stops inventory acceptance before persistence awaits.",
+    "Cached removal identities are stripped, model rejects stale/cached removal, durable removal intent precedes filesystem mutation.",
+    "Logical persistence groups have matching registry policies for all listed concerns.",
+    "Existing parent/database permissions are validated for type but not tightened; creation uses 0700/0600. Avoid claiming permissions are enforced for arbitrary pre-existing store locations.",
+    "New regression covers cross-scope addition/baseline isolation and retained stale microphone membership.",
+    "Catalog notices are visible in footer; cached/stale removal checkboxes are disabled and review actions use only enabled installations."
+  ],
+  "limitations": [
+    "Source re-review passed; test execution remains coordinator-owned and was not independently rerun.",
+    "No native runtime verdict in this source report.",
+    "No holdout access.",
+    "No tag editor, outline browser, or new DAW usage coverage claimed."
+  ],
+  "previous_findings": [
+    {
+      "id": "P1",
+      "severity": "medium",
+      "file": "Sources/SimplifyCore/CatalogStore.swift",
+      "line": 82,
+      "finding": "Baseline classification is calculated for a scope but stored only on globally shared nodes. When a node first indexed as an addition in scope A appears in the initial scan of scope B, its existing baseline=false survives conflict handling and is returned for B. Conversely a node originally baseline in another scope can never be classified as an addition in an already-baselined new scope. This contradicts scope-specific baseline/addition semantics.",
+      "repair": "Persist baseline/newly-indexed classification per scope membership while retaining global physical node identity and firstSeen as intended. Add same-node/two-scopes tests for both directions."
+    },
+    {
+      "id": "P2",
+      "severity": "high",
+      "file": "Sources/SimplifyCore/CatalogStore.swift",
+      "line": 90,
+      "finding": "Ingest overwrites instrument payload contentPaths with the latest partial adapter output. Although physical_members retains earlier rows, read() never queries it and no member generation/stale state is recorded. A SINE instrument with Close+Room followed by a partial Close-only scan loses Room from the reconstructed catalog and its absence cannot be distinguished from complete membership.",
+      "repair": "Retain/reconstruct all known physical memberships with per-member observation/stale state, or expose an equivalent honest historical membership projection. Do not silently claim old members are current. Add a partial mic-loss/reopen fixture with an unchanged representative anchor."
+    }
+  ],
+  "resolved": [
+    "P1 Baseline classification is stored/read on scope_members, preserving each scope independently of shared physical node identity.",
+    "P2 Physical membership generations are persisted and reconstructed into contentPaths and contentMembers with stale flags; partial mic loss retains previous membership without presenting it as currently observed."
+  ]
+}

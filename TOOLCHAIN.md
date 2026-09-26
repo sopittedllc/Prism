@@ -25,7 +25,7 @@ A native AppKit preview is packaged by `python3 scripts/build_app.py` into
 in this environment. Run `build/Simplify.app/Contents/MacOS/Simplify --ui-smoke captures/catalog`
 for synthetic native interaction/capture tests (GUI escalation required).
 `python3 scripts/catalog_state_check.py` checks the native state registry and setup persistence IDs.
-There is no distribution signing, persistent catalog, sample/library deletion, or background service yet. Accepted folder setup is stored locally; filters and results remain session-only. Full DAW compatibility and host-generated REAPER fixture checks remain unverified.
+There is no distribution signing, sample/library deletion, or background service yet. Accepted folder setup and final inventory catalog are stored locally; filters remain session-only. The catalog restores asynchronously and marks retained unobserved entries stale. Full DAW compatibility and host-generated REAPER fixture checks remain unverified.
 The runtime probe is machine-specific and excluded from generic CI. CI requires macOS.
 
 Native smoke moves only generated dummy plugin bundles to macOS Trash; it never removes installed user plugins. Core removal validation tests inject failures without mutating real audio.

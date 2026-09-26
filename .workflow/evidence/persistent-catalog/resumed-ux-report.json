@@ -1,0 +1,102 @@
+{
+  "client": "codex",
+  "role": "independent-ux-reviewer-and-visual-regression-tester",
+  "status": "passed",
+  "scope": "Persistent catalog saved/fresh/stale/error states and adjacent native composition",
+  "revision_reviewed": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
+  "evidence_grade": "E2 screenshot matrix plus existing E3 native smoke log; reviewer did not launch UI",
+  "visual_observations": [
+    "Saved collection footer and Scan action are visible and distinguish saved inventory from current scan results.",
+    "Table alignment and inset consistency hold across light samples, dark plugins/libraries and compact reference inspection. Long names truncate intentionally; confirmation exposes complete paths.",
+    "Cached format checkboxes and destructive actions visibly disabled with scan explanation; Done remains available.",
+    "Removal result distinguishes moved and failed counts and provides Finder Trash restoration instructions.",
+    "No critical overlap or clipped actions observed in reviewed states."
+  ],
+  "images_reviewed": [
+    "cached-collection",
+    "cached-plugin-formats",
+    "samples-populated",
+    "plugins-dark",
+    "sample-reference-dark-compact",
+    "plugin-removal-result",
+    "reading-progress",
+    "libraries-dark",
+    "setup-save-error",
+    "plugin-removal-review",
+    "empty-light",
+    "cached-collection-light-compact",
+    "stale-library",
+    "stale-plugin-formats",
+    "catalog-save-error"
+  ],
+  "systemic_inventory": [
+    "Shared collection footer/search/table and inspector across Plugins, Samples, Libraries",
+    "Plugin-format selections and removal review/result",
+    "Setup ready copy and save-failure recovery",
+    "Live progress and pending-reference feedback"
+  ],
+  "missing_required_increment_cases": [],
+  "accessibility_evidence": {
+    "native_smoke": "main.swift checks native labels for Scan, Search collection, Audio collection and Selected item details; Command-F performs menu key equivalent and establishes search editor focus.",
+    "static": "Plugin choice labels include format and path; Done has Escape key; destructive confirmation defaults Return to Cancel.",
+    "limits": [
+      "No VoiceOver traversal or user testing",
+      "No complete keyboard-only workflow coverage",
+      "No measured contrast certification",
+      "No increased contrast/reduced transparency/largest text/RTL/alternate display-scale captures"
+    ]
+  },
+  "visual_limits": [
+    "First baseline; no previous reference pixel diffs",
+    "Current Mac only",
+    "Runtime JSON lacks per-image OS, locale, scale and fingerprint metadata; gate has content fingerprint and source defines fixtures/window sizes"
+  ],
+  "residual_design_debt": [
+    "Empty inspector repeats select/choose guidance; pre-existing, nonblocking",
+    "Library hierarchy, editable metadata and reliable DAW usage are intentionally outside increment"
+  ],
+  "excluded_consumers": [
+    "Future outline/tag editor",
+    "Real user asset removal",
+    "DAW-specific usage integrations"
+  ],
+  "holdout_read": false,
+  "resolved_findings": [
+    {
+      "id": "UX1",
+      "file": "Sources/SimplifyCatalog/SetupWindow.swift",
+      "line": 83,
+      "finding": "Setup says scan results are rebuilt each session, contradicting durable inventory. Visible in setup-save-error.png. Update the shared setup copy and recapture.",
+      "resolution": "Verified fixed in source and regenerated native captures."
+    },
+    {
+      "id": "UX2",
+      "file": "Sources/SimplifyCatalog/PluginFormatsWindow.swift",
+      "line": 59,
+      "finding": "Cached formats panel lists two retained saved installations but reports 0 selected / 0 kept. Explicitly distinguish unverified entries; message at line 48 should not call unverified cached entries unavailable.",
+      "resolution": "Verified fixed in source and regenerated native captures."
+    }
+  ],
+  "blockers": [],
+  "reinspection": {
+    "runtime_timestamp": "2026-09-26T00:04:48Z",
+    "changed_captures": [
+      "cached-plugin-formats",
+      "setup-save-error",
+      "plugin-removal-result"
+    ],
+    "observations": [
+      "Setup now accurately states collection restoration and explicit rescan.",
+      "Cached formats show 2 need scan; stale formats show 1 need scan. Disabled removal remains explained, Done remains enabled.",
+      "Removal result clearly distinguishes 1 kept and 1 removed.",
+      "Stale library row, inspector title and instrument each display Not observed in text.",
+      "Catalog corruption notice is visible without clipping at compact width and live sample inventory remains visible. Runtime asserts failed saving preserves corrupt database.",
+      "Saved collection footer remains visible at compact light width. No critical clipping, overlap or changed control hierarchy detected."
+    ]
+  },
+  "verdict_scope": "Passed for this persistence increment and observed native state/size matrix; does not certify complete accessibility, alternate platforms or broad product usability.",
+  "warnings": [
+    "Existing native accessibility smoke proves explicit labels and Command-F only. VoiceOver traversal and full keyboard-only flows remain unvalidated.",
+    "Screenshot environment metadata and prior-image diff limitations remain; this is a reviewed first baseline, not pixel-diff certification."
+  ]
+}

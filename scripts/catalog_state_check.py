@@ -23,3 +23,16 @@ assert set(native['persistence_ids']) == {s['id'] for s in registry['settings'] 
 assert all(s['policies']['preset']['decision'] == 'excluded' for s in registry['settings'])
 assert set(native['persistence_ids']) == {'roots', 'standard_plugins', 'onboarding_completed'}
 print('Catalog state: PASS (exact IDs/defaults; setup persistence IDs; explicit preset exclusions)')
+
+# Persistent inventory has its own runtime authority, separate from setup settings.
+fields = registry['catalog_fields']
+assert not validate_registry({**registry, 'settings': fields}, load(POLICY))
+expected_catalog = {field['id']: field for field in fields}
+actual_catalog = {field['id']: field for field in native['catalog_definitions']}
+assert len(actual_catalog) == len(native['catalog_definitions'])
+assert set(expected_catalog) == set(actual_catalog)
+for key in expected_catalog:
+    for field in ('value_type', 'default', 'introduced_in'):
+        assert expected_catalog[key][field] == actual_catalog[key][field]
+assert native['catalog_schema_version'] == 1
+print('Catalog persistence: PASS (exact IDs/defaults and all cross-cutting decisions)')

@@ -15,10 +15,22 @@ are not fully isolated by this prototype; scans have no mutation capability.
 ProjectReader supports experimental RPP and ALS subsets. It preserves unresolved
 candidates and never loads plugins. Matching uses explicit resolved paths, not names.
 A matched reference yields saved-project recency, never exact use time. Unsupported
-formats remain visible. No catalog database exists; accepted folder setup has a separate local versioned store.
+formats remain visible. Accepted folder setup and inventory have separate local versioned stores.
 
-Future catalog persistence, user tags, folder bookmarks, background reconciliation, and removal
-must follow the state-completeness contract before implementation. No vendor uninstaller integration exists.
+CatalogStore serializes SQLite operations on its own actor. Final scans atomically persist
+asset headers, instruments, physical memberships, and exact-scope snapshots. Unobserved
+entries are retained with stale evidence; a restored catalog does not authorize removal.
+Physical identity preserves observations across verified same-volume moves. Separate
+installations of the same product remain distinct. Baseline observations are newly indexed,
+not installation timestamps. Startup restores asynchronously; newer scans, scope edits,
+and reset prevent late restoration from replacing user intent. Unsupported or corrupt
+databases are preserved, and live results remain available if saving fails. Backup is local
+and explicit. No schema migration beyond the initial version is claimed.
+
+User tags, folder bookmarks, and background reconciliation remain future work subject to
+the state-completeness contract. Reviewed plugin removal moves only validated bundles to
+Trash, with durable removal intent preventing cache resurrection. Sample/library removal
+and vendor uninstaller integration are not implemented.
 
 The native AppKit browser uses a MainActor CatalogModel, immutable background scan
 snapshots, and one in-flight operation. CatalogStateRegistry and feature-registry.json

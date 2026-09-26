@@ -1,0 +1,73 @@
+{
+  "status": "passed",
+  "acting_client": "codex",
+  "role": "independent-source-and-completeness-reviewer",
+  "reviewed_at": "2026-09-26T00:05:09.600111+00:00",
+  "scope": [
+    "CatalogStore SQLite schema/ingestion/read/backup and file safety",
+    "CatalogModel restore/final scan/removal lifecycle",
+    "CatalogPersistenceRegistry and catalog_state_check coverage",
+    "App startup/native smoke assertions",
+    "CatalogWindow and PluginFormatsWindow saved/stale states",
+    "CatalogStoreTests and CatalogTests persistent catalog tests",
+    "Models and LibraryMetadata additive Codable fields",
+    "State completeness and feature registry policies"
+  ],
+  "findings": [],
+  "observations": [
+    "No confirmed blocking correctness, concurrency, storage-safety or completeness defect found in reviewed source.",
+    "Actor operations do not suspend while SQLite connections are owned; transactions cover scan writes and snapshot reads.",
+    "Scope-specific payloads, baselines and generation flags isolate selected roots and preserve unavailable observations.",
+    "Cached plugin file identities are stripped; model removal guard and durable intent precede filesystem action.",
+    "Reset/scan token and scope checks prevent late restore application. Scan inventory callbacks stop before final ingestion suspends.",
+    "All four logical persisted field groups have explicit cross-cutting policies and matching native IDs/defaults.",
+    "Focused re-review: populated foreign schema-0 database preservation and pending-restore versus changed-scope/fresh-scan fixtures added; no blocking findings.",
+    "Native smoke now writes only disposable synthetic catalog/setup under a UUID home-cache fixture and asserts successful save before restore checks; production application storage and symlink policy unchanged. Cleanup still targets the isolated UUID directory.",
+    "Resumed plan clarification is acceptable: independent Codex review substitutes for unavailable authenticated alternate client, deterministic gates record enforcement, and next hierarchy increment remains separate.",
+    "Architecture/setup documentation now correctly distinguishes persisted inventory from setup and explicitly avoids claiming automatic scans or completed metadata/removal/usage workflows.",
+    "Final UI-copy delta reviewed: setup describes retained local inventory; plugin summary separates selected, kept, needs-scan and removed states, and explicitly names active moving state. Guards and removal authorization are unchanged.",
+    "Additional native-smoke assertions exercise isolated offline sample/library/plugin scope, retained stale instruments and disabled stale removal, corrupted-store preservation with live browsing/retry, and compact light cached window. Filesystem moves are limited to generated synthetic fixtures. No blocking source findings."
+  ],
+  "checks": [
+    {
+      "command": [
+        "python3",
+        "scripts/feature_coverage.py",
+        "validate"
+      ],
+      "exit_code": 0,
+      "result": "feature coverage: PASS"
+    },
+    {
+      "command": [
+        "python3",
+        "scripts/catalog_state_check.py"
+      ],
+      "exit_code": 0,
+      "result": "Catalog state and persistence: PASS"
+    }
+  ],
+  "limitations": [
+    "Source-review verdict only; coordinator owns builds, full tests, native runtime and completion gates.",
+    "No holdout scenarios read.",
+    "Existing store/directory permissions are not tightened; 0700/0600 apply to creation.",
+    "No process-kill hot-journal recovery test inspected; transaction abort rollback fixture is present.",
+    "No million-item performance, new DAW usage coverage, metadata editor, or hierarchy UI is claimed.",
+    "Any subsequent source changes require focused re-review and a new content fingerprint.",
+    "Delayed-restore test releases its lock promptly and checks observable outcomes, but does not instrument internal load completion; source guards were also reviewed directly."
+  ],
+  "previous_review_revision": "content:7bd53d558e9d210857daea5501ccc8acc25c9e2564ab2acf5aa9d4b77e561caa",
+  "revision_source": "Coordinator verified all focused-review file hashes and matched final automated/runtime evidence fingerprint.",
+  "focused_review_content": {
+    ".work/active/persistent-catalog.md": "39a61e6c4d0a0e463320df1ea14357ad560fb9e17320c72baa7622a6846968a0",
+    "Sources/SimplifyApp/main.swift": "8e6f414490ef81523399d69ca9cfe5b779ea816eefbbfc2c54cc843e09c18a57",
+    "Sources/SimplifyCatalog/PluginFormatsWindow.swift": "ecf9f55040d99bb55ad7a57b410b560f18509d969bbd55e0417358bbf5320f97",
+    "Sources/SimplifyCatalog/SetupWindow.swift": "33eff5d87b3b35199e1cd8e8ed5fa01c157b902ef3504ffbbd71a47c84f2ed28",
+    "Sources/SimplifyCore/CatalogStore.swift": "36d23d17099b46154822f067c4e2abf5179469a1366528f378d815831b48ae5f",
+    "docs/architecture/overview.md": "aabd718e676a3fea137c317133f41500fe36453b1141e32ce53713080fa2dae5",
+    "docs/ui-ux/COLLECTION_AND_SETUP.md": "a502d3b8d0c0407ff68d7c3cc54016ffc2723c8674d01e77f607d49546362af5",
+    "tests/SimplifyCatalogTests/CatalogTests.swift": "846a7bcd761c31411104e858b07d819ca9d40d942da374db851bbef6c856e994",
+    "tests/SimplifyCoreTests/CatalogStoreTests.swift": "a32b9abf4707b5e02e812312c9b133f5b1ac655f7d4b54a915cc15f3736d1c3f"
+  },
+  "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2"
+}

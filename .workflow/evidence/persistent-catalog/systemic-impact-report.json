@@ -1,0 +1,43 @@
+{
+  "client": "codex",
+  "role": "implementer",
+  "symptom": "Inventory disappears on quit; cached inventory must not imply verified availability or authorize removal.",
+  "semantic_role": "Saved, fresh, unobserved and failed-persistence inventory states",
+  "authority": "CatalogStore snapshots, CatalogModel lifecycle, CatalogWindow status/rows/inspector, PluginFormatsWindow authorization",
+  "searches": [
+    "CatalogModel restore/scan/reset and root setters",
+    "CatalogWindow refresh/status/inspector and table cells",
+    "PluginFormatsWindow choices and review actions",
+    "CatalogPersistenceRegistry and feature-registry catalog_fields"
+  ],
+  "included_consumers": [
+    "All three collection categories",
+    "Saved catalog footer and tooltip",
+    "Unobserved asset and instrument labels",
+    "Cached and stale plugin checkboxes and all-format removal",
+    "App startup, scan completion and post-removal reopen"
+  ],
+  "excluded_consumers": [
+    "Future outline browser and tag editor",
+    "Real user content removal",
+    "New DAW usage adapters"
+  ],
+  "system_changes": [
+    "Persist final exact-scope inventory and retain stale observations",
+    "Strip cached removal identities; enable removal only from fresh scan evidence",
+    "Restore asynchronously with scope/token guards",
+    "Expose persistence failures while preserving live results"
+  ],
+  "representative_tests": [
+    "Swift persistent catalog and model fixtures",
+    "Native 3000-sample restore and cached format controls",
+    "Native post-removal reopen",
+    "Light/dark and compact window screenshot matrix"
+  ],
+  "regression_prevention": [
+    "Schema-v1 fixture and unsupported database preservation",
+    "Late restore vs new scan/scope/reset regressions",
+    "Native persistence assertion before reopening",
+    "Exact registry ID/default/policy checks"
+  ]
+}

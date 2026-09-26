@@ -2,60 +2,63 @@
   "schema_version": 1,
   "risk_tier": 2,
   "base_revision": "content:e2744b65b627ba2bd2e085a99d29d10b7ee07b6f46ece909ba288443c6ea38ad",
-  "domains": [],
-  "task_id": "library-ownership",
-  "title": "Library ownership and identity foundation",
+  "domains": [
+    "stateful-feature",
+    "ui-ux"
+  ],
+  "task_id": "persistent-catalog",
+  "title": "Persistent inventory catalog and immediate cached browsing",
   "state": "complete",
   "product_decisions_needed": [],
   "acceptance_criteria": [
     {
       "id": "AC1",
-      "statement": "Kontakt product ownership",
+      "statement": "Durable graph and identity",
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/library-ownership/implementation-report.json",
-        ".workflow/evidence/library-ownership/source-review-report.json",
-        ".workflow/evidence/library-ownership/runtime-report.json"
+        ".workflow/evidence/persistent-catalog/automated_tests.json",
+        ".workflow/evidence/persistent-catalog/runtime_tests.json",
+        ".workflow/evidence/persistent-catalog/state-report.json"
       ]
     },
     {
       "id": "AC2",
-      "statement": "Scope and manifest ambiguity",
+      "statement": "Partial/offline and removal safety",
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/library-ownership/implementation-report.json",
-        ".workflow/evidence/library-ownership/source-review-report.json",
-        ".workflow/evidence/library-ownership/runtime-report.json"
+        ".workflow/evidence/persistent-catalog/automated_tests.json",
+        ".workflow/evidence/persistent-catalog/runtime_tests.json",
+        ".workflow/evidence/persistent-catalog/state-report.json"
       ]
     },
     {
       "id": "AC3",
-      "statement": "SINE stable IDs and all mic files",
+      "statement": "Atomic schema and backup",
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/library-ownership/implementation-report.json",
-        ".workflow/evidence/library-ownership/source-review-report.json",
-        ".workflow/evidence/library-ownership/runtime-report.json"
+        ".workflow/evidence/persistent-catalog/automated_tests.json",
+        ".workflow/evidence/persistent-catalog/runtime_tests.json",
+        ".workflow/evidence/persistent-catalog/state-report.json"
       ]
     },
     {
       "id": "AC4",
-      "statement": "Context tags and compatible reports",
+      "statement": "Async model integration",
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/library-ownership/implementation-report.json",
-        ".workflow/evidence/library-ownership/source-review-report.json",
-        ".workflow/evidence/library-ownership/runtime-report.json"
+        ".workflow/evidence/persistent-catalog/automated_tests.json",
+        ".workflow/evidence/persistent-catalog/runtime_tests.json",
+        ".workflow/evidence/persistent-catalog/state-report.json"
       ]
     },
     {
       "id": "AC5",
-      "statement": "Four-host matrix and regressions",
+      "statement": "State coverage and validation",
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/library-ownership/implementation-report.json",
-        ".workflow/evidence/library-ownership/source-review-report.json",
-        ".workflow/evidence/library-ownership/runtime-report.json"
+        ".workflow/evidence/persistent-catalog/automated_tests.json",
+        ".workflow/evidence/persistent-catalog/runtime_tests.json",
+        ".workflow/evidence/persistent-catalog/state-report.json"
       ]
     }
   ],
@@ -63,51 +66,123 @@
     "research": {
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/library-ownership/research.json"
+        ".workflow/evidence/persistent-catalog/research.json"
       ],
-      "revision": "content:ae4c9f6a211945492f8a25a15ca83d6f3cb6227f9d03770d2ffd911353d45ab8",
-      "agent": "researcher"
+      "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
+      "agent": "codex-report-verification"
     },
     "plan_review": {
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/library-ownership/plan_review.json"
+        ".workflow/evidence/persistent-catalog/plan_review.json"
       ],
-      "revision": "content:ae4c9f6a211945492f8a25a15ca83d6f3cb6227f9d03770d2ffd911353d45ab8",
-      "agent": "critic"
+      "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
+      "agent": "codex-report-verification"
     },
     "implementation": {
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/library-ownership/implementation.json"
+        ".workflow/evidence/persistent-catalog/implementation.json"
       ],
-      "revision": "content:ae4c9f6a211945492f8a25a15ca83d6f3cb6227f9d03770d2ffd911353d45ab8",
-      "agent": "implementer"
+      "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
+      "agent": "codex-report-verification"
     },
     "automated_tests": {
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/library-ownership/automated_tests.json"
+        ".workflow/evidence/persistent-catalog/automated_tests.json"
       ],
-      "revision": "content:ae4c9f6a211945492f8a25a15ca83d6f3cb6227f9d03770d2ffd911353d45ab8",
+      "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
       "agent": "scripts/run_check.py"
     },
     "code_review": {
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/library-ownership/code_review.json"
+        ".workflow/evidence/persistent-catalog/code_review.json"
       ],
-      "revision": "content:ae4c9f6a211945492f8a25a15ca83d6f3cb6227f9d03770d2ffd911353d45ab8",
-      "agent": "reviewer"
+      "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
+      "agent": "codex-report-verification"
     },
     "runtime_tests": {
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/library-ownership/runtime_tests.json"
+        ".workflow/evidence/persistent-catalog/runtime_tests.json"
       ],
-      "revision": "content:ae4c9f6a211945492f8a25a15ca83d6f3cb6227f9d03770d2ffd911353d45ab8",
-      "agent": "qa"
+      "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
+      "agent": "scripts/run_check.py"
+    },
+    "state_coverage": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/persistent-catalog/state_coverage.json"
+      ],
+      "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
+      "agent": "codex-report-verification"
+    },
+    "preset_roundtrip": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/persistent-catalog/preset_roundtrip.json"
+      ],
+      "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
+      "agent": "codex-report-verification"
+    },
+    "state_migration": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/persistent-catalog/state_migration.json"
+      ],
+      "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
+      "agent": "codex-report-verification"
+    },
+    "state_integration": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/persistent-catalog/state_integration.json"
+      ],
+      "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
+      "agent": "codex-report-verification"
+    },
+    "ui_research": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/persistent-catalog/ui_research.json"
+      ],
+      "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
+      "agent": "codex-report-verification"
+    },
+    "design_system_audit": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/persistent-catalog/design_system_audit.json"
+      ],
+      "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
+      "agent": "codex-report-verification"
+    },
+    "accessibility": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/persistent-catalog/accessibility.json"
+      ],
+      "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
+      "agent": "codex-report-verification"
+    },
+    "visual_regression": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/persistent-catalog/visual_regression.json"
+      ],
+      "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
+      "agent": "codex-report-verification"
+    },
+    "ux_review": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/persistent-catalog/ux_review.json"
+      ],
+      "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
+      "agent": "codex-report-verification"
     }
   },
-  "current_revision": "content:ae4c9f6a211945492f8a25a15ca83d6f3cb6227f9d03770d2ffd911353d45ab8"
+  "current_revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2"
 }

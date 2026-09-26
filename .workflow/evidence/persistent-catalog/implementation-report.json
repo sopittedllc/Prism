@@ -1,0 +1,25 @@
+{
+  "client": "codex",
+  "role": "implementer",
+  "status": "passed",
+  "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
+  "changes": [
+    "SQLite persistent inventory with physical observation identity and exact-scope snapshots",
+    "Asynchronous cached startup and final-scan persistence",
+    "Stale observation retention and cached removal exclusion",
+    "Durable removal intent before reviewed Trash",
+    "State registry, schema compatibility and concurrency regressions",
+    "Accurate setup/format/status feedback; expanded synthetic native state matrix"
+  ],
+  "verification": [
+    "automated_tests.json",
+    "runtime_tests.json",
+    "resumed-source-review-report.json",
+    "resumed-ux-report.json"
+  ],
+  "known_limits": [
+    "Full product redesign is unfinished; this report covers only persistence foundation.",
+    "Native hooks were not exercised; shared deterministic gates run directly.",
+    "Claude alternate-client review unavailable because CLI is not authenticated. Independent Codex reviews used."
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "status": "passed",
+  "acting_client": "codex",
+  "role": "independent-specification-critic",
+  "scope": [
+    "Transactional normalized inventory and snapshot reconstruction",
+    "Logical versus physical identity and same-scope stale retention",
+    "Asynchronous startup races, cached removal exclusion, and removal reconciliation",
+    "Registry coverage, private storage, schema failure handling, and backup"
+  ],
+  "reviewed_documents": [".work/active/persistent-catalog.md"],
+  "findings": [],
+  "resolved_findings": [
+    {
+      "id": "SPEC-01",
+      "severity": "resolved",
+      "finding": "Asset-header nodes resolve through vendor ID, but one vendor product may have multiple physical installations. Vendor identity alone cannot identify an installation or prove its move, and collapsing installations violates the broader catalog identity contract.",
+      "resolution": "The clarification separates product_key from installation-observation UUID, requires vendor plus physical identity or explicit locator fallback, keeps equal-vendor distinct locations separate, and mandates duplicate-location fixtures. Vendor-only moves are not reconciled; SINE anchor replacement retains a stale prior observation unless physical evidence proves continuity."
+    }
+  ],
+  "verdict": "PASS after explicit logical-product versus physical-observation identity clarification.",
+  "nonblocking_assessment": [
+    "Same-scope snapshot retention and stale labeling avoid claiming missing or offline assets remain currently installed.",
+    "Only final scans commit, restore guards protect newer scans/setup, and cached assets cannot authorize removal.",
+    "Atomic transactions, preserved invalid/newer schemas, consistent backup, private permissions, and isolated runtime fixtures establish appropriate persistence boundaries.",
+    "Explicit registry policies and session-only reset semantics limit accidental persistence scope expansion."
+  ],
+  "limitations": [
+    "Specification critique only; no implementation or runtime verification.",
+    "No product code changed and no holdout or private content accessed."
+  ]
+}

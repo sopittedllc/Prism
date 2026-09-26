@@ -80,7 +80,7 @@ import AppKit
                 let row = NSStackView(views: [label(title, size: 13, weight: .semibold), NSView(), label(value, size: 12, secondary: true)])
                 stack.addArrangedSubview(row); row.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true
             }
-            stack.addArrangedSubview(label("Setup is saved only on this Mac. Scan results are rebuilt each session. Scans start when you ask; scheduled monitoring isn't part of this preview.", size: 12, secondary: true))
+            stack.addArrangedSubview(label("Setup and your collection are saved only on this Mac. Your saved collection opens next time; scan to refresh availability. Scans start when you ask; scheduled monitoring isn't part of this preview.", size: 12, secondary: true))
         }
         for view in stack.arrangedSubviews where view is NSTextField || view is NSScrollView || view is CatalogPanel { view.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true }
         if let focusKind, let button = folderActions[focusKind] { window?.makeFirstResponder(button) }

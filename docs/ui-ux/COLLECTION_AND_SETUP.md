@@ -4,7 +4,7 @@ The earlier screen stacked navigation, actions, status and details vertically. T
 
 Research: [Apple onboarding](https://developer.apple.com/design/human-interface-guidelines/onboarding?changes=_7), [Finder views](https://support.apple.com/en-kg/guide/mac-help/mchldaafb302/mac), [XO sample folders](https://support.xlnaudio.com/hc/en-us/articles/16920660349085-Adding-your-own-samples), [DaisyDisk scan scope](https://daisydiskapp.com/guide/1/en/DisksOverview/). The recurring patterns are brief interactive setup, explicit scan scope, a persistent collection hierarchy, and contextual details. Applying these together is a Simplify design inference, not proof of usability. Official source details and alternatives are in the task research evidence.
 
-Setup: Welcome (standard plugins) → Your sounds (samples/libraries) → Your projects (optional) → Review/Scan. Back retains the draft; Cancel/Set up later discards it. Manage locations reopens the flow. Save setup & Scan stores only chosen roots, the plugin toggle and completion flag in local Application Support/Simplify/setup.json. Filters, selection and scan results reset each launch. Use for this session & Scan offers recovery when setup cannot be saved. No automatic or recurring scan is implied.
+Setup: Welcome (standard plugins) → Your sounds (samples/libraries) → Your projects (optional) → Review/Scan. Back retains the draft; Cancel/Set up later discards it. Manage locations reopens the flow. Save setup & Scan stores chosen roots, the plugin toggle and completion flag in local Application Support/Simplify/setup.json. Final inventory is stored separately in catalog.sqlite and restored for the exact configured sources. Filters and selection reset each launch. Use for this session & Scan offers recovery when setup cannot be saved. No automatic or recurring scan is implied.
 
 Local schema version 1 uses native registry-selected IDs. Missing keys default; unknown keys ignored; malformed/wrong-type/relative root/unsupported-version data rejected without replacement. Reads reject nonregular files and are bounded at 1 MiB. Saves are atomic. No older persisted release exists; unsupported version handling is tested rather than invented migrations. Transient wizard stage and draft are discarded controller state. No presets, telemetry, sync or export of setup.
 
@@ -40,3 +40,19 @@ unsupported DAW coverage stay distinct from verified dependencies.
 Folder setup uses Add folders, current folder counts, repeated multi-select and
 explicit more-specific-root precedence. Empty states disclose saved/unscanned roots
 and partial scan issues; entry limits are per category to avoid starving projects.
+
+### Saved collection states
+On launch, browse the last final catalog for the exact configured sources. The footer
+says “Saved collection · Scan to refresh”; its tooltip has the snapshot time. This is
+not a current availability check. Retained unobserved rows/patches say “Not observed”
+in text, never color alone. Existing native table, search, inspector and source controls
+remain usable during restore and background scans. Catalog failures appear in the
+footer and leave live results available. Cached/stale plugin-format checkboxes and
+removal actions are disabled with a scan-to-verify explanation; viewing paths remains
+available. No extra setup step or account is required. The hierarchy redesign is still
+pending; this increment uses the established table and spacing system.
+Setup review describes local setup and collection persistence. Format summaries separate
+selected, kept, needs-scan and removed installations; unverified cached entries never
+appear as zero retained entries or as proven unavailable. Native persistence cases cover
+cached light/compact browsing, offline library/instrument labels, disabled stale plugin
+removal and corrupt-catalog save failure with live results retained.

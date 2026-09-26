@@ -6,8 +6,11 @@ import SimplifyCatalog
     var controller: CatalogWindow?
     func applicationDidFinishLaunching(_ notification: Notification) {
         let isSmoke = CommandLine.arguments.contains("--ui-smoke")
-        let store = isSmoke ? SetupStore(url: FileManager.default.temporaryDirectory.appendingPathComponent("SimplifySmoke-" + UUID().uuidString + "/setup.json")) : .application
-        let model = CatalogModel(store: store)
+        // Foundation preserves macOS's /var alias even when resolving temp URLs.
+        // Use the same nonlinked, disposable fixture location as the store tests.
+        let store = isSmoke ? SetupStore(url: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".cache/SimplifySmoke/" + UUID().uuidString + "/setup.json")) : .application
+        let catalog = isSmoke ? CatalogStore(url: store.url.deletingLastPathComponent().appendingPathComponent("catalog.sqlite")) : .application
+        let model = CatalogModel(store: store, catalogStore: catalog)
         if let iconURL = Bundle.main.url(forResource: "Simplify", withExtension: "icns"), let icon = NSImage(contentsOf: iconURL) {
             NSApp.applicationIconImage = icon
             NSApp.dockTile.display()
@@ -21,6 +24,7 @@ import SimplifyCatalog
             controller?.model.addRoots([URL(fileURLWithPath: CommandLine.arguments[2])], kind: .projects)
         }
         NSApp.activate(ignoringOtherApps: true)
+        if !isSmoke { Task { await model.restoreSavedCatalog() } }
         if !isSmoke && !model.onboardingCompleted { controller?.showSetup() }
         if CommandLine.arguments.count == 3, CommandLine.arguments[1] == "--ui-smoke" {
             let output = URL(fileURLWithPath: CommandLine.arguments[2])
@@ -135,11 +139,31 @@ enum SmokeError: Error { case failed(String) }
     let deadline = Date().addingTimeInterval(60)
     while (model.isScanning || (scheduledProgressCapture && !capturedProgress && progressCaptureError == nil)) && Date() < deadline { try await Task.sleep(for: .milliseconds(50)) }
     try require(!model.isScanning, "Scan timeout")
+    try require(model.catalogNotice == nil && model.savedCatalogDate != nil, "Fixture catalog persisted: \(model.catalogNotice ?? "no save timestamp")")
     try require(capturedProgress && progressCaptureError == nil, "Determinate reading progress shown and captured: \(progressCaptureError ?? "capture incomplete")")
-    let reopened = CatalogModel(store: store)
-    try require(reopened.onboardingCompleted && reopened.roots == model.roots && reopened.report == nil, "Reopen restores setup only")
+    let setupOnly = CatalogModel(store: store)
+    try require(setupOnly.onboardingCompleted && setupOnly.roots == model.roots && setupOnly.report == nil, "Reopen restores setup only")
     activate(controller.categoryButtons[1])
     try require(model.category == .sample, "Sample category action")
+    let reopenStart = Date()
+    let reopened = CatalogModel(store: store, catalogStore: CatalogStore(url: store.url.deletingLastPathComponent().appendingPathComponent("catalog.sqlite")))
+    await reopened.restoreSavedCatalog()
+    let restoreSeconds = Date().timeIntervalSince(reopenStart)
+    try require(reopened.usingSavedCatalog && reopened.report?.assets.count == model.report?.assets.count, "Durable inventory reopens without a scan")
+    try require(restoreSeconds < 2, "Cached 3000-sample fixture opens within 2 seconds")
+    let cachedWindow = CatalogWindow(model: reopened); cachedWindow.showWindow(nil)
+    cachedWindow.table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+    cachedWindow.showFormats()
+    try require(cachedWindow.formatsWindow?.choices.allSatisfy { !$0.isEnabled } == true, "Cached plugin removal disabled")
+    try require(cachedWindow.formatsWindow?.allButton.isEnabled == false, "Cached all-format removal disabled")
+    try await capture("cached-plugin-formats", target: cachedWindow.formatsWindow?.window)
+    cachedWindow.formatsWindow?.closeSheet()
+    reopened.category = .sample; cachedWindow.refresh()
+    try await capture("cached-collection", target: cachedWindow.window)
+    cachedWindow.window?.appearance = NSAppearance(named: .aqua)
+    cachedWindow.window?.setContentSize(NSSize(width: 1040, height: 658))
+    try await capture("cached-collection-light-compact", target: cachedWindow.window)
+    cachedWindow.close(); window.makeKeyAndOrderFront(nil)
     try require(controller.table.numberOfRows == 3000, "All samples visible")
     window.contentView?.layoutSubtreeIfNeeded()
     if let cell = controller.table.view(atColumn: 0, row: 0, makeIfNecessary: true) as? NSTableCellView, let text = cell.textField {
@@ -267,8 +291,60 @@ enum SmokeError: Error { case failed(String) }
         try dockCapture.run(); dockCapture.waitUntilExit()
         try require(dockCapture.terminationStatus == 0, "Dock screenshot available")
     }
-    let result: [String: Any] = ["status": "passed", "fixture_samples": 3000, "screenshots": screenshots,
-                                "checks": ["setup next/back/skip/finish controls", "draft cancellation", "setup reopen restores accepted roots", "explicit first scan", "actual scan/category controls", "async completion", "discovery counts and determinate reading progress", "search", "selection retention", "sample provenance", "unavailable matching", "coverage issues", "accessibility labels", "keyboard search focus", "centered padded cells", "inventory browsing before analysis completes", "long folder removal focus", "save error recovery", "grouped plugin formats", "cancel removal keeps all", "real Trash of synthetic fixtures only", "selective and whole-product removal"],
+    let afterRemoval = CatalogModel(store: store, catalogStore: CatalogStore(url: store.url.deletingLastPathComponent().appendingPathComponent("catalog.sqlite")))
+    await afterRemoval.restoreSavedCatalog()
+    try require(afterRemoval.usingSavedCatalog && afterRemoval.pluginProducts.isEmpty, "Removed formats stay absent after reopen")
+
+    // Exercise every persistence state in native controls using a small separate scope.
+    try file("PersistenceStates/Samples/Accordion.wav")
+    try file("PersistenceStates/Libraries/Folk/Instruments/Accordion.nki")
+    try file("PersistenceStates/Libraries/Folk/Samples/C3.wav")
+    try file("PersistenceStates/Plugins/Folk.vst3/Contents/marker")
+    let stateRoot = fixture.appendingPathComponent("PersistenceStates")
+    let stateModel = CatalogModel(catalogStore: CatalogStore(url: stateRoot.appendingPathComponent("catalog.sqlite")))
+    stateModel.setStandardPlugins(false)
+    for kind in [RootKind.samples, .libraries, .plugins] { stateModel.addRoots([stateRoot.appendingPathComponent(kind.rawValue)], kind: kind) }
+    func finishStateScan(_ model: CatalogModel) async throws {
+        model.scan()
+        let deadline = Date().addingTimeInterval(15)
+        while model.isScanning && Date() < deadline { try await Task.sleep(for: .milliseconds(20)) }
+        try require(!model.isScanning, "Persistence state fixture scan completes")
+    }
+    try await finishStateScan(stateModel)
+    try require(stateModel.report?.assets.count == 3 && stateModel.catalogNotice == nil, "Persistence state fixture saved")
+    for kind in [RootKind.samples, .libraries, .plugins] {
+        try files.moveItem(at: stateRoot.appendingPathComponent(kind.rawValue), to: stateRoot.appendingPathComponent("Offline" + kind.rawValue))
+    }
+    try await finishStateScan(stateModel)
+    try require(stateModel.report?.assets.count == 3 && stateModel.report?.assets.allSatisfy { $0.catalogStale == true } == true, "Unavailable sources retain stale inventory")
+    let stateWindow = CatalogWindow(model: stateModel); stateWindow.showWindow(nil)
+    stateWindow.window?.appearance = NSAppearance(named: .darkAqua)
+    stateModel.category = .library; stateWindow.refresh()
+    stateWindow.table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+    try require(stateWindow.detail.string.contains("Not observed"), "Unobserved library instrument is labeled")
+    try await capture("stale-library", target: stateWindow.window)
+    stateModel.category = .plugin; stateWindow.refresh()
+    stateWindow.table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+    stateWindow.showFormats()
+    try require(stateWindow.formatsWindow?.choices.allSatisfy { !$0.isEnabled } == true && stateWindow.formatsWindow?.allButton.isEnabled == false, "Stale installation removal disabled")
+    try await capture("stale-plugin-formats", target: stateWindow.formatsWindow?.window)
+    stateWindow.formatsWindow?.closeSheet(); stateWindow.close()
+
+    try file("PersistenceStates/broken.sqlite", "preserve this corrupt fixture")
+    let errorModel = CatalogModel(catalogStore: CatalogStore(url: stateRoot.appendingPathComponent("broken.sqlite")))
+    errorModel.setStandardPlugins(false); errorModel.addRoots([stateRoot.appendingPathComponent("OfflineSamples")], kind: .samples)
+    try await finishStateScan(errorModel)
+    let errorWindow = CatalogWindow(model: errorModel); errorWindow.showWindow(nil)
+    errorWindow.window?.appearance = NSAppearance(named: .aqua)
+    errorWindow.window?.setContentSize(NSSize(width: 1040, height: 658))
+    errorModel.category = .sample; errorWindow.refresh()
+    try require(errorModel.catalogNotice != nil && errorWindow.table.numberOfRows == 1 && errorWindow.scanButton.isEnabled, "Catalog save failure retains browsable live results and retry")
+    let corruptContents = try String(contentsOf: stateRoot.appendingPathComponent("broken.sqlite"), encoding: .utf8)
+    try require(corruptContents == "preserve this corrupt fixture", "Corrupt catalog remains unchanged")
+    try await capture("catalog-save-error", target: errorWindow.window)
+    errorWindow.close()
+    let result: [String: Any] = ["status": "passed", "fixture_samples": 3000, "cached_restore_seconds": restoreSeconds, "screenshots": screenshots,
+                                "checks": ["setup next/back/skip/finish controls", "draft cancellation", "setup reopen restores accepted roots", "explicit first scan", "actual scan/category controls", "async completion", "discovery counts and determinate reading progress", "search", "selection retention", "sample provenance", "unavailable matching", "coverage issues", "accessibility labels", "keyboard search focus", "centered padded cells", "inventory browsing before analysis completes", "long folder removal focus", "save error recovery", "grouped plugin formats", "cancel removal keeps all", "real Trash of synthetic fixtures only", "selective and whole-product removal", "durable catalog reopening", "cached removal disabled", "removed plugins stay absent after reopen", "offline library and instrument labels", "stale removal disabled", "catalog save failure retains live browsing", "corrupt catalog preserved"],
                                 "limits": ["VoiceOver user testing not performed", "native open panel interaction not automated", "current Mac only", "first visual baseline, no previous image diff"]]
     try JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted, .sortedKeys]).write(to: output.appendingPathComponent("runtime.json"))
     print("UI smoke: PASS")
@@ -276,9 +352,11 @@ enum SmokeError: Error { case failed(String) }
 
 if CommandLine.arguments == [CommandLine.arguments[0], "--state-contract"] {
     let model = CatalogModel()
-    let contract: [String: Any] = ["definitions": CatalogStateRegistry.definitions, "defaults": model.stateSnapshot,
+    var contract: [String: Any] = ["definitions": CatalogStateRegistry.definitions, "defaults": model.stateSnapshot,
                                  "runtime_ids": Array(model.stateSnapshot.keys).sorted(), "preset_ids": [String](),
                                  "persistence": "local-setup-v1", "persistence_ids": Array(CatalogStateRegistry.persistedIDs).sorted(), "migration": "version 1; reject unsupported versions", "preset_serialization": "absent"]
+    contract["catalog_definitions"] = try JSONSerialization.jsonObject(with: JSONEncoder().encode(CatalogPersistenceRegistry.definitions))
+    contract["catalog_schema_version"] = CatalogPersistenceRegistry.schemaVersion
     print(String(data: try JSONSerialization.data(withJSONObject: contract, options: [.sortedKeys]), encoding: .utf8)!)
 } else {
     let application = NSApplication.shared

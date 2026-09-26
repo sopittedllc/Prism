@@ -28,6 +28,7 @@ public enum CatalogSort: String, CaseIterable, Sendable { case name = "Name", si
     public private(set) var isBackgroundScanning = false
     public private(set) var basicInventoryComplete = false
     private var inventorySequence = 0
+    private var acceptingInventory = false
     private var cachedVisible: [Asset]?
     private var assetsByKey: [String: Asset] = [:]
     private var inclusionsByPath: [String: SampleInclusion] = [:]
@@ -66,10 +67,17 @@ public enum CatalogSort: String, CaseIterable, Sendable { case name = "Name", si
 
     public private(set) var onboardingCompleted = false
     public private(set) var setupNotice: String?
+    public private(set) var savedCatalogDate: Date?
+    public private(set) var usingSavedCatalog = false
+    public private(set) var isRestoringCatalog = false
+    public private(set) var catalogNotice: String?
+    public private(set) var catalogObservations: [String: CatalogObservation] = [:]
+    private let catalogStore: CatalogStore?
     private let store: SetupStore?
     private let sineDatabase: URL
 
-    public init(store: SetupStore? = nil, sineDatabase: URL = LibraryMetadataReader.sineDatabase) {
+    public init(store: SetupStore? = nil, sineDatabase: URL = LibraryMetadataReader.sineDatabase, catalogStore: CatalogStore? = nil) {
+        self.catalogStore = catalogStore
         self.store = store; self.sineDatabase = sineDatabase
         do {
             if let values = try store?.load() {
@@ -100,6 +108,7 @@ public enum CatalogSort: String, CaseIterable, Sendable { case name = "Name", si
 
     public func reset() {
         guard !isBusy else { return }
+        scanIdentifier = UUID(); usingSavedCatalog = false; savedCatalogDate = nil; catalogObservations = [:]; catalogNotice = nil
         category = .plugin; query = ""; sort = .name; standardPlugins = true
         roots = [:]; selectedPath = nil; report = nil; configurationChanged = false; onboardingCompleted = false; setupNotice = nil; scanProgress = nil; scanStartedAt = nil; basicInventoryComplete = false; isBackgroundScanning = false
         onChange?()
@@ -127,14 +136,38 @@ public enum CatalogSort: String, CaseIterable, Sendable { case name = "Name", si
         standardPlugins = enabled; configurationChanged = report != nil; onChange?()
     }
 
-    public func scan() {
-        guard !isBusy else { return }
+    private var scanRequest: ScanRequest {
         var request = ScanRequest()
         request.plugins = (standardPlugins ? ScanRequest.standardPluginRoots : []) + (roots[.plugins] ?? [])
         request.samples = roots[.samples] ?? []; request.libraries = roots[.libraries] ?? []
         request.projects = roots[.projects] ?? []
+        return request
+    }
+
+    /// Restore without blocking native interaction; late results cannot replace a scan/setup change.
+    public func restoreSavedCatalog() async {
+        guard let catalogStore, report == nil, !isScanning, !isRestoringCatalog else { return }
+        let scope = CatalogScope(scanRequest); let identifier = scanIdentifier
+        isRestoringCatalog = true
+        defer { isRestoringCatalog = false; onChange?() }
+        do {
+            let snapshot = try await catalogStore.load(scope: scope)
+            guard identifier == scanIdentifier, scope.roots == CatalogScope(scanRequest).roots, report == nil else { return }
+            if let snapshot {
+                report = snapshot.report; savedCatalogDate = snapshot.savedAt
+                catalogObservations = snapshot.observations; usingSavedCatalog = true
+            }
+        } catch {
+            guard identifier == scanIdentifier, scope.roots == CatalogScope(scanRequest).roots else { return }
+            catalogNotice = error.localizedDescription
+        }
+    }
+
+    public func scan() {
+        guard !isBusy else { return }
+        let request = scanRequest
         scanIdentifier = UUID(); let identifier = scanIdentifier
-        scanStartedAt = Date(); scanProgress = nil; inventorySequence = 0; basicInventoryComplete = false
+        scanStartedAt = Date(); scanProgress = nil; catalogNotice = nil; inventorySequence = 0; basicInventoryComplete = false
         isBackgroundScanning = report != nil
         foregroundTask?.cancel()
         foregroundTask = Task { [weak self] in
@@ -142,18 +175,26 @@ public enum CatalogSort: String, CaseIterable, Sendable { case name = "Name", si
             guard let self, self.isScanning, self.scanIdentifier == identifier else { return }
             self.isBackgroundScanning = true; self.onChange?()
         }
-        isScanning = true; onChange?()
-        let snapshot = request; let database = sineDatabase
+        isScanning = true; acceptingInventory = true; onChange?()
+        let snapshot = request; let database = sineDatabase; let preserveExisting = !configurationChanged
         scanTask = Task { [weak self] in
             let result = await Task.detached(priority: .utility) { [weak self] in
                 Scanner(sineDatabase: database).scan(snapshot, inventory: { [weak self] update in
                     Task { @MainActor [weak self] in
-                        guard let owner = self, owner.isScanning, owner.scanIdentifier == identifier,
+                        guard let owner = self, owner.isScanning, owner.acceptingInventory, owner.scanIdentifier == identifier,
                               update.sequence > owner.inventorySequence else { return }
                         owner.inventorySequence = update.sequence
                         owner.basicInventoryComplete = update.discoveryComplete
                         owner.isBackgroundScanning = true
-                        owner.report = ScanReport(inventory: update)
+                        if preserveExisting, let prior = owner.report {
+                            func key(_ asset: Asset) -> String { asset.kind.rawValue + ":" + asset.path + ":" + (asset.libraryMetadata?.identity?.productID ?? "") }
+                            var merged = Dictionary(prior.assets.map { (key($0), $0) }, uniquingKeysWith: { first, _ in first })
+                            for var asset in update.assets {
+                                asset.catalogID = merged[key(asset)]?.catalogID
+                                merged[key(asset)] = asset
+                            }
+                            owner.report = ScanReport(inventory: update).replacingAssets(Array(merged.values))
+                        } else { owner.report = ScanReport(inventory: update) }
                         owner.onChange?()
                     }
                 }) { [weak self] update in
@@ -165,8 +206,26 @@ public enum CatalogSort: String, CaseIterable, Sendable { case name = "Name", si
                 }
             }.value
             guard let self else { return }
-            self.report = result; self.isScanning = false; self.configurationChanged = false; self.isBackgroundScanning = false; self.basicInventoryComplete = true; self.foregroundTask?.cancel()
-            if let selected = self.selectedPath, !result.assets.contains(where: { $0.selectionKey == selected && $0.kind == self.category }) {
+            self.acceptingInventory = false
+            let selectedAsset = self.selectedAsset
+            self.report = result; self.usingSavedCatalog = false; self.onChange?()
+            if let catalogStore = self.catalogStore {
+                do {
+                    let saved = try await catalogStore.ingest(result, scope: CatalogScope(snapshot))
+                    let fresh = Dictionary(result.assets.map { ($0.kind.rawValue + ":" + $0.selectionKey, $0) }, uniquingKeysWith: { first, _ in first })
+                    var assets = saved.report.assets
+                    // Only current scan evidence can authorize removal. Cached entries never can.
+                    for index in assets.indices where assets[index].catalogStale != true {
+                        let key = assets[index].kind.rawValue + ":" + assets[index].path
+                        if assets[index].kind == .plugin { assets[index].fileIdentity = fresh[key]?.fileIdentity }
+                    }
+                    self.report = saved.report.replacingAssets(assets)
+                    self.savedCatalogDate = saved.savedAt; self.catalogObservations = saved.observations
+                    if let selectedAsset, let current = assets.first(where: { $0.kind == selectedAsset.kind && $0.path == selectedAsset.path && $0.libraryMetadata?.identity?.productID == selectedAsset.libraryMetadata?.identity?.productID }) { self.selectedPath = current.selectionKey }
+                } catch { self.catalogNotice = error.localizedDescription }
+            }
+            self.isScanning = false; self.configurationChanged = false; self.isBackgroundScanning = false; self.basicInventoryComplete = true; self.foregroundTask?.cancel()
+            if let selected = self.selectedPath, !(self.report?.assets ?? []).contains(where: { $0.selectionKey == selected && $0.kind == self.category }) {
                 self.selectedPath = nil
             }
             self.onChange?()
@@ -209,16 +268,23 @@ public enum CatalogSort: String, CaseIterable, Sendable { case name = "Name", si
         let prefix = projects.isEmpty ? "No saved plugin references identified. Last used is unknown." : "Candidate saved-project matches:\n" + projects.map(\.path).joined(separator: "\n")
         return prefix + "\n\nName matches do not identify a specific installed format. See Scan details for coverage by project. Missing matches do not establish that a plugin is unused."
     }
+    public func canReviewRemoval(_ asset: Asset) -> Bool {
+        !isBusy && !usingSavedCatalog && asset.catalogStale != true && asset.fileIdentity != nil
+    }
     /// Explicitly reviewed installation paths only. Caller must present confirmation first.
     public func trashPlugins(_ reviewed: [Asset]) async -> [PluginRemovalResult] {
         let paths = Set(reviewed.map(\.path))
-        guard !isBusy, !paths.isEmpty else { return [] }
+        guard !isBusy, !usingSavedCatalog, !paths.isEmpty, reviewed.allSatisfy({ $0.catalogStale != true && $0.fileIdentity != nil }) else { return [] }
         let selected = selectedPlugin
         let current = (report?.assets ?? []).filter { $0.kind == .plugin && paths.contains($0.path) }
         guard reviewed.count == paths.count, current.count == paths.count,
               reviewed.allSatisfy({ item in current.contains { $0.path == item.path && $0.fileIdentity == item.fileIdentity && $0.bundleIdentifier == item.bundleIdentifier } }) else { return [] }
         let targets = reviewed
         isRemoving = true; onChange?()
+        if let catalogStore {
+            do { try await catalogStore.recordRemovalIntent(paths: paths) }
+            catch { catalogNotice = error.localizedDescription; isRemoving = false; onChange?(); return [] }
+        }
         let result = await Task.detached(priority: .utility) { PluginRemoval.moveToTrash(targets) }.value
         let removed = Set(result.filter(\.succeeded).map(\.path))
         report = report?.removingPluginPaths(removed)
@@ -253,6 +319,8 @@ public enum CatalogSort: String, CaseIterable, Sendable { case name = "Name", si
     }
 
     public var status: String {
+        if let catalogNotice { return catalogNotice }
+        if usingSavedCatalog, !isScanning, let date = savedCatalogDate { return "Saved collection · \(date.formatted(date: .abbreviated, time: .shortened)) · Scan to refresh availability and references." }
         if isRemoving { return "Moving selected plugin installations to Trash…" }
         if isScanning { return basicInventoryComplete ? "Collection ready. Project references are being checked in the background." : "Discovering your collection in the background. More items may appear." }
         if configurationChanged { return "Folder selection changed. Scan to update results." }
@@ -261,7 +329,8 @@ public enum CatalogSort: String, CaseIterable, Sendable { case name = "Name", si
             return count == 0 ? "Choose folders, then Scan. Standard plugin folders are included by default." : "\(count) folders selected. Scan to build your collection."
         }
         let failed = report.projects.filter { $0.coverage != "partial" }.count
-        return "\(report.assets.count) entries · \(report.projects.count) projects · \(report.issues.count) scan issues · \(failed) unsupported or failed projects. Reference coverage is partial."
+        let stale = report.assets.filter { $0.catalogStale == true }.count
+        return "\(report.assets.count) entries · \(stale) not observed in latest scan · \(report.projects.count) projects · \(report.issues.count) scan issues · \(failed) unsupported or failed projects. Reference coverage is partial."
     }
 
     public var detail: String {

@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "persistent-catalog",
+  "gate": "research",
+  "status": "passed",
+  "revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
+  "timestamp": "2026-09-26T00:06:39.834730+00:00",
+  "producer": "codex-report-verification",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "research-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/persistent-catalog/research-report.json",
+        "sha256": "69da40705195724d8da03fa277f740436ae5a9603623dd0ccc9699a8d58f344d"
+      }
+    }
+  ]
+}

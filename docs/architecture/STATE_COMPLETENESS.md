@@ -102,3 +102,45 @@ Session selection uses Asset.selectionKey (vendor product ID where available,
 otherwise path). The existing selection registry/default/reset/persistence policy is
 unchanged. Finder operations still use the physical path. Scanner/catalog fixtures
 prove two products sharing one physical file retain separate selection.
+
+## Persistent inventory catalog (schema 1)
+
+This supersedes the session-only lifetime of derived inventory above. Setup keeps its
+existing JSON registry. CatalogPersistenceRegistry is the runtime authority for four
+logical field groups, mirrored under catalog_fields in feature-registry.json and checked
+by catalog_state_check.py:
+
+| Field group | Stored state |
+| --- | --- |
+| catalog.inventory | Physical-observation UUIDs, physical/vendor keys, scoped asset headers, instruments, content memberships |
+| catalog.observations | Global first/last seen, per-scope baseline, generation-derived stale flags |
+| catalog.scopes | Exact selected roots, last final evidence snapshot, saved date, complete-baseline state |
+| catalog.removal_intents | Explicit plugin paths excluded before reviewed Trash starts |
+
+All are local app data, excluded from audio presets, DAW project persistence, external
+automation, structured clipboard, sync and telemetry. Empty database defaults; Reset
+clears the session view but retains history. No metadata-edit undo yet; derived data is
+refreshed by scans. Backup API exports a consistent local database, without import/merge
+UI. Native status, inspector and disabled removal controls expose cached/stale state.
+
+Initialization creates schema 1 atomically only in an empty database; application ID
+and user_version reject unrelated/newer schemas without overwrite. Frozen v1 SQL fixture
+lives under tests/fixtures. No earlier released SQLite version exists to migrate. Future
+version upgrades require a backup plus transactional ordered migrations before adoption.
+SQLite rollback restores the preceding snapshot after write failure/interruption.
+
+Physical identity uses volume UUID, inode and birthtime when available. Hardlinked files
+or unavailable identity use explicit path fallback; cross-volume equivalence is not
+inferred. Logical product key is separate from installation-observation UUID. The current
+SINE observation is anchored to its representative metadata file; anchor replacement
+without physical continuity can leave a stale observation, pending reconciliation.
+Scopes isolate payloads and baseline classifications; snapshots do not leak instrument
+memberships from another selection of roots. First seen is indexing history, not install
+or usage time. Missing nodes, patches and members remain marked stale, never removal-safe.
+
+Only final scans persist. Background restore has scan/configuration/reset guards. Save
+failure retains live results and displays a notice. Cached plugin removal identities are
+never restored. Durable removal intent is written before filesystem action; if that write
+fails, nothing is moved. A failed removal may remain hidden in saved inventory until a
+fresh scan reobserves it; live results still show failed items. User audio is never changed
+by the catalog store. Private files default to directory 0700/database 0600.

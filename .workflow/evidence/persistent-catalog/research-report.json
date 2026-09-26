@@ -1,0 +1,28 @@
+{
+  "client": "codex",
+  "role": "researcher",
+  "status": "passed",
+  "sources": [
+    {
+      "url": "https://www.sqlite.org/lang_transaction.html",
+      "finding": "Explicit transactions retain a consistent read snapshot; BEGIN IMMEDIATE obtains write intent. A failed commit must be rolled back explicitly."
+    },
+    {
+      "url": "https://www.sqlite.org/backup.html",
+      "finding": "The backup API yields a consistent destination snapshot; final step and finish results must be checked."
+    },
+    {
+      "url": "https://www.sqlite.org/pragma.html",
+      "finding": "Application ID and user_version identify the application's database and schema."
+    }
+  ],
+  "local_evidence": [
+    "CatalogStore uses actor-owned connections and transaction-scoped snapshot reads and ingestion.",
+    "CatalogStoreTests exercises reopen, rollback, future/corrupt/schema-0 preservation, backup and stale scope membership.",
+    "Foundation diagnostic confirmed resolvingSymlinksInPath retains /var on this Mac; generated native fixture database moved to nonlinked home-cache location."
+  ],
+  "limitations": [
+    "Apple volume UUID page returned a JavaScript shell; physical identity continuity is checked by same-volume fixture rename.",
+    "No cross-volume move reconciliation or abrupt-process-kill test claimed."
+  ]
+}

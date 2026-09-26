@@ -1,0 +1,23 @@
+{
+  "client": "codex",
+  "role": "qa-native-accessibility-checks",
+  "status": "passed",
+  "scope": "Incremental saved/stale/error semantics and existing native focus/labels; not full assistive-technology certification",
+  "evidence": [
+    "runtime-report.json",
+    "resumed-ux-report.json"
+  ],
+  "verified": [
+    "Native search, collection table, details and Scan labels",
+    "Command-F focuses native search editor",
+    "Saved and unobserved states use visible text",
+    "Cached/stale checkboxes and destructive actions disabled; Done remains available",
+    "Error notice visible at compact width while live collection and Scan remain available",
+    "Format checkbox accessibility labels include format and exact path"
+  ],
+  "limits": [
+    "VoiceOver not operated.",
+    "Complete keyboard-only workflow and contrast certification not performed.",
+    "Older macOS, Intel, RTL and alternate scale not tested."
+  ]
+}

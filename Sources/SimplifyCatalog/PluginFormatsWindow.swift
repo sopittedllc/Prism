@@ -34,7 +34,7 @@ import SimplifyCore
             rows.trailingAnchor.constraint(equalTo: document.trailingAnchor, constant: -12), rows.bottomAnchor.constraint(lessThanOrEqualTo: document.bottomAnchor, constant: -8)])
         for (index, installation) in product.installations.enumerated() {
             let toggle = NSButton(checkboxWithTitle: PluginProduct.formatName(installation.format) + " · " + URL(fileURLWithPath: installation.path).lastPathComponent, target: self, action: #selector(updateChoices))
-            toggle.tag = index; toggle.state = .off; toggle.lineBreakMode = .byTruncatingMiddle
+            toggle.tag = index; toggle.state = .off; toggle.isEnabled = model.canReviewRemoval(installation); toggle.lineBreakMode = .byTruncatingMiddle
             toggle.setAccessibilityLabel("Remove " + PluginProduct.formatName(installation.format) + " at " + installation.path)
             choices.append(toggle)
             let path = label(installation.path, size: 11, secondary: true); path.maximumNumberOfLines = 2; path.lineBreakMode = .byTruncatingMiddle; path.toolTip = installation.path; path.isSelectable = true
@@ -45,7 +45,7 @@ import SimplifyCore
         selectedButton.target = self; selectedButton.action = #selector(reviewSelected); selectedButton.bezelStyle = .rounded
         allButton.target = self; allButton.action = #selector(reviewAll); allButton.bezelStyle = .rounded
         closeButton.target = self; closeButton.action = #selector(closeSheet); closeButton.bezelStyle = .rounded; closeButton.keyEquivalent = "\u{1b}"
-        message.stringValue = "Only the listed plugin bundles are moved to Trash. Presets, licenses, shared files, and sample libraries stay in place. Quit your DAWs first."
+        message.stringValue = model.usingSavedCatalog || product.installations.contains(where: { $0.catalogStale == true }) ? "Scan again to verify these installations before removing them." : "Only the listed plugin bundles are moved to Trash. Presets, licenses, shared files, and sample libraries stay in place. Quit your DAWs first."
         let footer = NSStackView(views: [allButton, NSView(), closeButton, selectedButton]); footer.spacing = 10
         let stack = column([name, subtitle, scroll, summary, message, footer], spacing: 16); pin(stack, in: panel.contentView!, inset: 24)
         for view in stack.arrangedSubviews { view.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true }
@@ -56,7 +56,15 @@ import SimplifyCore
     required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
     @objc private func updateChoices() {
         let count = choices.filter { $0.state == .on && $0.isEnabled }.count
-        summary.stringValue = "\(count) selected · \(choices.filter(\.isEnabled).count - count) kept"
+        let currentPaths = Set(model.pluginProducts.flatMap(\.installations).map(\.path))
+        let needsScan = choices.filter { !$0.isEnabled && currentPaths.contains(product.installations[$0.tag].path) }.count
+        let removed = product.installations.filter { !currentPaths.contains($0.path) }.count
+        let kept = choices.filter(\.isEnabled).count - count
+        var parts = ["\(count) selected"]
+        if kept > 0 { parts.append("\(kept) kept") }
+        if needsScan > 0 { parts.append("\(needsScan) need scan") }
+        if removed > 0 { parts.append("\(removed) removed") }
+        summary.stringValue = isWorking ? "Moving selected installations…" : parts.joined(separator: " · ")
         selectedButton.isEnabled = count > 0 && !model.isBusy && !isWorking
         allButton.isEnabled = choices.contains(where: \.isEnabled) && !model.isBusy && !isWorking
     }
@@ -82,7 +90,7 @@ import SimplifyCore
                 self.isWorking = false; self.closeButton.isEnabled = true
                 let removed = Set(self.results.filter(\.succeeded).map(\.path))
                 for (index, toggle) in self.choices.enumerated() {
-                    toggle.isEnabled = self.model.pluginProducts.contains { $0.installations.contains { $0.path == self.product.installations[index].path } }
+                    toggle.isEnabled = self.model.pluginProducts.contains { $0.installations.contains { $0.path == self.product.installations[index].path && self.model.canReviewRemoval($0) } }
                     toggle.state = .off
                 }
                 self.message.stringValue = self.results.isEmpty ? "Nothing was moved. Close this panel and scan again." : "\(removed.count) moved to Trash. \(self.results.count - removed.count) could not be moved. Restore from Trash in Finder; rescan after restoring."

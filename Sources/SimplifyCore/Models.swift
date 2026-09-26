@@ -13,10 +13,12 @@ public struct Asset: Codable, Sendable {
     public let classification: String
     public var libraryMetadata: LibraryMetadata? = nil
     public var fileIdentity: PluginFileIdentity? = nil
+    public var catalogID: String? = nil
+    public var catalogStale: Bool? = nil
     /// Session catalog key. Vendor-backed libraries use product identity even when
     /// their physical content is shared or moves. Other assets retain path identity.
     public var selectionKey: String {
-        kind == .library ? (libraryMetadata?.identity?.productID ?? path) : path
+        kind == .library ? (catalogID ?? libraryMetadata?.identity?.productID ?? path) : path
     }
 }
 
@@ -58,6 +60,9 @@ public struct ScanReport: Codable, Sendable {
     internal init(schemaVersion: Int, assets: [Asset], projects: [ProjectReport], sampleInclusions: [SampleInclusion], issues: [ScanIssue], durationSeconds: Double) {
         self.schemaVersion = schemaVersion; self.assets = assets; self.projects = projects
         self.sampleInclusions = sampleInclusions; self.issues = issues; self.durationSeconds = durationSeconds
+    }
+    public func replacingAssets(_ assets: [Asset]) -> ScanReport {
+        ScanReport(schemaVersion: schemaVersion, assets: assets, projects: projects, sampleInclusions: sampleInclusions, issues: issues, durationSeconds: durationSeconds)
     }
     public func removingPluginPaths(_ paths: Set<String>) -> ScanReport {
         ScanReport(schemaVersion: schemaVersion, assets: assets.filter { $0.kind != .plugin || !paths.contains($0.path) }, projects: projects, sampleInclusions: sampleInclusions, issues: issues, durationSeconds: durationSeconds)

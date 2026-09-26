@@ -13,14 +13,20 @@ public struct LibraryIdentity: Codable, Sendable, Equatable {
     public let installationRoot: String?
 }
 
+public struct LibraryContentMember: Codable, Sendable {
+    public let path: String
+    public let stale: Bool
+}
 public struct LibraryInstrument: Codable, Sendable {
     public let name: String
     public let path: String
     public let tags: [String]
     public var vendorID: String? = nil
+    public var catalogStale: Bool? = nil
     /// Known physical members only, not a claim of exhaustive dependencies or ownership.
     /// SINE includes each installed mic's metadata and archive; nil means not established.
     public var contentPaths: [String]? = nil
+    public var contentMembers: [LibraryContentMember]? = nil
 }
 public struct LibraryMetadata: Codable, Sendable {
     public let player: String

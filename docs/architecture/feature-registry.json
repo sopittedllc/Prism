@@ -314,5 +314,231 @@
         }
       }
     }
+  ],
+  "catalog_fields": [
+    {
+      "id": "catalog.inventory",
+      "value_type": "object",
+      "default": {},
+      "introduced_in": 1,
+      "policies": {
+        "preset": {
+          "decision": "excluded",
+          "reason": "Inventory is not an audio preset; no preset serializer."
+        },
+        "project_persistence": {
+          "decision": "excluded",
+          "reason": "Local application catalog, never a DAW project."
+        },
+        "default_reset": {
+          "decision": "included",
+          "reason": "Empty on first run. Session Reset does not delete the durable catalog."
+        },
+        "migration": {
+          "decision": "included",
+          "reason": "SQLite schema version 1; initialize only empty schema; reject unknown versions without replacing. No previous released catalog."
+        },
+        "undo": {
+          "decision": "excluded",
+          "reason": "Derived scan observations and recoverable removal intents; no editable user tags in this increment."
+        },
+        "automation": {
+          "decision": "excluded",
+          "reason": "Store API is internal to scan/restore, no external automation commands."
+        },
+        "copy_paste": {
+          "decision": "excluded",
+          "reason": "No structured catalog clipboard; existing selectable text only."
+        },
+        "sync": {
+          "decision": "excluded",
+          "reason": "Local storage only; no account or synchronization."
+        },
+        "accessibility": {
+          "decision": "included",
+          "reason": "Cached/stale/errors use existing native status and inspector text; no new custom controls."
+        },
+        "privacy": {
+          "decision": "included",
+          "reason": "0700 catalog directory and 0600 database, local paths only, no network transmission."
+        },
+        "analytics": {
+          "decision": "excluded",
+          "reason": "No telemetry collected."
+        },
+        "export_import": {
+          "decision": "included",
+          "reason": "Consistent local SQLite backup API; no import/merge UI yet."
+        }
+      }
+    },
+    {
+      "id": "catalog.observations",
+      "value_type": "object",
+      "default": {},
+      "introduced_in": 1,
+      "policies": {
+        "preset": {
+          "decision": "excluded",
+          "reason": "Inventory is not an audio preset; no preset serializer."
+        },
+        "project_persistence": {
+          "decision": "excluded",
+          "reason": "Local application catalog, never a DAW project."
+        },
+        "default_reset": {
+          "decision": "included",
+          "reason": "Empty on first run. Session Reset does not delete the durable catalog."
+        },
+        "migration": {
+          "decision": "included",
+          "reason": "SQLite schema version 1; initialize only empty schema; reject unknown versions without replacing. No previous released catalog."
+        },
+        "undo": {
+          "decision": "excluded",
+          "reason": "Derived scan observations and recoverable removal intents; no editable user tags in this increment."
+        },
+        "automation": {
+          "decision": "excluded",
+          "reason": "Store API is internal to scan/restore, no external automation commands."
+        },
+        "copy_paste": {
+          "decision": "excluded",
+          "reason": "No structured catalog clipboard; existing selectable text only."
+        },
+        "sync": {
+          "decision": "excluded",
+          "reason": "Local storage only; no account or synchronization."
+        },
+        "accessibility": {
+          "decision": "included",
+          "reason": "Cached/stale/errors use existing native status and inspector text; no new custom controls."
+        },
+        "privacy": {
+          "decision": "included",
+          "reason": "0700 catalog directory and 0600 database, local paths only, no network transmission."
+        },
+        "analytics": {
+          "decision": "excluded",
+          "reason": "No telemetry collected."
+        },
+        "export_import": {
+          "decision": "included",
+          "reason": "Consistent local SQLite backup API; no import/merge UI yet."
+        }
+      }
+    },
+    {
+      "id": "catalog.scopes",
+      "value_type": "object",
+      "default": {},
+      "introduced_in": 1,
+      "policies": {
+        "preset": {
+          "decision": "excluded",
+          "reason": "Inventory is not an audio preset; no preset serializer."
+        },
+        "project_persistence": {
+          "decision": "excluded",
+          "reason": "Local application catalog, never a DAW project."
+        },
+        "default_reset": {
+          "decision": "included",
+          "reason": "Empty on first run. Session Reset does not delete the durable catalog."
+        },
+        "migration": {
+          "decision": "included",
+          "reason": "SQLite schema version 1; initialize only empty schema; reject unknown versions without replacing. No previous released catalog."
+        },
+        "undo": {
+          "decision": "excluded",
+          "reason": "Derived scan observations and recoverable removal intents; no editable user tags in this increment."
+        },
+        "automation": {
+          "decision": "excluded",
+          "reason": "Store API is internal to scan/restore, no external automation commands."
+        },
+        "copy_paste": {
+          "decision": "excluded",
+          "reason": "No structured catalog clipboard; existing selectable text only."
+        },
+        "sync": {
+          "decision": "excluded",
+          "reason": "Local storage only; no account or synchronization."
+        },
+        "accessibility": {
+          "decision": "included",
+          "reason": "Cached/stale/errors use existing native status and inspector text; no new custom controls."
+        },
+        "privacy": {
+          "decision": "included",
+          "reason": "0700 catalog directory and 0600 database, local paths only, no network transmission."
+        },
+        "analytics": {
+          "decision": "excluded",
+          "reason": "No telemetry collected."
+        },
+        "export_import": {
+          "decision": "included",
+          "reason": "Consistent local SQLite backup API; no import/merge UI yet."
+        }
+      }
+    },
+    {
+      "id": "catalog.removal_intents",
+      "value_type": "object",
+      "default": {},
+      "introduced_in": 1,
+      "policies": {
+        "preset": {
+          "decision": "excluded",
+          "reason": "Inventory is not an audio preset; no preset serializer."
+        },
+        "project_persistence": {
+          "decision": "excluded",
+          "reason": "Local application catalog, never a DAW project."
+        },
+        "default_reset": {
+          "decision": "included",
+          "reason": "Empty on first run. Session Reset does not delete the durable catalog."
+        },
+        "migration": {
+          "decision": "included",
+          "reason": "SQLite schema version 1; initialize only empty schema; reject unknown versions without replacing. No previous released catalog."
+        },
+        "undo": {
+          "decision": "excluded",
+          "reason": "Derived scan observations and recoverable removal intents; no editable user tags in this increment."
+        },
+        "automation": {
+          "decision": "excluded",
+          "reason": "Store API is internal to scan/restore, no external automation commands."
+        },
+        "copy_paste": {
+          "decision": "excluded",
+          "reason": "No structured catalog clipboard; existing selectable text only."
+        },
+        "sync": {
+          "decision": "excluded",
+          "reason": "Local storage only; no account or synchronization."
+        },
+        "accessibility": {
+          "decision": "included",
+          "reason": "Cached/stale/errors use existing native status and inspector text; no new custom controls."
+        },
+        "privacy": {
+          "decision": "included",
+          "reason": "0700 catalog directory and 0600 database, local paths only, no network transmission."
+        },
+        "analytics": {
+          "decision": "excluded",
+          "reason": "No telemetry collected."
+        },
+        "export_import": {
+          "decision": "included",
+          "reason": "Consistent local SQLite backup API; no import/merge UI yet."
+        }
+      }
+    }
   ]
 }

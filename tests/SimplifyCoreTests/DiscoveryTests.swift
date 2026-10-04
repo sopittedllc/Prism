@@ -29,6 +29,57 @@ private final class Fixture {
     let result = Scanner().scan(request)
     #expect(result.assets.count == 5)
     #expect(result.assets.allSatisfy { $0.kind == .plugin && $0.bundleIdentifier == "org.example.test" })
+    #expect(result.assets.allSatisfy { $0.logicalBytes == result.assets.first?.logicalBytes && ($0.logicalBytes ?? 0) > 0 })
+}
+
+@Test func pluginBundleSizeCountsHardLinksOnceAndRejectsLinksAndDepth() throws {
+    let f = try Fixture()
+    let bundle = f.root.appendingPathComponent("Plugins/Measured.vst3")
+    let file = try f.file("Plugins/Measured.vst3/Contents/Binary", String(repeating: "x", count: 100))
+    try FileManager.default.linkItem(at: file, to: bundle.appendingPathComponent("Contents/Hardlink"))
+    var pass = PluginBundleSize.Pass()
+    let measured = PluginBundleSize.measure(bundle, pass: &pass)
+    #expect(measured.bytes == 100 && measured.issue == nil)
+    _ = try f.file("Plugins/Measured.vst3/Contents/__Pace_Eden.bundle/Contents/Resources/Signatures/codesign.dsig", "sig!")
+    let internalLink = bundle.appendingPathComponent("Contents/Resources/__Pace_Eden/Signatures/codesign.dsig")
+    try FileManager.default.createDirectory(at: internalLink.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try FileManager.default.createSymbolicLink(atPath: internalLink.path,
+        withDestinationPath: "../../../__Pace_Eden.bundle/Contents/Resources/Signatures/codesign.dsig")
+    pass = PluginBundleSize.Pass()
+    #expect(PluginBundleSize.measure(bundle, pass: &pass).bytes == 104)
+    try FileManager.default.removeItem(at: internalLink)
+    try FileManager.default.createSymbolicLink(at: bundle.appendingPathComponent("Contents/External"), withDestinationURL: file)
+    pass = PluginBundleSize.Pass()
+    #expect(PluginBundleSize.measure(bundle, pass: &pass).bytes == nil)
+    try FileManager.default.removeItem(at: bundle.appendingPathComponent("Contents/External"))
+    try FileManager.default.createSymbolicLink(atPath: internalLink.path, withDestinationPath: "../Missing")
+    pass = PluginBundleSize.Pass()
+    let dangling = PluginBundleSize.measure(bundle, pass: &pass)
+    #expect(dangling.bytes == nil && dangling.issue != nil)
+    try FileManager.default.removeItem(at: internalLink)
+    let deep = (0...PluginBundleSize.maximumBundleDepth).map { "d\($0)" }.joined(separator: "/")
+    _ = try f.file("Plugins/Measured.vst3/" + deep + "/too-deep", "x")
+    pass = PluginBundleSize.Pass()
+    #expect(PluginBundleSize.measure(bundle, pass: &pass).issue?.contains("depth") == true)
+    pass = PluginBundleSize.Pass(entries: 0, startedAt: ProcessInfo.processInfo.systemUptime - 9, exhausted: false)
+    #expect(PluginBundleSize.measure(bundle, pass: &pass).issue?.contains("pass time") == true)
+    pass = PluginBundleSize.Pass(entries: PluginBundleSize.maximumPassEntries - 1)
+    #expect(PluginBundleSize.measure(bundle, pass: &pass).issue?.contains("pass entry") == true)
+    #expect(pass.exhausted)
+    pass = PluginBundleSize.Pass()
+    #expect(PluginBundleSize.measure(f.root.appendingPathComponent("Missing.vst3"), pass: &pass).issue?.contains("unavailable") == true)
+    #expect(PluginBundleSize.checkedSum(Int.max, 1) == nil)
+}
+
+@Test func olderPluginInventoryWithoutLogicalBytesRemainsUnknown() throws {
+    let original = Asset(kind: .plugin, path: "/old/Glow.vst3", name: "Glow", format: "vst3",
+                         bundleIdentifier: "org.example.glow", logicalBytes: 42, classification: "test")
+    var payload = try #require(JSONSerialization.jsonObject(with: JSONEncoder().encode(original)) as? [String: Any])
+    payload.removeValue(forKey: "logicalBytes")
+    payload.removeValue(forKey: "finderDateAdded")
+    let restored = try JSONDecoder().decode(Asset.self, from: JSONSerialization.data(withJSONObject: payload))
+    #expect(restored.logicalBytes == nil && restored.finderDateAdded == nil)
+    #expect(restored.path == original.path && restored.kind == .plugin)
 }
 
 @Test func libraryRootsExcludeInternalSamplesAndDeduplicate() throws {
@@ -46,6 +97,47 @@ private final class Fixture {
     #expect(result.assets.filter { $0.kind == .library }.count == 2)
     #expect(result.assets.filter { $0.kind == .sample }.map(\.path) == [loose.path])
     #expect(result.sampleInclusions.first?.status == "noReferencesFoundInScannedProjects")
+}
+
+@Test func manifestOwnedLibrarySizeIsCompleteOrUnknownWithoutPartialTotals() throws {
+    let f = try Fixture()
+    let root = f.root.appendingPathComponent("Libraries/Strings")
+    let manifest = "<ProductHints><Product><Name>Strings</Name><Company>Example Audio</Company></Product></ProductHints>"
+    _ = try f.file("Libraries/Strings/Strings.nicnt", manifest)
+    let sample = try f.file("Libraries/Strings/Samples/C3.wav", String(repeating: "x", count: 100))
+    try FileManager.default.linkItem(at: sample, to: root.appendingPathComponent("Samples/Hardlink.wav"))
+    var request = ScanRequest(); request.libraries = [f.root.appendingPathComponent("Libraries")]
+    var report = Scanner().scan(request, scannedKinds: [.library])
+    let library = try #require(report.assets.first { $0.kind == .library })
+    #expect(library.logicalBytes == manifest.utf8.count + 100)
+    let deep = (0...PluginBundleSize.maximumBundleDepth).map { "d\($0)" }.joined(separator: "/")
+    _ = try f.file("Libraries/Strings/" + deep + "/too-deep", "x")
+    report = Scanner().scan(request, scannedKinds: [.library])
+    #expect(report.assets.first { $0.kind == .library }?.logicalBytes == nil)
+    #expect(report.issues.contains { $0.kind == .library && $0.reason.contains("Library size depth limit") })
+}
+
+@Test func ambiguousManifestFolderDoesNotClaimOneLibrarySize() throws {
+    let f = try Fixture()
+    let manifest = "<ProductHints><Product><Name>Shared</Name><Company>Example Audio</Company></Product></ProductHints>"
+    _ = try f.file("Libraries/Shared/One.nicnt", manifest)
+    _ = try f.file("Libraries/Shared/Two.nicnt", manifest)
+    _ = try f.file("Libraries/Shared/Samples/C3.wav", "sample")
+    var request = ScanRequest(); request.libraries = [f.root.appendingPathComponent("Libraries")]
+    let report = Scanner().scan(request, scannedKinds: [.library])
+    #expect(report.assets.allSatisfy { $0.logicalBytes == nil })
+    #expect(report.issues.contains { $0.reason.contains("Multiple Kontakt manifests") })
+}
+
+@Test func nestedManifestRootsNeverDoubleCountLibraryFiles() throws {
+    let f = try Fixture()
+    _ = try f.file("Libraries/Parent/Parent.nicnt", "<ProductHints><Product><Name>Parent</Name><Company>Example Audio</Company></Product></ProductHints>")
+    _ = try f.file("Libraries/Parent/Child/Child.nicnt", "<ProductHints><Product><Name>Child</Name><Company>Example Audio</Company></Product></ProductHints>")
+    _ = try f.file("Libraries/Parent/Child/Samples/C3.wav", "sample")
+    var request = ScanRequest(); request.libraries = [f.root.appendingPathComponent("Libraries")]
+    let libraries = Scanner().scan(request, scannedKinds: [.library]).assets.filter { $0.kind == .library }
+    #expect(libraries.count == 2)
+    #expect(libraries.allSatisfy { $0.logicalBytes == nil })
 }
 
 @Test func missingAndSymlinkRootsAreReported() throws {

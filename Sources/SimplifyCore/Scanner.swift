@@ -1,4 +1,5 @@
 import Foundation
+import CoreServices
 
 /// Synchronous read-only discovery. Run off the UI thread. Symlinks are not followed.
 /// Results are candidates; neither absence nor candidate grouping authorizes removal.
@@ -27,6 +28,7 @@ public final class Scanner {
         var inventorySequence = 0
         var lastInventory = Date.distantPast
         var publishedAssetCount = -1
+        var pluginSizePass = PluginBundleSize.Pass()
         func publishInventory(complete: Bool = false, force: Bool = false) {
             guard let inventory else { return }
             let now = Date()
@@ -56,9 +58,11 @@ public final class Scanner {
         var issueKind: AssetKind = .plugin
         func issue(_ url: URL, _ reason: String) { issues.append(ScanIssue(path: url.path, reason: reason, kind: issueKind)) }
         func add(_ url: URL, _ kind: AssetKind, _ classification: String, _ isDirectory: Bool, bytes: Int? = nil) {
-            assets[kind.rawValue + ":" + url.path] = Asset(kind: kind, path: url.path,
+            var asset = Asset(kind: kind, path: url.path,
                 name: url.deletingPathExtension().lastPathComponent, format: url.pathExtension.lowercased(),
                 bundleIdentifier: nil, logicalBytes: bytes, classification: classification, fileIdentity: kind == .plugin ? PluginFileIdentity.read(url.path) : nil)
+            if kind == .sample { asset.finderDateAdded = FinderDateAdded.read(url) }
+            assets[kind.rawValue + ":" + url.path] = asset
             // Only plugin identifiers require a later metadata read. Sample sizes
             // come from prefetched directory properties, without rereading each file.
             if kind == .plugin { candidates.append((url, kind, classification, isDirectory)) }
@@ -75,11 +79,22 @@ public final class Scanner {
                     }
                 }
             }
-            let bytes = isDirectory ? nil : (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize)
-            assets[kind.rawValue + ":" + url.path] = Asset(
+            let bytes: Int?
+            if kind == .plugin && isDirectory {
+                let measured = PluginBundleSize.measure(url, pass: &pluginSizePass)
+                bytes = measured.bytes
+                if let reason = measured.issue {
+                    issues.append(ScanIssue(path: url.path, reason: reason, kind: .plugin))
+                }
+            } else {
+                bytes = isDirectory ? nil : (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize)
+            }
+            var asset = Asset(
                 kind: kind, path: url.path, name: url.deletingPathExtension().lastPathComponent,
                 format: url.pathExtension.lowercased(), bundleIdentifier: identifier,
                 logicalBytes: bytes, classification: classification, fileIdentity: kind == .plugin ? PluginFileIdentity.read(url.path) : nil)
+            asset.finderDateAdded = FinderDateAdded.read(url)
+            assets[kind.rawValue + ":" + url.path] = asset
         }
 
         func walk(_ url: URL, mode: String, depth: Int) {
@@ -138,6 +153,8 @@ public final class Scanner {
             if mode == "projects" { publishInventory(force: true) }
             for raw in roots.sorted(by: { $0.path < $1.path }) {
                 let root = raw.standardizedFileURL
+                if mode == "plugins", request.optionalPluginRoots.contains(where: { $0.standardizedFileURL.path == root.path }),
+                   !files.fileExists(atPath: root.path) { continue }
                 publish(.discovering, count, nil, root.path, force: true)
                 guard !hasSymlink(root) else { issue(root, "Root or ancestor is a symbolic link; skipped"); continue }
                 do {
@@ -150,7 +167,43 @@ public final class Scanner {
         }
         if scannedKinds.contains(.library) {
             var libraryIssues: [ScanIssue] = []
-            for asset in LibraryDiscovery.scan(request, sineDatabase: sineDatabase, issues: &libraryIssues) {
+            let discovered = LibraryDiscovery.scan(request, sineDatabase: sineDatabase, issues: &libraryIssues)
+            let claimedRoots = Dictionary(discovered.compactMap { $0.libraryMetadata?.identity?.installationRoot }
+                .map { URL(fileURLWithPath: $0).standardizedFileURL.path }.map { ($0, 1) },
+                uniquingKeysWith: +)
+            var librarySizePass = PluginBundleSize.Pass()
+            for var asset in discovered {
+                let url = URL(fileURLWithPath: asset.path)
+                if !hasSymlink(url), files.fileExists(atPath: url.path) { asset.finderDateAdded = FinderDateAdded.read(url) }
+                if let identity = asset.libraryMetadata?.identity, identity.evidence == .manifest,
+                   let path = identity.installationRoot {
+                    let root = URL(fileURLWithPath: path).standardizedFileURL
+                    let withinConfiguredRoot = request.libraries.contains { candidate in
+                        let configured = candidate.standardizedFileURL.path
+                        return root.path == configured || root.path.hasPrefix(configured + "/")
+                    }
+                    let overlapsAnotherRoot = claimedRoots.keys.contains { other in
+                        other != root.path && (other.hasPrefix(root.path + "/") || root.path.hasPrefix(other + "/"))
+                    }
+                    if claimedRoots[root.path] == 1, !overlapsAnotherRoot, withinConfiguredRoot,
+                       asset.path.hasPrefix(root.path + "/"), !hasSymlink(root) {
+                        let measured = PluginBundleSize.measure(root, pass: &librarySizePass)
+                        asset.logicalBytes = measured.bytes
+                        if let reason = measured.issue {
+                            libraryIssues.append(ScanIssue(path: root.path,
+                                reason: reason.replacingOccurrences(of: "Plugin size", with: "Library size"), kind: .library))
+                        }
+                    }
+                }
+                if var metadata = asset.libraryMetadata {
+                    for index in metadata.instruments.indices {
+                        let path = URL(fileURLWithPath: metadata.instruments[index].path)
+                        if !hasSymlink(path), (try? path.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true {
+                            metadata.instruments[index].finderDateAdded = FinderDateAdded.read(path)
+                        }
+                    }
+                    asset.libraryMetadata = metadata
+                }
                 assets["library:" + asset.selectionKey] = asset; publishInventory()
             }
             issues += libraryIssues.map { ScanIssue(path: $0.path, reason: $0.reason, kind: .library) }
@@ -201,5 +254,17 @@ public final class Scanner {
             current.deleteLastPathComponent()
         }
         return false
+    }
+}
+
+/// Spotlight's file-moved-into-current-location date. It is not a package install
+/// event or a fallback to file creation, modification, or scan time.
+enum FinderDateAdded {
+    static func read(_ url: URL) -> Date? {
+        guard let item = MDItemCreateWithURL(kCFAllocatorDefault, url as CFURL),
+              let date = MDItemCopyAttribute(item, kMDItemDateAdded) as? Date,
+              date.timeIntervalSince1970.isFinite, date.timeIntervalSince1970 > 0,
+              date <= Date() else { return nil }
+        return date
     }
 }

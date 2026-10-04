@@ -42,8 +42,14 @@ import AppKit
 
 @MainActor enum Brand {
     static func icon() -> NSImage? {
-        guard let url = Bundle.main.url(forResource: "AppMark", withExtension: "png") else { return nil }
-        return NSImage(contentsOf: url)
+        if let url = Bundle.main.url(forResource: "AppMark", withExtension: "png"),
+           let image = NSImage(contentsOf: url) { return image }
+        // A locally packaged preview can be launched by its executable path;
+        // in that case Foundation may treat the executable as an unbundled tool.
+        guard let executable = Bundle.main.executableURL else { return nil }
+        let contents = executable.deletingLastPathComponent().deletingLastPathComponent()
+        guard contents.lastPathComponent == "Contents", contents.deletingLastPathComponent().pathExtension == "app" else { return nil }
+        return NSImage(contentsOf: contents.appendingPathComponent("Resources/AppMark.png"))
     }
     static func mark(size: CGFloat) -> NSView {
         let tile = NSView(); tile.wantsLayer = true

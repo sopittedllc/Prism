@@ -6,15 +6,19 @@ import SimplifyCatalog
     var controller: CatalogWindow?
     func applicationDidFinishLaunching(_ notification: Notification) {
         let isSmoke = CommandLine.arguments.contains("--ui-smoke")
+        let isDemo = CommandLine.arguments == [CommandLine.arguments[0], "--demo"]
+        let demoRoot = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            .appendingPathComponent("Prism Demo", isDirectory: true)
         // Foundation preserves macOS's /var alias even when resolving temp URLs.
         // Use the same nonlinked, disposable fixture location as the store tests.
-        let store = isSmoke ? SetupStore(url: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".cache/SimplifySmoke/" + UUID().uuidString + "/setup.json")) : .application
-        let catalog = isSmoke ? CatalogStore(url: store.url.deletingLastPathComponent().appendingPathComponent("catalog.sqlite")) : .application
+        let store = isSmoke ? SetupStore(url: FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".cache/SimplifySmoke/" + UUID().uuidString + "/setup.json"))
+            : isDemo ? SetupStore(url: demoRoot.appendingPathComponent("setup.json")) : .application
+        let catalog = isSmoke || isDemo ? CatalogStore(url: store.url.deletingLastPathComponent().appendingPathComponent("catalog.sqlite")) : .application
         let receiptCollector: CatalogModel.ReceiptCollector?
-        if isSmoke { receiptCollector = nil }
+        if isSmoke || isDemo { receiptCollector = nil }
         else { receiptCollector = { assets, store in await PackageReceiptCollector.collect(assets: assets, store: store) } }
         let usageCollector: CatalogModel.UsageCollector?
-        if isSmoke { usageCollector = nil }
+        if isSmoke || isDemo { usageCollector = nil }
         else {
             usageCollector = { assets, store in
                 let live = await LiveUsageCollector.collect(assets: assets, store: store)
@@ -45,12 +49,14 @@ import SimplifyCatalog
             }
         }
         let model = CatalogModel(store: store, catalogStore: catalog, receiptCollector: receiptCollector, usageCollector: usageCollector, tagStore: ProductTagStore(url: store.url.deletingLastPathComponent().appendingPathComponent("product-tags.json")))
-        if !isSmoke { model.setStandardPlugins(true) } // Standard roots are automatic; synthetic profiles remain isolated.
+        if isDemo { model.setStandardPlugins(false) }
+        else if !isSmoke { model.setStandardPlugins(true) } // Standard roots are automatic; synthetic profiles remain isolated.
         if let iconURL = Bundle.main.url(forResource: "Prism", withExtension: "icns"), let icon = NSImage(contentsOf: iconURL) {
             NSApp.applicationIconImage = icon
             NSApp.dockTile.display()
         }
         controller = CatalogWindow(model: model)
+        if isDemo { controller?.window?.title = "Prism — Demo Data" }
         let settings = NSMenuItem(title: "Settings…", action: #selector(CatalogWindow.showSettings), keyEquivalent: ",")
         settings.target = controller
         NSApp.mainMenu?.items.first?.submenu?.insertItem(settings, at: 0)
@@ -63,8 +69,29 @@ import SimplifyCatalog
             controller?.model.addRoots([URL(fileURLWithPath: CommandLine.arguments[2])], kind: .projects)
         }
         NSApp.activate(ignoringOtherApps: true)
-        if !isSmoke { Task { await model.restoreSavedCatalog() } }
-        if !isSmoke && !model.onboardingCompleted { controller?.showSetup() }
+        if isDemo { Task {
+            do {
+                try seedDemoFiles(at: demoRoot.appendingPathComponent("Fixtures"))
+                await model.restoreSavedCatalog()
+                if model.report == nil {
+                    model.addRoots([demoRoot.appendingPathComponent("Fixtures/Plugins")], kind: .plugins)
+                    model.addRoots([demoRoot.appendingPathComponent("Fixtures/Samples")], kind: .samples)
+                    model.addRoots([demoRoot.appendingPathComponent("Fixtures/Libraries")], kind: .libraries)
+                    model.addRoots([demoRoot.appendingPathComponent("Fixtures/Projects")], kind: .projects)
+                }
+                model.scan()
+                let deadline = Date().addingTimeInterval(30)
+                while model.isScanning && Date() < deadline { try await Task.sleep(for: .milliseconds(50)) }
+                if !model.isScanning, let report = model.report {
+                    try await seedDemoEvidence(report: report, store: catalog, model: model)
+                }
+            } catch { fputs("Demo data unavailable: \(error)\n", stderr) }
+        } }
+        else if !isSmoke { Task {
+            await model.restoreSavedCatalog()
+            if !model.onboardingCompleted { controller?.showSetup() }
+            else { model.refreshConfiguredCollectionAfterRestore() }
+        } }
         if CommandLine.arguments.count == 3, CommandLine.arguments[1] == "--ui-smoke" {
             let output = URL(fileURLWithPath: CommandLine.arguments[2])
             Task { @MainActor in
@@ -75,6 +102,58 @@ import SimplifyCatalog
         }
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+}
+
+@MainActor private func seedDemoEvidence(report: ScanReport, store: CatalogStore, model: CatalogModel) async throws {
+    let now = Date()
+    let assets = report.assets.compactMap { asset -> (Asset, String)? in asset.catalogID.map { (asset, $0) } }
+    let existing = try await store.confirmedAdditionDates(for: assets.map(\.1), asOf: now)
+    let additions = assets.compactMap { asset, id -> AssetDateEvidence? in
+        guard existing[Data(id.utf8)] == nil else { return nil }
+        let timestamp: TimeInterval = asset.kind == .plugin ? 1_762_560_000
+            : asset.kind == .library ? 1_730_500_000 : 1_750_000_000
+        return AssetDateEvidence(sourceID: "prism.demo.synthetic", evidenceID: "addition:" + id,
+            subjectID: id, kind: .confirmedAddition, eventDate: Date(timeIntervalSince1970: timestamp), ingestedAt: now)
+    }
+    if !additions.isEmpty { try await store.appendDateEvidence(additions, asOf: now) }
+    if let plugin = assets.first(where: { $0.0.kind == .plugin && $0.0.format == "vst3" }),
+       try await store.latestHostUsage(for: [plugin.1], asOf: now).isEmpty {
+        let use = try JSONDecoder().decode(CubasePluginUse.self, from: JSONSerialization.data(withJSONObject: [
+            "name": plugin.0.name, "vendor": "Example Audio", "version": "1.0", "architecture": "arm64",
+            "eventID": "demo-studio-compressor-use", "projectID": "demo-project",
+            "reportedMilliseconds": 1_790_474_024_000
+        ]))
+        let record = AssetDateEvidence(sourceID: CubasePluginUse.sourceID, evidenceID: use.eventID,
+            subjectID: plugin.1, kind: .confirmedUse, eventDate: use.reportedDate, ingestedAt: now,
+            cubaseUsage: use)
+        try await store.appendDateEvidence([record], asOf: now)
+    }
+    await model.reloadInstallerRecords(); await model.reloadUsage()
+}
+
+/// A persistent copy of representative synthetic smoke fixtures, kept outside the real catalog.
+private func seedDemoFiles(at root: URL) throws {
+    let files = FileManager.default
+    func file(_ path: String, _ content: String = "fixture") throws {
+        let url = root.appendingPathComponent(path)
+        guard !files.fileExists(atPath: url.path) else { return }
+        try files.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(content.utf8).write(to: url, options: .atomic)
+    }
+    for index in 0..<80 { try file("Samples/Percussion \(index).wav") }
+    for name in ["Warm Piano Loop 110 BPM C#m", "Bright Guitar One Shot", "Dark Strings Legato", "Soft Flute Melody"] {
+        try file("Samples/\(name).wav")
+    }
+    let pluginName = "Studio Compressor – Extended Edition"
+    try file("Plugins/\(pluginName).vst3/Contents/Info.plist", "<plist version=\"1.0\"><dict><key>CFBundleIdentifier</key><string>com.fixture.studiocompressor.vst3</string></dict></plist>")
+    try file("Plugins/\(pluginName).component/Contents/Info.plist", "<plist version=\"1.0\"><dict><key>CFBundleIdentifier</key><string>com.fixture.studiocompressor.au</string></dict></plist>")
+    try file("Libraries/Chamber Strings/Samples/C3.wav")
+    try file("Libraries/Chamber Strings/Legato Strings.nki")
+    try file("Libraries/Chamber Strings/Strings.nicnt", "<ProductHints><Product><Name>Chamber Strings</Name><Company>Example Audio</Company></Product></ProductHints>")
+    try file("Libraries/Folk Colors/Folk.nicnt", "<ProductHints><Product><Name>Folk Colors</Name><Company>Example Audio</Company></Product></ProductHints>")
+    try file("Libraries/Folk Colors/Instruments/Accordion.nki")
+    try file("Libraries/Folk Colors/Instruments/Piano.nki")
+    try file("Projects/Fixture.rpp", "<REAPER_PROJECT\n<TRACK\n<ITEM\n<SOURCE WAVE\nFILE \"../Samples/Percussion 0.wav\"\n>\n>\n>\n>")
 }
 
 enum SmokeError: Error { case failed(String) }
@@ -211,7 +290,7 @@ enum SmokeError: Error { case failed(String) }
                     try require(model.basicInventoryComplete && visible(controller, kind: .sample).count == 3000,
                         "Basic inventory is browseable before project analysis finishes: complete=\(model.basicInventoryComplete), rows=\(visible(controller, kind: .sample).count), assets=\(model.report?.assets.filter { $0.kind == .sample }.count ?? -1)")
                     try select(controller, kind: .sample)
-                    try require(controller.detail.string.contains("Checking…"), "References remain pending during analysis")
+                    try require(controller.inspectorSummaryText.contains("Last used   Not recorded"), "No use is invented during analysis")
                     try await capture("reading-progress"); capturedProgress = true
                 } catch { progressCaptureError = String(describing: error) }
             }
@@ -258,11 +337,23 @@ enum SmokeError: Error { case failed(String) }
         try require(textRect.minX >= 7.5 && cell.bounds.maxX - textRect.maxX >= 7.5, "Table text has horizontal padding")
     } else { try require(false, "Table uses padded cells") }
     try await capture("samples-populated")
+    let sampleQueryStart = Date()
+    controller.search.stringValue = "Percussion 0"
+    model.query = controller.search.stringValue
+    _ = model.outline
+    let sampleOutlineMilliseconds = Date().timeIntervalSince(sampleQueryStart) * 1_000
+    controller.refresh()
+    let sampleQueryMilliseconds = Date().timeIntervalSince(sampleQueryStart) * 1_000
+    let laterQueryStart = Date()
+    controller.search.stringValue = "Percussion 1"
+    controller.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
+    let laterQueryMilliseconds = Date().timeIntervalSince(laterQueryStart) * 1_000
     controller.search.stringValue = "Percussion 0"
     controller.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
     try require(controller.table.numberOfRows == 1, "Search updates table")
     controller.table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
-    try require(controller.detail.string.contains("Project recency"), "Selected details show references")
+    try require(controller.table.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("reference"))?.title == "Project recency"
+                && controller.selectedNode?.asset != nil, "Selected sample has a distinctly labeled project-recency column")
     let selected = model.selectedPath
     controller.refresh()
     try require(model.selectedPath == selected, "Selection survives refresh")
@@ -282,7 +373,7 @@ enum SmokeError: Error { case failed(String) }
         activate(controller.categoryButtons[segment])
         try require(visible(controller, kind: segment == 0 ? .plugin : .library).count == (segment == 0 ? 1 : 3), "Other category")
         try select(controller, kind: segment == 0 ? .plugin : .library)
-        try require(controller.detail.string.localizedCaseInsensitiveContains("unknown"), "No false plugin/library reference")
+        try require(controller.inspectorSummaryText.contains("Last used   Not recorded"), "No false plugin/library use")
         try await capture(segment == 0 ? "plugins-dark" : "libraries-dark")
     }
     let folk = try select(controller, kind: .library, title: "Folk Colors")
@@ -290,7 +381,7 @@ enum SmokeError: Error { case failed(String) }
     try arrow(controller, right: true)
     try require(controller.table.isItemExpanded(folk), "Native right arrow expands library")
     let piano = try select(controller, kind: .instrument, title: "Piano")
-    try require(controller.detail.string.contains("Folk Colors") && controller.detail.string.contains("Shared with library"), "Instrument retains parent and shared storage context")
+    try require(piano.breadcrumb.contains("Folk Colors") && controller.inspectorSummaryText.contains("Size   Shared with library"), "Instrument retains parent and shared storage context")
     try await capture("library-expanded-dark")
     controller.refresh()
     try require(controller.selectedNode?.id == piano.id && controller.table.isItemExpanded(folk), "Refresh preserves patch and expansion")
@@ -298,7 +389,7 @@ enum SmokeError: Error { case failed(String) }
     controller.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
     try require(visible(controller, kind: .instrument).map(\.title) == ["Accordion"], "Library search prunes unrelated instruments")
     try select(controller, kind: .instrument, title: "Accordion")
-    try require(controller.detail.string.contains("Example Audio › Folk Colors › Accordion"), "Search retains matching instrument breadcrumb")
+    try require(controller.selectedNode?.breadcrumb.joined(separator: " › ").contains("Folk Colors › Accordion") == true, "Search retains matching instrument breadcrumb")
     try await capture("library-instrument-search")
     activate(controller.categoryButtons[1]); activate(controller.categoryButtons[2])
     try require(controller.selectedNode?.title == "Accordion", "Category roundtrip retains search selection")
@@ -310,7 +401,7 @@ enum SmokeError: Error { case failed(String) }
     controller.search.stringValue = "Folk Colors"; controller.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
     try require(visible(controller, kind: .instrument).isEmpty, "Library-only query does not invent matching patches")
     try select(controller, kind: .library, title: "Folk Colors")
-    try require(controller.detail.string.contains("Library tags match") && controller.detail.string.contains("Clear search to browse.") && !controller.detail.string.contains("Expand this library"), "Metadata-only match explains how to return to installed instruments")
+    try require(controller.selectedNode?.title == "Folk Colors" && controller.inspectorSummaryText.contains("Date added"), "Metadata-only library match remains selectable")
     try await capture("library-metadata-search")
     controller.search.stringValue = ""; controller.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
     try select(controller, kind: .library, title: "Folk Colors")
@@ -326,16 +417,19 @@ enum SmokeError: Error { case failed(String) }
     controller.table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
     try require(model.selectedPlugin?.installations.count == 2 && controller.table.numberOfRows == 1, "Formats share one plugin row")
     let pluginPaths = Set(model.selectedPlugin!.installations.map(\.path))
-    let pathTexts = descendants(window.contentView!).compactMap { $0 as? NSTextView }.filter { $0.isSelectable }.map(\.string)
-    let finderPaths = descendants(window.contentView!).compactMap { $0 as? NSButton }.filter { $0.title == "Show in Finder" }.compactMap(\.toolTip)
-    try require(pluginPaths.isSubset(of: Set(pathTexts)) && Set(finderPaths) == pluginPaths, "Every plugin format has selectable full path and matching Finder target")
-
-    try require(controller.table.tableColumns.filter { !$0.isHidden }.map { $0.identifier.rawValue } == ["name", "size", "installed", "reference"], "Plugin formats remain visible beside name and last used")
-    try require(controller.detail.string.contains("Last used   Unknown") && controller.detail.string.contains("Date added   By ") && controller.detail.string.contains("Size   Not measured"), "Plugin lifecycle and size explicitly unknown")
-    try require(!controller.detail.string.contains(fixture.path), "Plugin inspector hides installation paths")
+    try require(controller.table.tableColumns.filter { !$0.isHidden }.map { $0.identifier.rawValue } == ["name", "tags", "size", "installed", "reference"], "Tags, size, date and last use remain visible")
+    let selectedPluginDate = model.additionDate(model.selectedPlugin!.representative)
+    try require(controller.inspectorSummaryText.contains("Last used   Not recorded")
+                && controller.inspectorSummaryText.contains("Date added   " + selectedPluginDate.value)
+                && !controller.inspectorSummaryText.contains("Size   Not measured"),
+                "Plugin summary uses measured size and the scanned addition evidence")
+    try require(!descendants(window.contentView!).contains { ($0 as? NSButton)?.title == "Show details" }, "Inspector has no diagnostic details control")
     try await capture("asset-plugin-priority-compact")
     controller.showFormats()
     let formats = controller.formatsWindow!
+    let pathTexts = descendants(formats.window!.contentView!).compactMap { $0 as? NSTextField }.filter { $0.isSelectable }.map(\.stringValue)
+    let finderPaths = descendants(formats.window!.contentView!).compactMap { $0 as? NSButton }.filter { $0.title == "Show in Finder" }.compactMap(\.toolTip)
+    try require(pluginPaths.isSubset(of: Set(pathTexts)) && Set(finderPaths) == pluginPaths, "Every format has its full path and Finder action in Manage formats")
     let originals = formats.product.installations.map(\.path)
     try require(originals.allSatisfy { $0.hasPrefix(fixture.standardizedFileURL.path + "/") }, "Trash test is restricted to generated fixtures")
     try require(formats.choices.allSatisfy { $0.state == .off } && !formats.selectedButton.isEnabled, "Removal defaults to keep")
@@ -367,7 +461,7 @@ enum SmokeError: Error { case failed(String) }
     try require(controller.search.accessibilityLabel() == "Search collection", "Named search")
     try require(controller.categoryButtons.allSatisfy { $0.isEnabled }, "Sidebar navigation remains enabled")
     try require(controller.table.accessibilityLabel() == "Audio collection", "Named table")
-    try require(controller.detail.accessibilityLabel() == "Selected item details", "Named details")
+    try require(controller.formatsButton.accessibilityLabel() != "Show selected sound details", "No obsolete details action")
     window.makeFirstResponder(controller.table)
     let findEvent = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: .command,
                                     timestamp: 0, windowNumber: window.windowNumber, context: nil,
@@ -445,7 +539,7 @@ enum SmokeError: Error { case failed(String) }
     let staleLibrary = try select(stateWindow, kind: .library)
     stateWindow.table.expandItem(staleLibrary)
     try select(stateWindow, kind: .instrument)
-    try require(stateWindow.detail.string.contains("Not observed"), "Unobserved library instrument is labeled")
+    try require(stateWindow.inspectorSummaryText.contains("Last used   Not recorded"), "Unobserved library instrument has no invented use")
     try await capture("stale-library", target: stateWindow.window)
     stateModel.category = .plugin; stateWindow.refresh()
     stateWindow.table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
@@ -484,7 +578,7 @@ enum SmokeError: Error { case failed(String) }
     try arrow(sampleWindow, right: true)
     try require(sampleWindow.table.isItemExpanded(folder), "Native right arrow expands sample folder")
     let kick = try select(sampleWindow, kind: .sample, title: "Kick")
-    try require(descendants(sampleWindow.window!.contentView!).compactMap { $0 as? NSTextView }.contains { $0.isSelectable && $0.string.contains("One/Samples/Percussion") }, "Sample details preserve distinguishable root and folder context")
+    try require(kick.breadcrumb.joined(separator: " › ").contains("Percussion") && sampleWindow.revealButton.toolTip == kick.location, "Sample keeps folder context and exact Finder target")
     try await capture("sample-folder-tree", target: sampleWindow.window)
     sampleWindow.search.stringValue = "Kick"; sampleWindow.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
     sampleModel.sort = .size; sampleWindow.refresh()
@@ -544,29 +638,28 @@ enum SmokeError: Error { case failed(String) }
     try await capture("product-tags-light", target: composerWindow.window)
     composerWindow.window?.setContentSize(NSSize(width: 1040, height: 680))
     composerWindow.window?.appearance = NSAppearance(named: .darkAqua)
-    try require(composerWindow.detail.string.contains("No indexed instruments.") && !composerWindow.detail.string.contains("Expand this library"), "Empty instrument index offers no impossible expansion")
+    try require(composerWindow.selectedNode?.children.isEmpty == true && composerWindow.table.numberOfRows > 0, "Empty instrument index remains browsable without an impossible expansion")
     try await capture("product-tags-dark-compact", target: composerWindow.window)
     let usageColumn = try requireColumn(composerWindow.table, id: "reference")
-    try require(composerWindow.table.rect(ofColumn: usageColumn).maxX <= composerWindow.table.visibleRect.maxX, "Compact library usage remains visible")
+    try require(composerWindow.table.rect(ofColumn: usageColumn).maxX <= composerWindow.table.visibleRect.maxX,
+                "Compact library usage remains visible: last=\(composerWindow.table.rect(ofColumn: usageColumn).maxX), visible=\(composerWindow.table.visibleRect.maxX), widths=\(composerWindow.table.tableColumns.filter { !$0.isHidden }.map { $0.identifier.rawValue + ":" + String(Int($0.width)) }.joined(separator: ","))")
     composerWindow.showSettings()
     composerWindow.setup!.onlineTagsButton.state = .off
     activate(composerWindow.setup!.scanButton)
     try await Task.sleep(for: .milliseconds(250))
-    try require(!composerWindow.detail.string.contains("vendor suggestion"), "Disable excludes vendor suggestions")
+    try require(!composerModel.tagSummary(composerWindow.selectedNode!).contains("vendor suggestion"), "Disable excludes vendor suggestions")
     composerWindow.window?.appearance = NSAppearance(named: .aqua)
     composerModel.query = "solo accordion legato"; composerWindow.refresh()
     try require(composerWindow.search.searchMenuTemplate == nil, "Search has no dropdown menu")
     try require(composerModel.outline.nodes.filter { $0.kind == .instrument }.count == 1, "Multiword musical query finds exact instrument")
     let instrumentNode = try select(composerWindow, kind: .instrument)
-    try require(composerWindow.detail.string.contains("Last used   Unknown") && composerWindow.detail.string.contains("Date added   Unknown"), "Instrument lifecycle facts remain independent of library dates")
-    try require(!composerWindow.detail.string.contains(composerRoot.path), "Default library inspector excludes paths")
-    try require(composerModel.tagSummary(instrumentNode).contains("accordion"), "List metadata summarizes selected instrument")
-    try require(descendants(composerWindow.window!.contentView!).compactMap { $0 as? NSTextView }.contains { $0.isSelectable && $0.string == instrumentNode.location } && composerWindow.revealButton.toolTip == instrumentNode.location && composerWindow.revealButton.isEnabled, "Finder targets selected instrument location")
-    let heading = composerWindow.revealButton.superview!
-    try require(heading.subviews.contains { ($0 as? NSTextField)?.stringValue == "Location" }, "Finder sits beside Location")
+    try require(composerWindow.inspectorSummaryText.contains("Last used   Not recorded") && composerWindow.inspectorSummaryText.contains("Date added   Unknown"), "Instrument lifecycle facts remain independent of library dates")
+    try require(!composerWindow.inspectorSummaryText.contains(composerRoot.path), "Default library inspector excludes paths")
+    try require(composerModel.tagSummary(instrumentNode).contains("Accordion"), "List metadata summarizes selected instrument")
+    try require(composerWindow.revealButton.toolTip == instrumentNode.location && composerWindow.revealButton.isEnabled, "Finder targets selected instrument location")
     composerWindow.window?.setContentSize(NSSize(width: 1220, height: 780))
     try await Task.sleep(for: .milliseconds(100))
-    for key in ["name", "format", "size", "installed", "reference"] {
+    for key in ["name", "tags", "size", "installed", "reference"] {
         try clickHeader(composerWindow, key: key)
         let initialDirection = composerModel.sortReversed
         try clickHeader(composerWindow, key: key)
@@ -665,11 +758,11 @@ enum SmokeError: Error { case failed(String) }
     composerWindow.window?.makeFirstResponder(legatoPill.removeButton)
     try require(composerWindow.window?.firstResponder === legatoPill.removeButton, "Pill delete keyboard reachable")
     try await capture("tag-pills-keyboard", target: composerWindow.window)
-    let spaceUp = NSEvent.keyEvent(with: .keyUp, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: composerWindow.window!.windowNumber, context: nil, characters: " ", charactersIgnoringModifiers: " ", isARepeat: false, keyCode: 49)!
-    NSApp.postEvent(spaceUp, atStart: true)
-    legatoPill.removeButton.keyDown(with: NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: [], timestamp: 0, windowNumber: composerWindow.window!.windowNumber, context: nil, characters: " ", charactersIgnoringModifiers: " ", isARepeat: false, keyCode: 49)!)
-    try await Task.sleep(for: .milliseconds(100))
-    while composerModel.isSavingMetadata { try await Task.sleep(for: .milliseconds(20)) }
+    legatoPill.removeButton.performClick(nil)
+    let pillRemovalDeadline = Date().addingTimeInterval(5)
+    while composerWindow.tagPills.pills.contains(where: { $0.value == "legato" }) && Date() < pillRemovalDeadline {
+        try await Task.sleep(for: .milliseconds(20))
+    }
     try require(!composerWindow.tagPills.pills.contains { $0.value == "legato" }, "Pill deletes suggested tag")
     try await composerModel.undoMetadata(); composerWindow.refresh()
     try require(composerWindow.tagPills.pills.contains { $0.value == "legato" }, "One Undo restores removed pill")
@@ -681,7 +774,7 @@ enum SmokeError: Error { case failed(String) }
     try await finishStateScan(composerModel)
     composerWindow.refresh()
     try select(composerWindow, kind: .library, title: "New Colors")
-    try require(composerWindow.detail.string.contains("Date added   During") && composerWindow.detail.string.contains("move or restored copy"), "New library arrival is qualified rather than an exact acquisition: " + composerWindow.detail.string)
+    try require(composerWindow.inspectorSummaryText.contains("Date added   Unknown") && composerModel.additionDate(composerWindow.selectedNode!.asset!).detail.contains("Observed arrival"), "New library arrival stays separate from qualified Date added")
     composerWindow.window?.appearance = NSAppearance(named: .darkAqua)
     try await capture("simple-browsing-dark", target: composerWindow.window)
     let overflowNode = composerWindow.selectedNode!
@@ -766,7 +859,7 @@ enum SmokeError: Error { case failed(String) }
     try await finishStateScan(sectionModel)
     let sectionWindow = CatalogWindow(model: sectionModel); sectionWindow.showWindow(nil)
     try require(sectionModel.pluginProducts.count == 2 && sectionModel.pluginProducts.allSatisfy { $0.installations.count == 4 }, "Soundtoys products group all formats but preserve Deluxe")
-    try require(sectionWindow.table.tableColumn(withIdentifier: .init("format"))?.isHidden == true, "Plugins have no duplicate format column")
+    try require(sectionWindow.table.tableColumn(withIdentifier: .init("format")) == nil, "Plugins have no duplicate format column")
     try await capture("plugin-products-simple", target: sectionWindow.window)
     try require(descendants(sectionWindow.table).compactMap { $0 as? NSTextField }.contains { $0.stringValue == "AAX, AU, VST2, VST3" }, "Formats appear under product names")
     try require(!descendants(sectionWindow.window!.contentView!).compactMap { $0 as? NSButton }.contains { $0.title == "Tag settings…" }, "Separate Tag settings removed")
@@ -808,20 +901,35 @@ enum SmokeError: Error { case failed(String) }
     try await dateCatalog.appendDateEvidence([fixtureReceipt(synth, id: "synth.receipt", time: 1_758_067_200),
                                             fixtureReceipt(earlier, id: "earlier.receipt", time: 1_735_689_600)], asOf: Date())
     await dateModel.reloadInstallerRecords()
-    try require(dateFormats.installerLabels.contains { $0.stringValue.contains("org.example.synth.receipt") }
-                && dateFormats.installerLabels.contains { $0.stringValue.contains("Unknown") }, "Open format sheet updates only exact installation evidence")
+    try require(dateModel.installerDate(synth, grouped: false).date == Date(timeIntervalSince1970: 1_758_067_200)
+                && dateModel.installerDate(dateModel.report!.assets.first { $0.name == "Fixture Synth" && $0.format == "vst3" }!, grouped: false).date == nil,
+                "Receipt evidence remains bound to the exact installation")
     try await capture("installer-record-formats-light", target: dateFormats.window)
     activate(dateFormats.closeButton); try await Task.sleep(for: .milliseconds(150))
-    try require(dateWindow.detail.string.contains("Records for 1 of 2 installations") && dateWindow.detail.string.contains("Date added   By "), "Partial receipt coverage does not imply acquisition")
+    try require(dateWindow.inspectorSummaryText.contains("Date added   " + dateModel.additionDate(synth).value),
+                "Partial receipt coverage does not replace the scanned addition evidence")
+    func dateSortMatchesEvidence() -> Bool {
+        let assets = dateModel.visibleAssets
+        return zip(assets, assets.dropFirst()).allSatisfy { left, right in
+            let lhs = dateModel.additionEvidence(left)?.upper
+            let rhs = dateModel.additionEvidence(right)?.upper
+            if lhs == nil { return rhs == nil }
+            if rhs == nil { return true }
+            if lhs != rhs { return dateModel.sortReversed ? lhs! < rhs! : lhs! > rhs! }
+            return left.name.localizedStandardCompare(right.name) != .orderedDescending
+        }
+    }
     try clickHeader(dateWindow, key: "installed")
-    try require(dateModel.visibleAssets.map(\.name) == ["Earlier", "Fixture Synth", "Unknown"], "Equal present-by dates use stable name ordering")
+    try require(dateSortMatchesEvidence(), "Date sorting follows scanned evidence with unknown dates last")
     try clickHeader(dateWindow, key: "installed")
-    try require(dateModel.visibleAssets.map(\.name) == ["Earlier", "Fixture Synth", "Unknown"] && dateWindow.selectedNode?.id == synthNode.id, "Date sorting preserves selection")
+    try require(dateSortMatchesEvidence() && dateWindow.selectedNode?.id == synthNode.id,
+                "Reverse date sorting follows scanned evidence and preserves selection")
     let column = try requireColumn(dateWindow.table, id: "installed")
     let row = dateWindow.table.row(forItem: dateWindow.selectedNode!)
     let dateCell = dateWindow.table.view(atColumn: column, row: row, makeIfNecessary: true) as? NSTableCellView
-    try require(dateCell?.textField?.accessibilityLabel()?.contains("present by") == true || dateCell?.textField?.accessibilityLabel()?.contains("Present by") == true,
-                "Date cell accessibility exposes presence-bound meaning")
+    try require(dateCell?.textField?.stringValue == dateModel.additionDate(synth).value
+                && dateCell?.textField?.accessibilityLabel()?.contains(dateModel.additionDate(synth).value) == true,
+                "Date cell and accessibility agree with scanned addition evidence")
     try require(dateWindow.table.tableColumns[column].title == "Date added", "Shared addition header uses accurate meaning")
     try await capture("installer-record-light", target: dateWindow.window)
     dateWindow.window?.setContentSize(NSSize(width: 1040, height: 680)); dateWindow.window?.appearance = NSAppearance(named: .darkAqua)
@@ -846,7 +954,10 @@ enum SmokeError: Error { case failed(String) }
     try file("DateEvidence/New Arrival.component/Contents/Info.plist", "<plist><dict><key>CFBundleIdentifier</key><string>org.example.arrival</string></dict></plist>")
     try await finishStateScan(dateModel)
     try select(dateWindow, kind: .plugin, title: "New Arrival")
-    try require(dateWindow.detail.string.contains("Date added   During"), "Prospective arrival preserves interval precision")
+    let arrival = dateModel.report!.assets.first { $0.name == "New Arrival" }!
+    try require(dateWindow.inspectorSummaryText.contains("Date added   " + dateModel.additionDate(arrival).value)
+                && dateModel.additionDate(arrival).detail.contains("Observed arrival"),
+                "Prospective arrival remains distinct from Finder Date Added")
     dateWindow.window?.setContentSize(NSSize(width: 1220, height: 780)); dateWindow.window?.appearance = NSAppearance(named: .aqua)
     try await capture("addition-arrival-light", target: dateWindow.window)
     // An isolated synthetic history exercises cross-year bounds through persistence.
@@ -871,7 +982,14 @@ enum SmokeError: Error { case failed(String) }
     try await Task.sleep(for: .milliseconds(150))
     let arrivalRow = rangeWindow.table.row(forItem: rangeWindow.selectedNode!)
     let arrivalCell = rangeWindow.table.view(atColumn: column, row: arrivalRow, makeIfNecessary: true) as? NSTableCellView
-    try require(arrivalCell?.textField?.stringValue.contains("–\n") == true && arrivalCell?.textField?.accessibilityLabel()?.contains("between") == true, "Range endpoints and accessible meaning retained")
+    let rangeAsset = rangeModel.report!.assets.first { $0.name == "Range Synth" }!
+    let rangeDate = rangeModel.additionDate(rangeAsset)
+    try require(arrivalCell?.textField?.stringValue == rangeDate.value
+                && arrivalCell?.textField?.accessibilityLabel()?.contains(rangeDate.value) == true
+                && rangeDate.detail.contains("Observed arrival")
+                && rangeDate.detail.contains(rangeStart.formatted(date: .abbreviated, time: .omitted))
+                && rangeDate.detail.contains(rangeEnd.formatted(date: .abbreviated, time: .omitted)),
+                "Arrival bounds remain evidence, separate from Date added")
     try await capture("addition-range-dark-compact", target: rangeWindow.window)
     rangeWindow.close()
     let usageLog = """
@@ -893,7 +1011,7 @@ enum SmokeError: Error { case failed(String) }
     await dateModel.reloadUsage()
     try select(dateWindow, kind: .plugin, title: "Fixture Synth")
     dateWindow.window?.setContentSize(NSSize(width: 1220, height: 780)); dateWindow.window?.appearance = NSAppearance(named: .aqua)
-    try require(dateWindow.detail.string.contains("Last used   2026-09-25 DAW local") && dateWindow.detail.string.contains("product history"), "Qualified local usage is visible with class scope")
+    try require(dateWindow.inspectorSummaryText.contains("Last used   2026-09-25") && dateModel.lastUsed(synth).detail.contains("product history"), "Qualified local usage is visible with class scope")
     try clickHeader(dateWindow, key: "reference")
     try require(dateModel.visibleAssets.first?.name == "Fixture Synth", "Qualified usage sorts before unknown")
     try await capture("last-used-live-light", target: dateWindow.window)
@@ -911,7 +1029,7 @@ enum SmokeError: Error { case failed(String) }
     savedDatesWindow.window?.appearance = NSAppearance(named: .aqua)
     savedDatesWindow.window?.setContentSize(NSSize(width: 1040, height: 680))
     try select(savedDatesWindow, kind: .plugin, title: "Fixture Synth")
-    try require(savedDatesWindow.detail.string.contains("current installation not verified"), "Restored date is visibly historical")
+    try require(savedDates.usingSavedCatalog && savedDatesWindow.inspectorSummaryText.contains("Date added   " + savedDates.additionDate(synth).value), "Restored date retains its qualified value")
     try await capture("installer-record-cached-light-compact", target: savedDatesWindow.window)
     savedDatesWindow.close()
     let failedDates = CatalogModel(catalogStore: dateCatalog, installerRecordLoader: { _, _, _ in throw CatalogStoreError.invalid })
@@ -920,11 +1038,11 @@ enum SmokeError: Error { case failed(String) }
     let failedDatesWindow = CatalogWindow(model: failedDates); failedDatesWindow.showWindow(nil)
     failedDatesWindow.window?.setContentSize(NSSize(width: 1040, height: 680))
     try select(failedDatesWindow, kind: .plugin, title: "Fixture Synth")
-    try require(failedDatesWindow.detail.string.contains("Unavailable") && failedDatesWindow.detail.string.contains("Scan to retry"), "Date read error is distinct and recoverable")
+    try require(failedDates.installerDate(synth).detail.contains("Unavailable") && failedDatesWindow.inspectorSummaryText.contains("Date added   "), "Installer read error remains distinct from qualified Date added")
     try await capture("installer-record-unavailable", target: failedDatesWindow.window)
     failedDatesWindow.close()
-    let result: [String: Any] = ["status": "passed", "fixture_samples": 3000, "cached_restore_seconds": restoreSeconds, "screenshots": screenshots,
-                                "checks": ["installer-record sorting both ways, partial coverage, live format sheet, accessible source labels, locale widths, cached and read-error states", "section-scoped Scan and Soundtoys product grouping", "Settings appearance preview/cancel/save/session recovery and Command-comma", "single-page setup add/remove/cancel/scan controls", "draft cancellation", "setup reopen restores accepted roots", "explicit first scan", "actual scan/category controls", "async completion", "discovery counts and determinate reading progress", "search", "selection retention", "sample provenance", "unavailable matching", "coverage issues", "accessibility labels", "keyboard search focus", "centered padded cells", "inventory browsing before analysis completes", "long folder removal focus", "save error recovery", "grouped plugin formats", "cancel removal keeps all", "real Trash of synthetic fixtures only", "selective and whole-product removal", "durable catalog reopening", "cached removal disabled", "removed plugins stay absent after reopen", "offline library and instrument labels", "stale removal disabled", "catalog save failure retains live browsing", "corrupt catalog preserved", "native outline accessibility role", "native arrow expand and collapse", "library maker and instrument hierarchy", "search prunes unrelated patches", "search clear and category restoration", "metadata-only matches explicit", "distinct overlapping sample roots", "flat sample search and cross-root sort", "sample rescan selection restoration", "musical metadata cancel/save/undo", "edited metadata survives restart", "multiword musical search", "actual column header clicks toggle every sort and preserve selection", "search has no dropdown", "Finder beside Location targets selected instrument", "compact lifecycle columns visible", "installed date never inferred from scan", "plain tag search updates after edits and Undo", "Settings opt-in tag fetch and source tooltip", "compact single-page setup", "standard folders automatic", "pill add/delete/Undo and keyboard focus", "pill failed save preserves draft", "hover and Space key tag removal", "saving popover cannot dismiss", "long tag list plus reachable", "invalid BPM retains draft", "failed metadata save retains draft and retry"],
+    let result: [String: Any] = ["status": "passed", "fixture_samples": 3000, "cached_restore_seconds": restoreSeconds, "sample_query_ms": sampleQueryMilliseconds, "sample_outline_ms": sampleOutlineMilliseconds, "subsequent_query_ms": laterQueryMilliseconds, "screenshots": screenshots,
+                                "checks": ["installer-record sorting both ways, partial coverage, live format sheet, accessible source labels, locale widths, cached and read-error states", "section-scoped Scan and Soundtoys product grouping", "Settings appearance preview/cancel/save/session recovery and Command-comma", "single-page setup add/remove/cancel/scan controls", "draft cancellation", "setup reopen restores accepted roots", "explicit first scan", "actual scan/category controls", "async completion", "discovery counts and determinate reading progress", "search", "selection retention", "sample provenance", "unavailable matching", "coverage issues", "accessibility labels", "keyboard search focus", "centered padded cells", "inventory browsing before analysis completes", "long folder removal focus", "save error recovery", "grouped plugin formats", "cancel removal keeps all", "real Trash of synthetic fixtures only", "selective and whole-product removal", "durable catalog reopening", "cached removal disabled", "removed plugins stay absent after reopen", "offline library and instrument labels", "stale removal disabled", "catalog save failure retains live browsing", "corrupt catalog preserved", "native outline accessibility role", "native arrow expand and collapse", "library maker and instrument hierarchy", "search prunes unrelated patches", "search clear and category restoration", "metadata-only matches explicit", "distinct overlapping sample roots", "flat sample search and cross-root sort", "sample rescan selection restoration", "musical metadata cancel/save/undo", "edited metadata survives restart", "multiword musical search", "actual column header clicks toggle every sort and preserve selection", "search has no dropdown", "Finder beside Location targets selected instrument", "compact lifecycle columns visible", "installed date never inferred from scan", "plain tag search updates after edits and Undo", "Settings opt-in tag fetch and source tooltip", "compact single-page setup", "standard folders automatic", "pill add/delete/Undo and keyboard focus", "pill failed save preserves draft", "hover and native button action tag removal", "saving popover cannot dismiss", "long tag list plus reachable", "invalid BPM retains draft", "failed metadata save retains draft and retry"],
                                 "limits": ["VoiceOver user testing not performed", "native open panel interaction not automated", "current Mac only", "first visual baseline, no previous image diff"]]
     try JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted, .sortedKeys]).write(to: output.appendingPathComponent("runtime.json"))
     print("UI smoke: PASS")

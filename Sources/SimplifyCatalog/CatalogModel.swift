@@ -10,7 +10,14 @@ public enum CatalogAppearance: String, CaseIterable, Sendable {
         switch self { case .light: "Light"; case .dark: "Dark"; case .system: "Match system preference" }
     }
 }
-public enum CatalogSort: String, CaseIterable, Sendable { case name = "Name", size = "Size", recency = "Last used", firstFound = "First found", format = "Format", installed = "Installed" }
+public enum CatalogSort: String, CaseIterable, Sendable { case name = "Name", tags = "Tags", size = "Size", recency = "Last used", firstFound = "First found", format = "Format", installed = "Installed" }
+
+public struct PluginSizePresentation: Sendable {
+    public let completeBytes: Int?
+    public let value: String
+    public let detail: String
+    public let accessibility: String
+}
 
 /// Positive host evidence is distinct from missing coverage. Unknown is never inactivity.
 public enum CatalogUsageFilter: String, CaseIterable, Sendable {
@@ -41,6 +48,7 @@ public enum CatalogUsageFilter: String, CaseIterable, Sendable {
     public private(set) var isFetchingTags = false
     public private(set) var tagFetchStatus = "Online product tags are off."
     private var tagRecords: [String: ProductTagRecord] = [:]
+    private var tagFailureDates: [String: Date] = [:]
     private var tagCacheLoaded = false
     private var tagTask: Task<Void, Never>?
     private var tagGeneration = UUID()
@@ -52,6 +60,7 @@ public enum CatalogUsageFilter: String, CaseIterable, Sendable {
     public private(set) var roots: [RootKind: [URL]] = [:]
     /// Legacy API name: holds Asset.selectionKey, not necessarily a filesystem path.
     public var selectedPath: String?
+    public var selectedProductID: String?
     public private(set) var report: ScanReport? { didSet { rebuildIndexes() } }
     public private(set) var isScanning = false
     private var dirtyCategories: Set<AssetKind> = []
@@ -90,7 +99,7 @@ public enum CatalogUsageFilter: String, CaseIterable, Sendable {
             categoryCounts[asset.kind, default: 0] += 1
         }
         for inclusion in report?.sampleInclusions ?? [] { inclusionsByPath[inclusion.samplePath] = inclusion }
-        pluginProducts = PluginProduct.group(report?.assets ?? []); productsByPath = [:]; candidateProjects = [:]
+        pluginProducts = PluginProduct.group(report?.assets ?? [], names: pluginProductNames); productsByPath = [:]; candidateProjects = [:]
         categoryCounts[.plugin] = pluginProducts.count
         let byName = Dictionary(grouping: pluginProducts, by: { PluginProduct.normalizedName($0.name) })
         for product in pluginProducts { for item in product.installations { productsByPath[item.path] = product } }
@@ -118,20 +127,35 @@ public enum CatalogUsageFilter: String, CaseIterable, Sendable {
                 assets: category == .plugin ? pluginProducts.map(\.representative) : (report?.assets ?? []),
                 category: category, sampleRoots: roots[.samples] ?? [], sort: sort, reversed: sortReversed,
                 recency: sortDates, additions: sortAdditions, usageDays: usageDays, formats: Dictionary(uniqueKeysWithValues: pluginProducts.map { ($0.representative.path, $0.formats) }),
-                pluginProductIDs: Dictionary(uniqueKeysWithValues: pluginProducts.map { ($0.representative.path, $0.id) }))
+                pluginProductIDs: Dictionary(uniqueKeysWithValues: pluginProducts.map { ($0.representative.path, $0.id) }),
+                pluginNames: Dictionary(uniqueKeysWithValues: pluginProducts.map { ($0.representative.path, $0.name) }),
+                pluginSizes: Dictionary(uniqueKeysWithValues: pluginProducts.map { ($0.representative.path, pluginSize($0.representative)) }),
+                tags: sortTags)
             outlineState.reconcile(previous: previousOutlineBases[category], current: base, category: category)
             previousOutlineBases[category] = nil; outlineBases[category] = base
         }
         let result = base.filtered(query: query, sort: sort, reversed: sortReversed,
-                                  recency: sortDates, additions: sortAdditions, usageDays: usageDays,
+                                  recency: sortDates, additions: sortAdditions, usageDays: usageDays, tags: sortTags,
                                   pluginMatches: matchesRow, isFiltering: hasFilters,
                                   nodeMatches: matchesNode)
         cachedOutline = result
         return result
     }
     private func matchesQuery(_ asset: Asset) -> Bool {
-        MusicalSearch.matches(query, in: [asset.name, asset.libraryMetadata?.maker ?? "", effectiveMetadata(asset: asset).searchText].joined(separator: " "))
+        matchesCatalogQuery(name: product(for: asset)?.name ?? asset.name,
+                            other: [asset.libraryMetadata?.maker ?? "", effectiveMetadata(asset: asset).searchText].joined(separator: " "))
             && matchesFacets(effectiveMetadata(asset: asset)) && (!recentOnly || isRecent(asset))
+    }
+
+    private func matchesCatalogQuery(name: String, other: String) -> Bool {
+        let nameWords = MusicalSearch.normalized(name).split(separator: " ")
+        let allText = name + " " + other
+        return MusicalSearch.normalized(query).split(separator: " ").allSatisfy { term in
+            // Incremental one-letter name search should find Glow on "g"; typed
+            // tag keys and numeric sample suffixes retain exact-token matching.
+            (term.count == 1 && !term.allSatisfy(\.isNumber) && nameWords.contains { $0.hasPrefix(term) })
+                || MusicalSearch.matches(String(term), in: allText)
+        }
     }
 
     public private(set) var onboardingCompleted = false
@@ -141,9 +165,13 @@ public enum CatalogUsageFilter: String, CaseIterable, Sendable {
     public private(set) var isRestoringCatalog = false
     public private(set) var catalogNotice: String?
     public private(set) var catalogObservations: [String: CatalogObservation] = [:] { didSet { cachedVisible = nil; invalidateOutline() } }
+    public private(set) var pluginProductDates: [String: Date] = [:] { didSet { cachedVisible = nil; invalidateOutline() } }
+    public private(set) var pluginProductNames: [String: String] = [:] { didSet { cachedVisible = nil; invalidateOutline() } }
+    public private(set) var pluginConfirmedAdditionDates: [String: Date] = [:] { didSet { cachedVisible = nil; invalidateOutline() } }
     public typealias InstallerRecordLoader = @Sendable (CatalogStore, [String], Date) async throws -> [Data: AssetDateEvidence]
     private let installerRecordLoader: InstallerRecordLoader?
     private var installerRecords: [Data: AssetDateEvidence] = [:]
+    private var confirmedAdditionDates: [Data: Date] = [:]
     private var installerReadGeneration = UUID()
     public private(set) var isLoadingInstallerRecords = false
     public private(set) var installerRecordsUnavailable = false
@@ -167,7 +195,15 @@ public enum CatalogUsageFilter: String, CaseIterable, Sendable {
             let ids = (report?.assets ?? []).filter { $0.kind == .plugin }.compactMap(\.catalogID)
             let records: [Data: AssetDateEvidence]
             if let usageLoader { records = try await usageLoader(catalogStore, ids, Date()) }
-            else { records = try await catalogStore.latestHostUsage(for: ids, asOf: Date()) }
+            else {
+                let products = try await catalogStore.latestProductUsage(for: pluginProducts.map(\.id), asOf: Date())
+                var installations: [Data: AssetDateEvidence] = [:]
+                for offset in stride(from: 0, to: ids.count, by: 2048) {
+                    let batch = try await catalogStore.latestHostUsage(for: Array(ids[offset..<min(offset + 2048, ids.count)]), asOf: Date())
+                    installations.merge(batch) { first, _ in first }
+                }
+                records = products.merging(installations) { product, _ in product }
+            }
             guard generation == usageGeneration, readGeneration == usageReadGeneration, !Task.isCancelled else { return }
             usageRecords = records; usageUnavailable = false
         } catch {
@@ -177,34 +213,22 @@ public enum CatalogUsageFilter: String, CaseIterable, Sendable {
         cachedVisible = nil; invalidateOutline(); onChange?()
     }
     public func usageRecord(_ asset: Asset, grouped: Bool = true) -> AssetDateEvidence? {
-        guard asset.kind == .plugin, !(isScanning && scanningKinds.contains(.plugin)) else { return nil }
+        guard asset.kind == .plugin else { return nil }
+        if grouped, let productID = asset.pluginProductID, let record = usageRecords[Data(productID.utf8)] { return record }
         let items = grouped ? product(for: asset)?.installations ?? [asset] : [asset]
         return items.compactMap { item -> AssetDateEvidence? in
             guard let id = item.catalogID, assetsByKey["plugin:" + item.selectionKey]?.catalogID == id else { return nil }
             return usageRecords[Data(id.utf8)]
-        }.sorted { a, b in
-            if usageDay(a) != usageDay(b) { return usageDay(a) > usageDay(b) }
-            if let ap = a.proToolsUsage, let bp = b.proToolsUsage {
-                if ap.localTime != bp.localTime {
-                    return (ap.localTime?.canonical ?? "") > (bp.localTime?.canonical ?? "")
-                }
-                if ap.runHash != bp.runHash { return (ap.runHash ?? "") < (bp.runHash ?? "") }
-                if ap.sourceSeconds != bp.sourceSeconds { return ap.sourceSeconds > bp.sourceSeconds }
-            }
-            return a.evidenceID.utf8.lexicographicallyPrecedes(b.evidenceID.utf8)
-        }.first
+        }.sorted { HostUsageOrdering.precedes($0, $1) }.first
     }
     private func usageDay(_ record: AssetDateEvidence) -> String {
-        record.hostUsage?.localTime.dayKey ?? record.cubaseUsage?.reportedDate.formatted(.iso8601.year().month().day()) ?? record.proToolsUsage?.localTime?.dayKey ?? record.logicUsage?.reportedDate.formatted(.iso8601.year().month().day()) ?? ""
+        HostUsageOrdering.dayKey(record)
     }
     public func lastUsed(_ asset: Asset) -> UsageDatePresentation {
         guard asset.kind == .plugin else { return UsageDatePresentation(record: nil) }
-        let items = product(for: asset)?.installations ?? [asset]
-        let total = Set(items.map(\.format)).count
-        let covered = Set(items.filter { usageRecord($0, grouped: false) != nil }.map(\.format)).count
         return UsageDatePresentation(record: usageRecord(asset), unavailable: usageUnavailable,
             checking: isCollectingUsage || (isScanning && scanningKinds.contains(.plugin)), saved: usingSavedCatalog || asset.catalogStale == true,
-            incomplete: usageCollection.map { $0.failures > 0 } ?? false, formatCoverage: "History associated with \(covered) of \(total) formats.")
+            incomplete: usageCollection.map { $0.failures > 0 } ?? false, formatCoverage: "")
     }
     private var usageDays: [String: String] {
         guard sort == .recency else { return [:] }
@@ -237,24 +261,124 @@ public enum CatalogUsageFilter: String, CaseIterable, Sendable {
     }
     public var dateColumnTitle: String { "Date added" }
 
+    public func pluginSize(_ asset: Asset, grouped: Bool = true) -> PluginSizePresentation {
+        let items = grouped ? product(for: asset)?.installations ?? [asset] : [asset]
+        var subtotal = 0, known = 0, overflow = false
+        for item in items {
+            guard let bytes = item.logicalBytes, bytes >= 0 else { continue }
+            let (next, didOverflow) = subtotal.addingReportingOverflow(bytes)
+            if didOverflow { overflow = true; break }
+            subtotal = next; known += 1
+        }
+        let complete = !overflow && known == items.count ? subtotal : nil
+        func formatted(_ bytes: Int) -> String { ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file) }
+        let value = complete.map(formatted) ?? (known > 0 ? "Partial" : "Unknown")
+        var detail = complete.map { "Measured bundle files: " + formatted($0) + "." }
+            ?? (known > 0 ? "Known subtotal " + formatted(subtotal) + " across \(known) of \(items.count) installations; total unknown."
+                : "Bundle size not measured.")
+        if usingSavedCatalog || items.contains(where: { $0.catalogStale == true }) {
+            detail += complete == nil && known == 0
+                ? " Saved collection; scan to measure bundle size."
+                : " Saved size; scan to verify current files."
+        }
+        return PluginSizePresentation(completeBytes: complete, value: value, detail: detail,
+                                      accessibility: "Size, " + value + ". " + detail)
+    }
+
     public func additionEvidence(_ asset: Asset, grouped: Bool = true) -> AdditionDateEvidence? {
-        guard !(isScanning && scanningKinds.contains(asset.kind)) else { return nil }
+        if asset.kind != .plugin, let date = asset.finderDateAdded,
+           let id = asset.catalogID,
+           assetsByKey[asset.kind.rawValue + ":" + asset.selectionKey]?.catalogID == id {
+            return try? AdditionDateEvidence(basis: .exact, lower: date, upper: date)
+        }
+        if asset.kind == .plugin, let productID = asset.pluginProductID, let known = pluginProductDates[productID] {
+            return try? AdditionDateEvidence(basis: .exact, lower: known, upper: known)
+        }
+        if asset.kind == .plugin, let productID = asset.pluginProductID, let known = pluginConfirmedAdditionDates[productID] {
+            return try? AdditionDateEvidence(basis: .exact, lower: known, upper: known)
+        }
         let items = grouped && asset.kind == .plugin ? product(for: asset)?.installations ?? [asset] : [asset]
-        return try? AdditionDateEvidence.group(items.map { item in
+        if asset.kind == .plugin {
+            let finderDates = items.compactMap { item -> Date? in
+                guard let id = item.catalogID,
+                      let current = assetsByKey[item.kind.rawValue + ":" + item.selectionKey]?.catalogID,
+                      id.utf8.elementsEqual(current.utf8) else { return nil }
+                return item.finderDateAdded
+            }
+            if let earliest = finderDates.min() {
+                return try? AdditionDateEvidence(basis: .exact, lower: earliest, upper: earliest)
+            }
+        }
+        let dates = items.map { item -> Date? in
             guard let id = item.catalogID,
                   let current = assetsByKey[item.kind.rawValue + ":" + item.selectionKey]?.catalogID,
                   id.utf8.elementsEqual(current.utf8) else { return nil }
-            return catalogObservations[id]?.addition
-        })
+            return confirmedAdditionDates[Data(id.utf8)]
+        }
+        guard dates.count == items.count, dates.allSatisfy({ $0 != nil }), let earliest = dates.compactMap({ $0 }).min() else { return nil }
+        return try? AdditionDateEvidence(basis: .exact, lower: earliest, upper: earliest)
     }
 
     public func additionDate(_ asset: Asset, grouped: Bool = true) -> AdditionDatePresentation {
         let items = grouped && asset.kind == .plugin ? product(for: asset)?.installations ?? [asset] : [asset]
         let known = items.filter { additionEvidence($0, grouped: false) != nil }.count
-        let coverage = items.count > 1 ? "Dates available for \(known) of \(items.count) installations." : ""
+        let coverage = items.count > 1 && known > 0 && known < items.count
+            ? "Original dates known for \(known) of \(items.count) formats." : ""
         let saved = usingSavedCatalog || items.contains { assetsByKey[$0.kind.rawValue + ":" + $0.selectionKey]?.catalogStale == true }
-        return AdditionDatePresentation(evidence: additionEvidence(asset, grouped: grouped), coverage: coverage, saved: saved,
-                                        checking: isScanning && scanningKinds.contains(asset.kind))
+        let finderCount = asset.kind == .plugin ? items.filter { item in
+            guard let id = item.catalogID,
+                  let current = assetsByKey[item.kind.rawValue + ":" + item.selectionKey]?.catalogID,
+                  id.utf8.elementsEqual(current.utf8) else { return false }
+            return item.finderDateAdded != nil
+        }.count : 0
+        let observations = items.compactMap { item -> (String, CatalogObservation)? in
+            guard let id = item.catalogID, let observation = catalogObservations[id] else { return nil }
+            return (PluginProduct.formatName(item.format), observation)
+        }
+        let observation: String
+        if observations.count > 1,
+           let first = observations.first?.1,
+           observations.allSatisfy({ Calendar.current.isDate($0.1.firstSeen, inSameDayAs: first.firstSeen) && $0.1.addition?.basis != .observedArrival }) {
+            observation = "First indexed " + first.firstSeen.formatted(date: .abbreviated, time: .omitted)
+                + " across \(observations.count) formats; scan does not establish the original date."
+        } else {
+            observation = observations.map { format, item in
+                let prefix = items.count > 1 ? format + ": " : ""
+                if item.addition?.basis == .observedArrival, let lower = item.addition?.lower, let upper = item.addition?.upper {
+                    return prefix + "Observed arrival " + lower.formatted(date: .abbreviated, time: .omitted)
+                        + "–" + upper.formatted(date: .abbreviated, time: .omitted) + "; original date unknown."
+                }
+                return prefix + "First indexed " + item.firstSeen.formatted(date: .abbreviated, time: .omitted)
+                    + "; scan does not establish the original date."
+            }.joined(separator: "\n")
+        }
+        let hasFinderDate = asset.finderDateAdded != nil || asset.pluginProductID.flatMap { pluginProductDates[$0] } != nil || finderCount > 0
+        let source = hasFinderDate
+            ? "Finder Date Added is when a file moved into its current location; earliest available format date. It does not prove installation."
+            : ""
+        let arrivals = observations.compactMap { item -> (Date, Date)? in
+            guard item.1.addition?.basis == .observedArrival,
+                  let lower = item.1.addition?.lower, let upper = item.1.addition?.upper else { return nil }
+            return (lower, upper)
+        }
+        let history: String
+        if asset.kind == .plugin, !arrivals.isEmpty,
+           let lower = arrivals.map(\.0).min(), let upper = arrivals.map(\.1).max() {
+            history = "Observed arrival " + lower.formatted(date: .abbreviated, time: .omitted)
+                + "–" + upper.formatted(date: .abbreviated, time: .omitted)
+                + "; a move or restored copy is possible."
+        } else if asset.kind == .plugin, let firstSeen = observations.map({ $0.1.firstSeen }).min() {
+            history = "First indexed " + firstSeen.formatted(date: .abbreviated, time: .omitted)
+                + "; scan does not establish Date added."
+        } else { history = observation }
+        return AdditionDatePresentation(evidence: additionEvidence(asset, grouped: grouped), coverage: hasFinderDate ? "" : coverage, saved: saved,
+                                        checking: isScanning && scanningKinds.contains(asset.kind), observation: [source, history].filter { !$0.isEmpty }.joined(separator: "\n"),
+                                        finderDateAdded: hasFinderDate, finderSourceExpected: asset.kind == .plugin)
+    }
+    public func instrumentAdditionDate(_ instrument: LibraryInstrument) -> AdditionDatePresentation {
+        let evidence = instrument.finderDateAdded.flatMap { try? AdditionDateEvidence(basis: .exact, lower: $0, upper: $0) }
+        return AdditionDatePresentation(evidence: evidence, finderDateAdded: evidence != nil,
+                                        finderSourceExpected: true)
     }
 
     /// Reload one atomic, bounded projection. Late reads cannot publish into a new scope.
@@ -268,11 +392,19 @@ public enum CatalogUsageFilter: String, CaseIterable, Sendable {
             let values: [Data: AssetDateEvidence]
             if let installerRecordLoader { values = try await installerRecordLoader(catalogStore, ids, Date()) }
             else { values = try await catalogStore.latestInstallerRecords(for: ids, asOf: Date()) }
+            let additionIDs = (report?.assets ?? []).compactMap(\.catalogID)
+            var additions: [Data: Date] = [:]
+            for start in stride(from: 0, to: additionIDs.count, by: 2_048) {
+                let end = min(start + 2_048, additionIDs.count)
+                let batch = try await catalogStore.confirmedAdditionDates(for: Array(additionIDs[start..<end]), asOf: Date())
+                additions.merge(batch) { first, _ in first }
+            }
+            let productAdditions = try await catalogStore.productConfirmedAdditionDates(for: pluginProducts.map(\.id), asOf: Date())
             guard installerReadGeneration == generation, receiptGeneration == scopeGeneration, !Task.isCancelled else { return }
-            installerRecords = values; installerRecordsUnavailable = false
+            installerRecords = values; confirmedAdditionDates = additions; pluginConfirmedAdditionDates = productAdditions; installerRecordsUnavailable = false
         } catch {
             guard installerReadGeneration == generation, receiptGeneration == scopeGeneration, !Task.isCancelled else { return }
-            installerRecords = [:]; installerRecordsUnavailable = true
+            installerRecords = [:]; confirmedAdditionDates = [:]; pluginConfirmedAdditionDates = [:]; installerRecordsUnavailable = true
         }
         isLoadingInstallerRecords = false; cachedVisible = nil; invalidateOutline(); onChange?()
     }
@@ -315,7 +447,7 @@ public enum CatalogUsageFilter: String, CaseIterable, Sendable {
             detail.append("Installer records could not be fully checked. Scan to retry.")
         } else if known.isEmpty { detail.append("No matching installer record available.") }
         if !known.isEmpty {
-            detail.append("May record an install or update; not original Date added.")
+            detail.append("May record an install or update; separate from Finder Date Added.")
             if usingSavedCatalog || items.contains(where: { assetsByKey["plugin:" + $0.path]?.catalogStale == true }) {
                 detail.append("Saved record; current installation not verified.")
             }
@@ -368,6 +500,7 @@ public enum CatalogUsageFilter: String, CaseIterable, Sendable {
 
     private let catalogStore: CatalogStore?
     private let store: SetupStore?
+    private var setupWasMissing = false
     private let sineDatabase: URL
 
     public init(store: SetupStore? = nil, sineDatabase: URL = LibraryMetadataReader.sineDatabase, catalogStore: CatalogStore? = nil,
@@ -380,7 +513,9 @@ public enum CatalogUsageFilter: String, CaseIterable, Sendable {
         self.catalogStore = catalogStore; self.receiptCollector = receiptCollector; self.installerRecordLoader = installerRecordLoader
         self.store = store; self.sineDatabase = sineDatabase
         do {
-            if let values = try store?.load() {
+            let savedSetup = try store?.load()
+            setupWasMissing = store != nil && savedSetup == nil
+            if let values = savedSetup {
                 standardPlugins = values["standard_plugins"] as? Bool ?? true
                 onlineTags = values["online_tags"] as? Bool ?? false
                 appearance = CatalogAppearance(rawValue: values["appearance"] as? String ?? "light") ?? .light
@@ -417,7 +552,7 @@ public enum CatalogUsageFilter: String, CaseIterable, Sendable {
         if enabled { refreshProductTags() } else { tagFetchStatus = "Online product tags are off." }
         onChange?()
     }
-    /// Each finite snapshot attempts every distinct source once, even after earlier failures.
+    /// Each finite snapshot checks distinct reviewed sources; failed requests cool down for a day.
     public func refreshProductTags(force: Bool = false) {
         guard onlineTags, !isFetchingTags else { return }
         guard let report, !isScanning else { tagFetchStatus = "Product tags will fetch when the collection scan finishes."; return }
@@ -431,14 +566,19 @@ public enum CatalogUsageFilter: String, CaseIterable, Sendable {
             do {
                 if !self.tagCacheLoaded {
                     let saved = try await self.tagStore?.load() ?? [:]
+                    let failures = try await self.tagStore?.recentFailures() ?? [:]
                     guard self.tagGeneration == generation, self.onlineTags, !Task.isCancelled else { return }
-                    self.tagRecords = saved; self.tagCacheLoaded = true
+                    self.tagRecords = saved; self.tagFailureDates = failures; self.tagCacheLoaded = true
                 }
                 var completed = 0, failed = 0
                 var lastError: String?
                 for source in sources {
                     guard self.tagGeneration == generation, self.onlineTags, !Task.isCancelled else { return }
                     if force || self.tagRecords[source.id]?.isFresh() != true {
+                        if !force, let failedAt = self.tagFailureDates[source.id], Date().timeIntervalSince(failedAt) < 24 * 3600 {
+                            failed += 1; completed += 1
+                            continue
+                        }
                         do {
                             let record = try await self.tagFetcher(source)
                             guard self.tagGeneration == generation, self.onlineTags, !Task.isCancelled else { return }
@@ -446,10 +586,15 @@ public enum CatalogUsageFilter: String, CaseIterable, Sendable {
                             var next = self.tagRecords; next[source.id] = record
                             try await self.tagStore?.save(next)
                             guard self.tagGeneration == generation, self.onlineTags, !Task.isCancelled else { return }
-                            self.tagRecords = next
+                            self.tagRecords = next; self.tagFailureDates.removeValue(forKey: source.id)
                         } catch is CancellationError { return }
                         catch {
                             guard self.tagGeneration == generation, self.onlineTags, !Task.isCancelled else { return }
+                            let failedAt = Date()
+                            if self.tagStore != nil {
+                                try? await self.tagStore?.markFailure(source.id, at: failedAt)
+                                self.tagFailureDates[source.id] = failedAt
+                            }
                             failed += 1; lastError = error.localizedDescription
                         }
                     }
@@ -460,6 +605,7 @@ public enum CatalogUsageFilter: String, CaseIterable, Sendable {
                 self.tagFetchStatus = sources.isEmpty ? "No supported product matches. Local tags remain available."
                     : "Product tags: \(completed - failed) of \(sources.count) verified."
                 if let lastError { self.tagFetchStatus += " \(failed) failed. " + lastError }
+                else if failed > 0 { self.tagFetchStatus += " \(failed) waiting to retry." }
             } catch {
                 guard self.tagGeneration == generation, self.onlineTags, !Task.isCancelled else { return }
                 self.tagFetchStatus = error.localizedDescription
@@ -494,14 +640,14 @@ public enum CatalogUsageFilter: String, CaseIterable, Sendable {
     public func reset() {
         guard !isBusy else { return }
         cancelReceiptCollection()
-        installerRecords = [:]; installerRecordsUnavailable = false
+        installerRecords = [:]; confirmedAdditionDates = [:]; installerRecordsUnavailable = false
         tagGeneration = UUID(); tagTask?.cancel(); isFetchingTags = false; onlineTags = false; tagFetchStatus = "Online product tags are off."
         usageRecords = [:]; usageUnavailable = false
         recentOnly = false; usageFilter = .all; musicalFilter = [:]; metadataOverrides = [:]; metadataUndo = []
         scanIdentifier = UUID(); usingSavedCatalog = false; savedCatalogDate = nil; catalogObservations = [:]; catalogNotice = nil
         outlineState.reset(); outlineBases = [:]; previousOutlineBases = [:]; cachedOutline = nil
         category = .plugin; query = ""; sort = .name; sortReversed = false; standardPlugins = true; appearance = .light
-        roots = [:]; selectedPath = nil; report = nil; dirtyCategories = []; scanningKinds = []; onboardingCompleted = false; setupNotice = nil; scanProgress = nil; scanStartedAt = nil; basicInventoryComplete = false; isBackgroundScanning = false
+        roots = [:]; selectedPath = nil; selectedProductID = nil; report = nil; pluginProductDates = [:]; pluginProductNames = [:]; dirtyCategories = []; scanningKinds = []; onboardingCompleted = false; setupNotice = nil; scanProgress = nil; scanStartedAt = nil; basicInventoryComplete = false; isBackgroundScanning = false
         onChange?()
     }
 
@@ -539,6 +685,10 @@ public enum CatalogUsageFilter: String, CaseIterable, Sendable {
     private var scanRequest: ScanRequest {
         var request = ScanRequest()
         request.plugins = (standardPlugins ? ScanRequest.standardPluginRoots : []) + (roots[.plugins] ?? [])
+        if standardPlugins {
+            let configured = Set((roots[.plugins] ?? []).map { $0.standardizedFileURL.path })
+            request.optionalPluginRoots = ScanRequest.standardPluginRoots.filter { !configured.contains($0.standardizedFileURL.path) }
+        }
         request.samples = roots[.samples] ?? []; request.libraries = roots[.libraries] ?? []
         request.projects = roots[.projects] ?? []
         return request
@@ -547,23 +697,48 @@ public enum CatalogUsageFilter: String, CaseIterable, Sendable {
     /// Restore without blocking native interaction; late results cannot replace a scan/setup change.
     public func restoreSavedCatalog() async {
         guard let catalogStore, report == nil, !isScanning, !isRestoringCatalog else { return }
-        let scope = CatalogScope(scanRequest); let identifier = scanIdentifier
+        let identifier = scanIdentifier
+        var intendedScope = CatalogScope(scanRequest)
         isRestoringCatalog = true
         defer { isRestoringCatalog = false; refreshProductTags(); onChange?() }
         do {
+            if setupWasMissing && !onboardingCompleted && roots.values.allSatisfy(\.isEmpty),
+               let savedScope = try await catalogStore.mostRecentSavedScope() {
+                let standard = Set(ScanRequest.standardPluginRoots.map { $0.standardizedFileURL.path })
+                let savedPlugins = Set(savedScope.roots["plugins"] ?? [])
+                standardPlugins = standard.isSubset(of: savedPlugins)
+                roots[.plugins] = (savedPlugins.subtracting(standardPlugins ? standard : [])).sorted().map { URL(fileURLWithPath: $0) }
+                for (kind, key) in [(RootKind.samples, "samples"), (.libraries, "libraries"), (.projects, "projects")] {
+                    roots[kind] = (savedScope.roots[key] ?? []).map { URL(fileURLWithPath: $0) }
+                }
+            }
+            let scope = CatalogScope(scanRequest)
+            intendedScope = scope
             let snapshot = try await catalogStore.load(scope: scope)
             guard identifier == scanIdentifier, scope.roots == CatalogScope(scanRequest).roots, report == nil else { return }
             if let snapshot {
+                pluginProductNames = snapshot.pluginProductNames
                 report = snapshot.report; savedCatalogDate = snapshot.savedAt
-                catalogObservations = snapshot.observations; metadataOverrides = snapshot.metadata; usingSavedCatalog = true
+                onboardingCompleted = true
+                catalogObservations = snapshot.observations; metadataOverrides = snapshot.metadata; pluginProductDates = snapshot.pluginProductDates; usingSavedCatalog = true
                 await reloadInstallerRecords(); await reloadUsage()
                 guard identifier == scanIdentifier, scope.roots == CatalogScope(scanRequest).roots, !isScanning else { return }
                 startUsageCollection()
             }
         } catch {
-            guard identifier == scanIdentifier, scope.roots == CatalogScope(scanRequest).roots else { return }
+            guard identifier == scanIdentifier, intendedScope.roots == CatalogScope(scanRequest).roots else { return }
             catalogNotice = error.localizedDescription
         }
+    }
+
+    /// One bounded background pass over every configured collection after restore.
+    public func refreshConfiguredCollectionAfterRestore() {
+        guard !isBusy, !configurationChanged else { return }
+        var kinds = Set<AssetKind>()
+        if standardPlugins || !(roots[.plugins] ?? []).isEmpty { kinds.insert(.plugin) }
+        if !(roots[.samples] ?? []).isEmpty || !(roots[.projects] ?? []).isEmpty { kinds.insert(.sample) }
+        if !(roots[.libraries] ?? []).isEmpty { kinds.insert(.library) }
+        if !kinds.isEmpty { scan(scannedKinds: kinds) }
     }
 
     public func scan(scannedKinds: Set<AssetKind> = Set(AssetKind.allCases)) {
@@ -599,7 +774,17 @@ public enum CatalogUsageFilter: String, CaseIterable, Sendable {
                             func key(_ asset: Asset) -> String { asset.kind.rawValue + ":" + asset.path + ":" + (asset.libraryMetadata?.identity?.productID ?? "") }
                             var merged = Dictionary(prior.assets.filter { preserveExisting || !scannedKinds.contains($0.kind) }.map { (key($0), $0) }, uniquingKeysWith: { first, _ in first })
                             for var asset in update.assets {
-                                asset.catalogID = merged[key(asset)]?.catalogID
+                                if asset.kind == .plugin {
+                                    // A path may now contain another installation. Saved rows have no
+                                    // physical identity, so leave inventory unbound until ingest verifies it.
+                                    if let previous = merged[key(asset)], let identity = asset.fileIdentity,
+                                       previous.fileIdentity == identity, previous.bundleIdentifier == asset.bundleIdentifier {
+                                        asset.catalogID = previous.catalogID
+                                        asset.pluginProductID = previous.pluginProductID
+                                    }
+                                } else {
+                                    asset.catalogID = merged[key(asset)]?.catalogID
+                                }
                                 merged[key(asset)] = asset
                             }
                             owner.report = ScanReport(inventory: update).merging(previous: priorReport, scannedKinds: scannedKinds).replacingAssets(Array(merged.values))
@@ -618,7 +803,11 @@ public enum CatalogUsageFilter: String, CaseIterable, Sendable {
             guard let self else { return }
             self.acceptingInventory = false
             let selectedAsset = self.selectedAsset
-            self.report = result.merging(previous: priorReport, scannedKinds: scannedKinds); self.usingSavedCatalog = false; self.onChange?()
+            if priorReport == nil || self.catalogStore == nil {
+                self.report = result.merging(previous: priorReport, scannedKinds: scannedKinds)
+                self.usingSavedCatalog = false
+                self.onChange?()
+            }
             if let catalogStore = self.catalogStore {
                 do {
                     let saved = try await catalogStore.ingest(result, scope: CatalogScope(snapshot), scannedKinds: scannedKinds, additionContext: additionContext)
@@ -633,9 +822,15 @@ public enum CatalogUsageFilter: String, CaseIterable, Sendable {
                         let observedPaths = Set(result.assets.filter { $0.kind == .plugin }.map { Data($0.path.utf8) })
                         self.collectReceipts(assets.filter { $0.kind == .plugin && $0.catalogStale != true && observedPaths.contains(Data($0.path.utf8)) })
                     }
+                    self.pluginProductNames = saved.pluginProductNames
                     self.report = saved.report.replacingAssets(assets)
-                    self.savedCatalogDate = saved.savedAt; self.catalogObservations = saved.observations; self.metadataOverrides = saved.metadata
-                    if let selectedAsset, let current = assets.first(where: { $0.kind == selectedAsset.kind && $0.path == selectedAsset.path && $0.libraryMetadata?.identity?.productID == selectedAsset.libraryMetadata?.identity?.productID }) { self.selectedPath = current.selectionKey }
+                    self.usingSavedCatalog = false
+                    self.savedCatalogDate = saved.savedAt; self.catalogObservations = saved.observations; self.metadataOverrides = saved.metadata; self.pluginProductDates = saved.pluginProductDates
+                    if let selectedAsset, selectedAsset.kind == .plugin,
+                       let id = selectedAsset.pluginProductID,
+                       let current = assets.first(where: { $0.pluginProductID == id }) {
+                        self.selectedProductID = id; self.selectedPath = current.selectionKey
+                    } else if let selectedAsset, let current = assets.first(where: { $0.kind == selectedAsset.kind && $0.path == selectedAsset.path && $0.libraryMetadata?.identity?.productID == selectedAsset.libraryMetadata?.identity?.productID }) { self.selectedPath = current.selectionKey }
                 } catch { self.catalogNotice = error.localizedDescription }
             }
             self.isScanning = false; self.dirtyCategories.subtract(scannedKinds); self.scanningKinds = []; self.isBackgroundScanning = false; self.basicInventoryComplete = true; self.foregroundTask?.cancel()
@@ -652,15 +847,15 @@ public enum CatalogUsageFilter: String, CaseIterable, Sendable {
     public var visibleAssets: [Asset] {
         if !recentOnly, let cachedVisible { return cachedVisible }
         let source = category == .plugin ? pluginProducts.map(\.representative) : (report?.assets ?? [])
-        let dates = sortDates; let reportedDays = usageDays
+        let dates = sortDates; let reportedDays = usageDays; let tags = sortTags
         let result = source.filter { $0.kind == category && matchesRow($0) }.sorted { left, right in
-            CatalogOrdering.precedes(title: left.name, id: left.selectionKey,
-                size: category == .sample ? left.logicalBytes : nil,
+            CatalogOrdering.precedes(title: product(for: left)?.name ?? left.name, id: left.selectionKey,
+                size: category == .sample ? left.logicalBytes : category == .plugin ? pluginSize(left).completeBytes : nil,
                 date: dates[left.path], format: product(for: left)?.formats ?? left.libraryMetadata?.player ?? left.format.uppercased(),
-                otherTitle: right.name, otherID: right.selectionKey,
-                otherSize: category == .sample ? right.logicalBytes : nil,
+                otherTitle: product(for: right)?.name ?? right.name, otherID: right.selectionKey,
+                otherSize: category == .sample ? right.logicalBytes : category == .plugin ? pluginSize(right).completeBytes : nil,
                 otherDate: dates[right.path], otherFormat: product(for: right)?.formats ?? right.libraryMetadata?.player ?? right.format.uppercased(),
-                sort: sort, reversed: sortReversed, addition: sort == .installed ? additionEvidence(left) : nil, otherAddition: sort == .installed ? additionEvidence(right) : nil, usageDay: reportedDays[left.path], otherUsageDay: reportedDays[right.path])
+                sort: sort, reversed: sortReversed, addition: sort == .installed ? additionEvidence(left) : nil, otherAddition: sort == .installed ? additionEvidence(right) : nil, usageDay: reportedDays[left.path], otherUsageDay: reportedDays[right.path], tags: tags[left.path], otherTags: tags[right.path])
         }
         cachedVisible = result
         return result
@@ -668,15 +863,32 @@ public enum CatalogUsageFilter: String, CaseIterable, Sendable {
 
     private var sortAdditions: [String: AdditionDateEvidence] {
         guard sort == .installed else { return [:] }
-        return Dictionary((report?.assets ?? []).filter { $0.kind == category }.compactMap { asset in
+        var values = Dictionary((report?.assets ?? []).filter { $0.kind == category }.compactMap { asset in
             additionEvidence(asset).map { (asset.path, $0) }
         }, uniquingKeysWith: { first, _ in first })
+        if category == .library {
+            for asset in report?.assets.filter({ $0.kind == .library }) ?? [] {
+                for instrument in asset.libraryMetadata?.instruments ?? [] {
+                    if let date = instrument.finderDateAdded,
+                       let evidence = try? AdditionDateEvidence(basis: .exact, lower: date, upper: date) { values[instrument.path] = evidence }
+                }
+            }
+        }
+        return values
     }
     private var sortDates: [String: Date] {
         if sort == .installed {
-            return Dictionary((report?.assets ?? []).filter { $0.kind == category }.compactMap { asset in
+            var values = Dictionary((report?.assets ?? []).filter { $0.kind == category }.compactMap { asset in
                 additionEvidence(asset).map { (asset.path, $0.upper) }
             }, uniquingKeysWith: { first, _ in first })
+            if category == .library {
+                for asset in report?.assets.filter({ $0.kind == .library }) ?? [] {
+                    for instrument in asset.libraryMetadata?.instruments ?? [] {
+                        if let date = instrument.finderDateAdded { values[instrument.path] = date }
+                    }
+                }
+            }
+            return values
         }
         if sort != .firstFound { return category == .sample ? inclusionsByPath.compactMapValues(\.latestReferencingProjectModifiedAt) : [:] }
         return Dictionary((report?.assets ?? []).compactMap { asset in firstFound(asset).map { (asset.path, $0) } }, uniquingKeysWith: { first, _ in first })
@@ -698,17 +910,45 @@ public enum CatalogUsageFilter: String, CaseIterable, Sendable {
         }
     }
     public func subject(asset: Asset, instrument: LibraryInstrument? = nil) -> MetadataSubject? {
-        asset.catalogID.map { MetadataSubject(nodeID: $0, instrument: instrument) }
+        (asset.kind == .plugin ? asset.pluginProductID : asset.catalogID).map { MetadataSubject(nodeID: $0, instrument: instrument) }
     }
     public func suggestedMetadata(asset: Asset, instrument: LibraryInstrument? = nil) -> MusicalMetadata {
-        let local = MusicalMetadata.suggested(name: instrument?.name ?? asset.name,
-            tags: instrument?.tags ?? asset.libraryMetadata?.tags ?? [], kind: asset.kind)
-        guard instrument == nil, let source = productTagSource(asset), tagRecords[source.id] != nil else { return local }
-        return local.applying(source.metadata)
+        let items = asset.kind == .plugin && instrument == nil ? product(for: asset)?.installations ?? [asset] : [asset]
+        var combined = MusicalMetadata()
+        for item in items {
+            var local = MusicalMetadata.suggested(name: instrument?.name ?? item.name,
+                tags: instrument?.tags ?? item.libraryMetadata?.tags ?? [], kind: item.kind)
+            if instrument == nil, let source = productTagSource(item), tagRecords[source.id] != nil {
+                local = local.applying(source.metadata)
+            }
+            for (key, values) in local.fields {
+                combined.fields[key] = Array(Set((combined.fields[key] ?? []) + values)).sorted()
+            }
+        }
+        return combined
     }
     public func effectiveMetadata(asset: Asset, instrument: LibraryInstrument? = nil) -> MusicalMetadata {
         let override = subject(asset: asset, instrument: instrument).flatMap { metadataOverrides[$0.key] }
         return suggestedMetadata(asset: asset, instrument: instrument).applying(override)
+    }
+    public func tagSortKey(asset: Asset, instrument: LibraryInstrument? = nil) -> String? {
+        let values = effectiveMetadata(asset: asset, instrument: instrument).fields.values.flatMap { $0 }
+            .map(MusicalSearch.normalized).filter { !$0.isEmpty }.sorted()
+        return values.isEmpty ? nil : values.joined(separator: " ")
+    }
+    private var sortTags: [String: String] {
+        guard sort == .tags else { return [:] }
+        var values = Dictionary((report?.assets ?? []).compactMap { asset in
+            tagSortKey(asset: asset).map { (asset.path, $0) }
+        }, uniquingKeysWith: { first, _ in first })
+        if category == .library {
+            for asset in report?.assets.filter({ $0.kind == .library }) ?? [] {
+                for instrument in asset.libraryMetadata?.instruments ?? [] {
+                    values[instrument.path] = tagSortKey(asset: asset, instrument: instrument)
+                }
+            }
+        }
+        return values
     }
     private func matchesFacets(_ metadata: MusicalMetadata) -> Bool {
         musicalFilter.allSatisfy { field, value in
@@ -718,14 +958,25 @@ public enum CatalogUsageFilter: String, CaseIterable, Sendable {
     private func matchesNode(_ node: CatalogOutlineNode) -> Bool {
         guard let asset = node.asset else { return false }
         if node.kind == .plugin { return matchesRow(asset) }
+        if node.kind == .sample && musicalFilter.isEmpty {
+            // Sample suggestions are derived solely from its filename. Searching
+            // that name plus explicit edits has the same matches without rebuilding
+            // the full suggested facet vocabulary for every keystroke.
+            let edited = subject(asset: asset).flatMap { metadataOverrides[$0.key]?.searchText } ?? ""
+            return matchesCatalogQuery(name: node.title, other: edited) && (!recentOnly || isRecent(asset))
+        }
         let metadata = effectiveMetadata(asset: asset, instrument: node.instrument)
         if node.instrument != nil, !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             let localText = node.title + " " + metadata.searchText
-            guard MusicalSearch.normalized(query).split(separator: " ").contains(where: { MusicalSearch.matches(String($0), in: localText) }) else { return false }
+            let nameWords = MusicalSearch.normalized(node.title).split(separator: " ")
+            guard MusicalSearch.normalized(query).split(separator: " ").contains(where: { term in
+                (term.count == 1 && !term.allSatisfy(\.isNumber) && nameWords.contains { $0.hasPrefix(term) })
+                    || MusicalSearch.matches(String(term), in: localText)
+            }) else { return false }
         }
         // Only literal identity context inherits. Aggregate sibling tags do not.
         let identityText = [node.title, asset.name, asset.libraryMetadata?.maker ?? ""]
-        return MusicalSearch.matches(query, in: (identityText + [metadata.searchText]).joined(separator: " "))
+        return matchesCatalogQuery(name: node.title, other: (identityText + [metadata.searchText]).joined(separator: " "))
             && matchesFacets(metadata) && (!recentOnly || isRecent(asset))
     }
     public func facetValues(_ facet: MusicalFacet) -> [String] {
@@ -770,7 +1021,7 @@ public enum CatalogUsageFilter: String, CaseIterable, Sendable {
         }
         let clean = try MusicalMetadata(fields: [facet.rawValue: [value]]).validated()[facet]?.first ?? ""
         guard !clean.isEmpty else { throw CatalogStoreError.invalid }
-        let targets = node.kind == .plugin ? (product(for: asset)?.installations ?? [asset]) : [asset]
+        let targets = [asset]
         var edits: [(MetadataSubject, MusicalMetadata?)] = []
         for target in targets {
             guard let subject = subject(asset: target, instrument: node.instrument) else { throw CatalogStoreError.invalid }
@@ -814,13 +1065,13 @@ public enum CatalogUsageFilter: String, CaseIterable, Sendable {
             let lines = MusicalFacet.fields(for: target.kind).compactMap { facet -> String? in
                 let values = effective[facet] ?? []
                 guard !values.isEmpty || override?[facet] != nil else { return nil }
-                return facet.title + ": " + (values.isEmpty ? "None" : values.joined(separator: ", ")) + (override?[facet] != nil ? " (edited)" : node.instrument == nil && productTagSource(target).map { tagRecords[$0.id] != nil && $0.metadata[facet] != nil } == true ? " (vendor suggestion)" : " (suggested from local labels)")
+                return facet.title + ": " + (values.isEmpty ? "None" : values.map(MusicalTagDisplay.title).joined(separator: ", ")) + (override?[facet] != nil ? " (edited)" : node.instrument == nil && productTagSource(target).map { tagRecords[$0.id] != nil && $0.metadata[facet] != nil } == true ? " (vendor suggestion)" : " (suggested from local labels)")
             }
             if !lines.isEmpty { sections.append((targets.count > 1 ? PluginProduct.formatName(target.format) + "\n" : "") + lines.joined(separator: "\n")) }
         }
         if let date = firstFound(asset) {
             let baseline = asset.catalogID.flatMap { catalogObservations[$0]?.baseline } ?? true
-            sections.append((baseline ? "First indexed: " : "First found: ") + date.formatted(date: .abbreviated, time: .omitted) + "\nObservation date; not original Date added or an installer record.")
+            sections.append((baseline ? "First indexed: " : "First found: ") + date.formatted(date: .abbreviated, time: .omitted) + "\nObservation date; not Date added or an installer record.")
         }
         return sections.joined(separator: "\n\n")
     }
@@ -839,16 +1090,19 @@ public enum CatalogUsageFilter: String, CaseIterable, Sendable {
                 }
             }
         }
-        return values.isEmpty ? "No tags yet" : values.prefix(3).joined(separator: " · ") + (values.count > 3 ? " · +\(values.count - 3)" : "")
+        return values.isEmpty ? "No tags yet" : values.prefix(3).map(MusicalTagDisplay.title).joined(separator: " · ") + (values.count > 3 ? " · +\(values.count - 3)" : "")
     }
 
     public var selectedAsset: Asset? {
+        if category == .plugin, let selectedProductID,
+           let asset = pluginProducts.first(where: { $0.id == selectedProductID })?.representative,
+           matchesRow(asset) { return asset }
         guard let selectedPath, let asset = assetsByKey[category.rawValue + ":" + selectedPath], matchesRow(asset) else { return nil }
         return asset
     }
     private func matchesRow(_ asset: Asset) -> Bool {
         if usageFilter == .unknown && usageRecord(asset) != nil { return false }
-        if let product = productsByPath[asset.path], asset.kind == .plugin { return product.installations.contains(where: matchesQuery) }
+        if asset.kind == .plugin, let product = productsByPath[asset.path] { return matchesQuery(product.representative) }
         return matchesQuery(asset)
     }
     public func product(for asset: Asset) -> PluginProduct? { asset.kind == .plugin ? productsByPath[asset.path] : nil }
@@ -879,9 +1133,13 @@ public enum CatalogUsageFilter: String, CaseIterable, Sendable {
         }
         let result = await Task.detached(priority: .utility) { PluginRemoval.moveToTrash(targets) }.value
         let removed = Set(result.filter(\.succeeded).map(\.path))
+        if let catalogStore {
+            do { try await catalogStore.finalizePluginRemoval(attempted: paths, succeeded: removed, scope: CatalogScope(scanRequest)) }
+            catch { catalogNotice = error.localizedDescription }
+        }
         report = report?.removingPluginPaths(removed)
-        if let selected, let replacement = selected.installations.first(where: { !removed.contains($0.path) }) { selectedPath = replacement.path }
-        else if let selectedPath, removed.contains(selectedPath) { self.selectedPath = nil }
+        if let selected, let replacement = selected.installations.first(where: { !removed.contains($0.path) }) { selectedPath = replacement.path; selectedProductID = selected.id }
+        else if let selectedPath, removed.contains(selectedPath) { self.selectedPath = nil; selectedProductID = nil }
         isRemoving = false; onChange?()
         return result
     }
@@ -932,7 +1190,7 @@ public enum CatalogUsageFilter: String, CaseIterable, Sendable {
         guard let asset = selectedAsset else { return "Select an item to see its tags and usage." }
         var lines = [asset.name, "", asset.path, "", "Format: \(asset.format.isEmpty ? "Folder" : asset.format.uppercased())",
                      "Type: \(asset.kind == .plugin ? "Plugin installation" : asset.kind == .sample ? "Audio file" : "Library candidate")",
-                     "Size: \(asset.logicalBytes.map { ByteCountFormatter.string(fromByteCount: Int64($0), countStyle: .file) } ?? "Not measured")"]
+                     "Size: \(asset.kind == .plugin ? pluginSize(asset).value : asset.logicalBytes.map { ByteCountFormatter.string(fromByteCount: Int64($0), countStyle: .file) } ?? "Not measured")"]
         if asset.kind == .sample {
             let inclusion = inclusionsByPath[asset.path]
             if isScanning {
@@ -951,6 +1209,16 @@ public enum CatalogUsageFilter: String, CaseIterable, Sendable {
     public var coverageDetail: String {
         guard let report else { return "No scan yet." }
         var lines = [isScanning ? "Scan is still running; project coverage is pending." : "Scan issues", ""]
+        let pluginsWithDate = pluginProducts.filter { additionEvidence($0.representative) != nil }.count
+        let pluginsWithUse = pluginProducts.filter { usageRecord($0.representative) != nil }.count
+        let samples = report.assets.filter { $0.kind == .sample }
+        let libraries = report.assets.filter { $0.kind == .library }
+        let instruments = libraries.flatMap { $0.libraryMetadata?.instruments ?? [] }
+        lines += ["Collection facts",
+                  "Plugins: \(pluginProducts.count) products, \(pluginsWithDate) with Date added, \(pluginsWithUse) with qualified Last used.",
+                  "Samples: \(samples.count), \(samples.filter { additionEvidence($0) != nil }.count) with Date added; individual Last used is not collected.",
+                  "Libraries: \(libraries.count), \(libraries.filter { additionEvidence($0) != nil }.count) with Date added; \(instruments.count) instruments, \(instruments.filter { $0.finderDateAdded != nil }.count) with Date added. Library/instrument Last used is not collected.",
+                  "Missing dates or use can mean the source has no qualified history; scan issues are listed below.", ""]
         lines += report.issues.map { "\($0.path)\n\($0.reason)\n" }
         lines += ["", "Project coverage", ""]
         lines += report.projects.map { "\($0.path)\n\($0.adapter): \($0.coverage), \($0.references.count) reference candidates\n\($0.limitations.joined(separator: " "))\n" }

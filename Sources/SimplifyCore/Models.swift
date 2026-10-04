@@ -9,11 +9,15 @@ public struct Asset: Codable, Sendable {
     public let name: String
     public let format: String
     public let bundleIdentifier: String?
-    public let logicalBytes: Int?
+    public var logicalBytes: Int?
+    /// Finder/Spotlight date moved into this location; absent on older catalogs or unsupported volumes.
+    public var finderDateAdded: Date? = nil
     public let classification: String
     public var libraryMetadata: LibraryMetadata? = nil
     public var fileIdentity: PluginFileIdentity? = nil
     public var catalogID: String? = nil
+    /// Durable catalog item owning this physical plugin installation.
+    public var pluginProductID: String? = nil
     public var catalogStale: Bool? = nil
     /// Session catalog key. Vendor-backed libraries use product identity even when
     /// their physical content is shared or moves. Other assets retain path identity.
@@ -96,6 +100,8 @@ public struct ScanReport: Codable, Sendable {
 
 public struct ScanRequest: Sendable {
     public var plugins: [URL] = []
+    /// Default discovery locations whose absence is expected, unlike user roots.
+    public var optionalPluginRoots: [URL] = []
     public var samples: [URL] = []
     public var libraries: [URL] = []
     public var projects: [URL] = []

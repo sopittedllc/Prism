@@ -52,6 +52,8 @@ public struct CatalogSnapshot: Sendable {
     public let savedAt: Date
     public let observations: [String: CatalogObservation]
     public let metadata: [String: MusicalMetadata]
+    public let pluginProductDates: [String: Date]
+    public let pluginProductNames: [String: String]
 }
 
 public enum CatalogStoreError: LocalizedError {
@@ -76,6 +78,17 @@ public actor CatalogStore {
             .appendingPathComponent("Simplify/catalog.sqlite"))
     }
 
+    private func productID(for asset: Asset, nodeID: String, db: CatalogDatabase) throws -> String {
+        if let id = try db.rows("SELECT product_id FROM plugin_installations WHERE node_id=?", [nodeID]).first?.first { return id }
+        let key = PluginProduct.verifiedIdentity(asset)
+        let matches = try key.map { try db.rows("SELECT id FROM plugin_products WHERE identity_key=? LIMIT 2", [$0]) } ?? []
+        let id = matches.count == 1 ? matches[0][0] : UUID().uuidString
+        if matches.count != 1 {
+            try db.run("INSERT INTO plugin_products(id,identity_key,name,archived) VALUES(?,?,?,0)", [id, key ?? "", asset.name])
+        }
+        return id
+    }
+
     public func load(scope: CatalogScope) throws -> CatalogSnapshot? {
         guard FileManager.default.fileExists(atPath: url.path) else { return nil }
         let db = try CatalogDatabase(url)
@@ -83,6 +96,19 @@ public actor CatalogStore {
         do { try seedScope(db, scope: scope); try invalidateOmittedCoverage(db, scope: scope); try db.execute("COMMIT") }
         catch { try? db.execute("ROLLBACK"); throw error }
         return try read(db, scope: scope)
+    }
+
+    /// Recover the user's last saved collection when setup preferences are missing.
+    /// The catalog already owns these configured roots; reading them does not scan.
+    public func mostRecentSavedScope() throws -> CatalogScope? {
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        let db = try CatalogDatabase(url)
+        guard let row = try db.strictRows("SELECT configuration FROM scopes WHERE generation!='unscanned' ORDER BY CAST(saved_at AS REAL) DESC LIMIT 1").first else { return nil }
+        let scope = try decode(CatalogScope.self, row[0])
+        let paths = scope.roots.values.flatMap { $0 }
+        guard paths.count <= 512, !paths.isEmpty,
+              paths.allSatisfy({ $0.hasPrefix("/") && !$0.contains("\0") }) else { throw CatalogStoreError.invalid }
+        return scope
     }
 
     /// Writes inventory, graph memberships and observations in a single transaction.
@@ -148,13 +174,14 @@ public actor CatalogStore {
                 let identity = asset.kind.rawValue + ":" + asset.format + ":" + product + ":" + physicalKey
                 let existing = try db.rows("SELECT id FROM nodes WHERE identity=?", [identity]).first?.first
                 let id = existing ?? UUID().uuidString
+                let pluginProductID = asset.kind == .plugin ? try productID(for: asset, nodeID: id, db: db) : nil
                 let covered = try completedRoots.contains { row in
                     guard row[0] == asset.kind.rawValue, CatalogScope.contains(asset.path, root: row[1]) else { return false }
                     return try !decode([String].self, row[2]).contains { CatalogScope.contains(asset.path, root: $0) }
                 }
                 let knownReplacement = try !db.rows("SELECT id FROM nodes WHERE kind=? AND path=?", [asset.kind.rawValue, asset.path]).isEmpty
                 let baseline = !covered || knownReplacement
-                var header = asset; header.catalogID = id; header.fileIdentity = nil
+                var header = asset; header.catalogID = id; header.pluginProductID = pluginProductID; header.fileIdentity = nil
                 let instruments = header.libraryMetadata?.instruments ?? []
                 header.libraryMetadata?.instruments = []
                 try db.run("""
@@ -162,6 +189,9 @@ public actor CatalogStore {
                     VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
                     path=excluded.path,last_seen=excluded.last_seen
                     """, [id, identity, product, asset.kind.rawValue, asset.path, stamp(date), stamp(date), baseline ? "1" : "0"])
+                if let pluginProductID {
+                    try db.run("INSERT OR IGNORE INTO plugin_installations(node_id,product_id) VALUES(?,?)", [id, pluginProductID])
+                }
                 if existing == nil {
                     let lower = knownReplacement || !physicalKey.hasPrefix("file:") ? nil : continuousRoots.filter {
                         $0.kind == asset.kind.rawValue && CatalogScope.contains(asset.path, root: $0.root)
@@ -183,6 +213,11 @@ public actor CatalogStore {
                 }
                 try db.run("DELETE FROM scope_members WHERE scope_id=? AND path=? AND node_id!=? AND node_id IN (SELECT id FROM nodes WHERE product_key=? AND kind=?)", [scope.key, asset.path, id, product, asset.kind.rawValue])
                 try db.run("INSERT INTO scope_members(scope_id,node_id,path,payload,generation,baseline,observed_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(scope_id,node_id) DO UPDATE SET path=excluded.path,payload=excluded.payload,generation=excluded.generation,observed_at=excluded.observed_at", [scope.key, id, asset.path, try encode(header), generation, baseline ? "1" : "0", stamp(date)])
+                if let pluginProductID { try db.run("UPDATE plugin_products SET archived=0 WHERE id=?", [pluginProductID]) }
+                if let pluginProductID, let added = asset.finderDateAdded {
+                    guard added.timeIntervalSince1970.isFinite else { throw CatalogStoreError.invalid }
+                    try db.run("UPDATE plugin_products SET earliest_date=CASE WHEN earliest_date IS NULL OR earliest_date>? THEN ? ELSE earliest_date END WHERE id=?", [stamp(added), stamp(added), pluginProductID])
+                }
                 if asset.kind == .plugin { try db.run("DELETE FROM removals WHERE path=?", [asset.path]) }
             }
             let evidence = ScanReport(schemaVersion: report.schemaVersion, assets: [], projects: report.projects,
@@ -463,43 +498,40 @@ public actor CatalogStore {
                 try Task.checkCancellation()
                 let records = try readDateEvidence(db, for: id, asOf: asOf); total += records.count
                 guard total <= 100_000 else { throw AssetDateEvidenceError.tooManyRecords }
-                func family(_ record: AssetDateEvidence) -> Int {
-                    if record.hostUsage != nil { return 0 }
-                    if record.cubaseUsage != nil { return 1 }
-                    if record.proToolsUsage != nil { return 2 }
-                    return 3
-                }
                 let usage = records.filter {
                     $0.hostUsage != nil || $0.cubaseUsage != nil ||
                     ($0.sourceID == ProToolsPluginUse.restoreV2SourceID && $0.proToolsUsage != nil) ||
                     $0.logicUsage != nil
-                }.sorted { a, b in
-                    let ad = a.hostUsage?.localTime.dayKey ?? a.cubaseUsage?.reportedDate.formatted(.iso8601.year().month().day()) ?? a.proToolsUsage?.localTime?.dayKey ?? a.logicUsage?.reportedDate.formatted(.iso8601.year().month().day()) ?? ""
-                    let bd = b.hostUsage?.localTime.dayKey ?? b.cubaseUsage?.reportedDate.formatted(.iso8601.year().month().day()) ?? b.proToolsUsage?.localTime?.dayKey ?? b.logicUsage?.reportedDate.formatted(.iso8601.year().month().day()) ?? ""
-                    if ad != bd { return ad > bd }
-                    let af = family(a), bf = family(b)
-                    if af != bf { return af < bf }
-                    if let al = a.hostUsage, let bl = b.hostUsage,
-                       al.localTime.canonical != bl.localTime.canonical {
-                        return al.localTime.canonical > bl.localTime.canonical
-                    }
-                    if let al = a.proToolsUsage, let bl = b.proToolsUsage {
-                        if al.localTime != bl.localTime {
-                            return (al.localTime?.canonical ?? "") > (bl.localTime?.canonical ?? "")
-                        }
-                        if al.runHash != bl.runHash {
-                            return (al.runHash ?? "") < (bl.runHash ?? "")
-                        }
-                        if al.sourceSeconds != bl.sourceSeconds {
-                            return al.sourceSeconds > bl.sourceSeconds
-                        }
-                    }
-                    return a.evidenceID.utf8.lexicographicallyPrecedes(b.evidenceID.utf8)
-                }
+                }.sorted { HostUsageOrdering.precedes($0, $1) }
                 if let first = usage.first { result[Data(id.utf8)] = first }
             }
             try db.execute("COMMIT"); return result
         } catch { try? db.execute("ROLLBACK"); throw error }
+    }
+
+    /// Product history includes qualified events from prior format installations.
+    public func latestProductUsage(for productIDs: [String], asOf: Date) throws -> [Data: AssetDateEvidence] {
+        guard productIDs.count <= 2048 else { throw AssetDateEvidenceError.tooManyRecords }
+        let db = try CatalogDatabase(url)
+        var owners: [Data: String] = [:]
+        for id in Set(productIDs) {
+            for row in try db.rows("SELECT node_id FROM plugin_installations WHERE product_id=? LIMIT 100001", [id]) {
+                guard owners.count < 100_000 else { throw AssetDateEvidenceError.tooManyRecords }
+                owners[Data(row[0].utf8)] = id
+            }
+        }
+        var result: [Data: AssetDateEvidence] = [:]
+        let nodes = owners.keys.map { String(decoding: $0, as: UTF8.self) }.sorted()
+        for offset in stride(from: 0, to: nodes.count, by: 2048) {
+            let records = try latestHostUsage(for: Array(nodes[offset..<min(offset + 2048, nodes.count)]), asOf: asOf)
+            for (node, record) in records {
+                guard let product = owners[node] else { continue }
+                let key = Data(product.utf8)
+                if let prior = result[key], !HostUsageOrdering.precedes(record, prior) { continue }
+                result[key] = record
+            }
+        }
+        return result
     }
 
     /// Read a bounded, validated history in one database snapshot. Missing database/node
@@ -553,6 +585,49 @@ public actor CatalogStore {
         try AssetDateResolver.summarize(dateEvidence(for: nodeID, asOf: asOf), for: nodeID, asOf: asOf)
     }
 
+    /// Earliest qualified original addition per exact node. Scan observations,
+    /// receipts, and use events never enter this projection.
+    public func confirmedAdditionDates(for nodeIDs: [String], asOf: Date) throws -> [Data: Date] {
+        try Task.checkCancellation()
+        guard nodeIDs.count <= 2_048, FileManager.default.fileExists(atPath: url.path) else { throw CatalogStoreError.invalid }
+        let db = try CatalogDatabase(url); try db.execute("BEGIN")
+        do {
+            var result: [Data: Date] = [:], seen = Set<Data>(), total = 0
+            for id in nodeIDs where seen.insert(Data(id.utf8)).inserted {
+                try Task.checkCancellation()
+                let records = try readDateEvidence(db, for: id, asOf: asOf)
+                total += records.count
+                guard total <= 100_000 else { throw AssetDateEvidenceError.tooManyRecords }
+                let dates = records.filter { $0.kind == .confirmedAddition }.compactMap(\.eventDate)
+                if let earliest = dates.min() { result[Data(id.utf8)] = earliest }
+            }
+            try Task.checkCancellation()
+            try db.execute("COMMIT")
+            return result
+        } catch { try? db.execute("ROLLBACK"); throw error }
+    }
+
+    public func productConfirmedAdditionDates(for productIDs: [String], asOf: Date) throws -> [String: Date] {
+        guard productIDs.count <= 2048 else { throw AssetDateEvidenceError.tooManyRecords }
+        let db = try CatalogDatabase(url)
+        var owners: [Data: String] = [:]
+        for id in Set(productIDs) {
+            for row in try db.rows("SELECT node_id FROM plugin_installations WHERE product_id=? LIMIT 100001", [id]) {
+                guard owners.count < 100_000 else { throw AssetDateEvidenceError.tooManyRecords }
+                owners[Data(row[0].utf8)] = id
+            }
+        }
+        let nodes = owners.keys.map { String(decoding: $0, as: UTF8.self) }.sorted()
+        var result: [String: Date] = [:]
+        for offset in stride(from: 0, to: nodes.count, by: 2048) {
+            for (node, date) in try confirmedAdditionDates(for: Array(nodes[offset..<min(offset + 2048, nodes.count)]), asOf: asOf) {
+                guard let owner = owners[node] else { continue }
+                result[owner] = min(result[owner] ?? date, date)
+            }
+        }
+        return result
+    }
+
     private nonisolated func readDateEvidence(_ db: CatalogDatabase, for nodeID: String, asOf: Date) throws -> [AssetDateEvidence] {
         guard try !db.rows("SELECT id FROM nodes WHERE id=?", [nodeID]).isEmpty else { throw CatalogStoreError.invalid }
         let rows = try db.dateRows("SELECT source_id,evidence_id,subject_id,payload FROM date_evidence WHERE subject_id=? ORDER BY source_id,evidence_id LIMIT 10001", [nodeID])
@@ -577,6 +652,11 @@ public actor CatalogStore {
         try db.execute("BEGIN IMMEDIATE")
         do {
             for (subject, value) in edits {
+                if subject.instrumentKey == nil,
+                   try !db.rows("SELECT id FROM plugin_products WHERE id=?", [subject.nodeID]).isEmpty {
+                    try db.run("UPDATE plugin_products SET metadata=? WHERE id=?", [try value.map(encode) ?? "", subject.nodeID])
+                    continue
+                }
                 guard try !db.rows("SELECT id FROM nodes WHERE id=?", [subject.nodeID]).isEmpty else { throw CatalogStoreError.invalid }
                 if let value, !value.fields.isEmpty {
                     try db.run("INSERT INTO metadata_overrides(subject,node_id,payload) VALUES(?,?,?) ON CONFLICT(subject) DO UPDATE SET payload=excluded.payload", [subject.key, subject.nodeID, try encode(value)])
@@ -686,6 +766,28 @@ public actor CatalogStore {
         } catch { try? db.execute("ROLLBACK"); throw error }
     }
 
+    /// Resolve only reviewed attempts. A failed or canceled Trash operation cannot
+    /// hide an installation on the next catalog restore.
+    public func finalizePluginRemoval(attempted: Set<String>, succeeded: Set<String>, scope: CatalogScope) throws {
+        guard succeeded.isSubset(of: attempted) else { throw CatalogStoreError.invalid }
+        let db = try CatalogDatabase(url)
+        try db.execute("BEGIN IMMEDIATE")
+        do {
+            for path in attempted.subtracting(succeeded) { try db.run("DELETE FROM removals WHERE path=?", [path]) }
+            for path in succeeded {
+                for row in try db.rows("SELECT p.product_id FROM plugin_installations p JOIN scope_members m ON m.node_id=p.node_id WHERE m.scope_id=? AND m.path=?", [scope.key, path]) {
+                    let survivors = try db.rows("""
+                        SELECT m.node_id FROM scope_members m JOIN plugin_installations p ON p.node_id=m.node_id
+                        JOIN scopes s ON s.id=m.scope_id WHERE p.product_id=? AND m.generation=s.generation
+                        AND m.path NOT IN (SELECT path FROM removals) LIMIT 1
+                        """, [row[0]])
+                    if survivors.isEmpty { try db.run("UPDATE plugin_products SET archived=1 WHERE id=?", [row[0]]) }
+                }
+            }
+            try db.execute("COMMIT")
+        } catch { try? db.execute("ROLLBACK"); throw error }
+    }
+
     /// Explicit local backup. Destination must not exist; no automatic upload/import.
     public func backup(to destination: URL) throws {
         guard !FileManager.default.fileExists(atPath: destination.path) else { throw CatalogStoreError.unavailable }
@@ -706,8 +808,8 @@ public actor CatalogStore {
             guard let time = Double(snapshot[1]) else { throw CatalogStoreError.invalid }
             let generation = snapshot[2]
             let rows = try db.rows("""
-                SELECT n.id,m.payload,n.first_seen,n.last_seen,n.baseline,m.generation FROM nodes n
-                JOIN scope_members m ON m.node_id=n.id WHERE m.scope_id=?
+                SELECT n.id,m.payload,n.first_seen,n.last_seen,n.baseline,m.generation,p.product_id FROM nodes n
+                JOIN scope_members m ON m.node_id=n.id LEFT JOIN plugin_installations p ON p.node_id=n.id WHERE m.scope_id=?
                 AND NOT (n.kind='plugin' AND m.path IN (SELECT path FROM removals)) ORDER BY n.id
                 """, [scope.key])
             let childRows = try db.rows("""
@@ -737,6 +839,7 @@ public actor CatalogStore {
             var assets: [Asset] = []; var observations: [String: CatalogObservation] = [:]
             for row in rows {
                 var asset = try decode(Asset.self, row[1]); asset.fileIdentity = nil
+                if asset.kind == .plugin { asset.pluginProductID = row[6].isEmpty ? nil : row[6] }
                 asset.libraryMetadata?.instruments = children[row[0]] ?? []
                 guard let first = Double(row[2]), let last = Double(row[3]) else { throw CatalogStoreError.invalid }
                 let stale = row[5] != generation
@@ -749,9 +852,17 @@ public actor CatalogStore {
             let report = ScanReport(schemaVersion: evidence.schemaVersion, assets: assets, projects: evidence.projects,
                 sampleInclusions: evidence.sampleInclusions, issues: evidence.issues, durationSeconds: evidence.durationSeconds)
             let metadataRows = try db.rows("SELECT subject,payload FROM metadata_overrides WHERE node_id IN (SELECT node_id FROM scope_members WHERE scope_id=?)", [scope.key])
-            let metadata = try Dictionary(uniqueKeysWithValues: metadataRows.map { ($0[0], try decode(MusicalMetadata.self, $0[1]).validated()) })
+            var metadata = try Dictionary(uniqueKeysWithValues: metadataRows.map { ($0[0], try decode(MusicalMetadata.self, $0[1]).validated()) })
+            let productRows = try db.rows("SELECT id,metadata,CAST(earliest_date AS TEXT),name FROM plugin_products")
+            var productDates: [String: Date] = [:]
+            var productNames: [String: String] = [:]
+            for row in productRows {
+                if !row[1].isEmpty { metadata[MetadataSubject(nodeID: row[0]).key] = try decode(MusicalMetadata.self, row[1]).validated() }
+                if let time = Double(row[2]), time.isFinite { productDates[row[0]] = Date(timeIntervalSince1970: time) }
+                productNames[row[0]] = row[3]
+            }
             try db.execute("COMMIT")
-            return CatalogSnapshot(report: report, savedAt: Date(timeIntervalSince1970: time), observations: observations, metadata: metadata)
+            return CatalogSnapshot(report: report, savedAt: Date(timeIntervalSince1970: time), observations: observations, metadata: metadata, pluginProductDates: productDates, pluginProductNames: productNames)
         } catch { try? db.execute("ROLLBACK"); throw error }
     }
     private nonisolated func stamp(_ date: Date) -> String { String(date.timeIntervalSince1970) }
@@ -808,10 +919,10 @@ private final class CatalogDatabase {
                 guard try rows("SELECT name FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'").isEmpty else { throw CatalogStoreError.incompatible }
                 try transaction {
                     try execute(Self.schema)
-                    try execute("PRAGMA application_id=\(Self.applicationID); PRAGMA user_version=4")
+                    try execute("PRAGMA application_id=\(Self.applicationID); PRAGMA user_version=5")
                 }
-            } else if application != String(Self.applicationID) || !["1", "2", "3", "4"].contains(version ?? "") { throw CatalogStoreError.incompatible }
-            if let version, ["1", "2", "3"].contains(version) {
+            } else if application != String(Self.applicationID) || !["1", "2", "3", "4", "5"].contains(version ?? "") { throw CatalogStoreError.incompatible }
+            if let version, ["1", "2", "3", "4"].contains(version) {
                 try transaction {
                     guard try rows("PRAGMA user_version").first?.first == version else { throw CatalogStoreError.busy }
                     // Keep the writer reservation through backup and ALTER. A separate
@@ -838,9 +949,13 @@ private final class CatalogDatabase {
                             }
                         }
                     }
-                    if version != "3" { try execute(Self.dateEvidenceSchema) }
-                    try execute(Self.additionSchema)
-                    try execute("PRAGMA user_version=4")
+                    if version != "4" {
+                        if version != "3" { try execute(Self.dateEvidenceSchema) }
+                        try execute(Self.additionSchema)
+                    }
+                    try execute(Self.productSchema)
+                    try migratePluginProducts()
+                    try execute("PRAGMA user_version=5")
                 }
             }
             try execute("PRAGMA foreign_keys=ON; PRAGMA synchronous=FULL")
@@ -849,6 +964,41 @@ private final class CatalogDatabase {
         }
     }
     deinit { if let handle { sqlite3_close(handle) } }
+    private func migratePluginProducts() throws {
+        let decoder = JSONDecoder(), encoder = JSONEncoder()
+        var seen = Set<String>()
+        var products: [String: String] = [:]
+        var dates: [String: Date] = [:]
+        for row in try rows("SELECT n.id,m.payload FROM nodes n JOIN scope_members m ON m.node_id=n.id WHERE n.kind='plugin' ORDER BY n.id,m.observed_at DESC") {
+            guard seen.insert(row[0]).inserted else { continue }
+            guard let asset = try? decoder.decode(Asset.self, from: Data(row[1].utf8)) else { throw CatalogStoreError.invalid }
+            let identity = PluginProduct.verifiedIdentity(asset)
+            let key = identity ?? "legacy-node:" + row[0]
+            let id: String
+            if let existing = products[key] { id = existing }
+            else {
+                id = UUID().uuidString
+                products[key] = id
+                try run("INSERT INTO plugin_products(id,identity_key,name,archived) VALUES(?,?,?,0)", [id, identity ?? "", asset.name])
+            }
+            try run("INSERT INTO plugin_installations(node_id,product_id) VALUES(?,?)", [row[0], id])
+            if let added = asset.finderDateAdded, added.timeIntervalSince1970.isFinite {
+                dates[id] = min(dates[id] ?? added, added)
+            }
+        }
+        for (id, date) in dates { try run("UPDATE plugin_products SET earliest_date=? WHERE id=?", [String(date.timeIntervalSince1970), id]) }
+        var merged: [String: [String: [String]]] = [:]
+        for row in try rows("SELECT p.product_id,o.payload FROM metadata_overrides o JOIN plugin_installations p ON p.node_id=o.node_id ORDER BY o.subject") {
+            let metadata = try decoder.decode(MusicalMetadata.self, from: Data(row[1].utf8)).validated()
+            for (facet, values) in metadata.fields {
+                merged[row[0], default: [:]][facet, default: []].append(contentsOf: values)
+            }
+        }
+        for (id, facets) in merged {
+            let metadata = try MusicalMetadata(fields: facets).validated()
+            try run("UPDATE plugin_products SET metadata=? WHERE id=?", [String(decoding: try encoder.encode(metadata), as: UTF8.self), id])
+        }
+    }
     func transaction<T>(isolation: isolated (any Actor)? = #isolation, _ operation: () throws -> T) throws -> T {
         try execute("BEGIN IMMEDIATE")
         do { let result = try operation(); try execute("COMMIT"); return result }
@@ -923,6 +1073,12 @@ private final class CatalogDatabase {
     CREATE TABLE scan_coverage(kind TEXT NOT NULL,root TEXT NOT NULL,exclusions TEXT NOT NULL,policy TEXT NOT NULL,root_identity TEXT NOT NULL,started REAL NOT NULL,finished REAL NOT NULL,PRIMARY KEY(kind,root,exclusions));
     CREATE TABLE node_addition_bounds(node_id TEXT PRIMARY KEY,payload TEXT NOT NULL,FOREIGN KEY(node_id) REFERENCES nodes(id));
     """
+    static let productSchema = """
+    CREATE TABLE plugin_products(id TEXT PRIMARY KEY,identity_key TEXT NOT NULL,name TEXT NOT NULL,metadata TEXT,earliest_date REAL,archived INTEGER NOT NULL DEFAULT 0);
+    CREATE TABLE plugin_installations(node_id TEXT PRIMARY KEY,product_id TEXT NOT NULL REFERENCES plugin_products(id),FOREIGN KEY(node_id) REFERENCES nodes(id));
+    CREATE INDEX plugin_products_identity ON plugin_products(identity_key);
+    CREATE INDEX plugin_installations_product ON plugin_installations(product_id);
+    """
     static let schema = """
     CREATE TABLE nodes(id TEXT PRIMARY KEY,identity TEXT UNIQUE NOT NULL,product_key TEXT NOT NULL,
       kind TEXT NOT NULL,path TEXT NOT NULL,first_seen REAL NOT NULL,last_seen REAL NOT NULL,baseline INTEGER NOT NULL);
@@ -933,5 +1089,5 @@ private final class CatalogDatabase {
     CREATE TABLE removals(path TEXT PRIMARY KEY);
     CREATE INDEX instruments_parent ON instruments(node_id);
     CREATE INDEX members_scope ON scope_members(scope_id);
-    """ + discoverySchema + dateEvidenceSchema + additionSchema
+    """ + discoverySchema + dateEvidenceSchema + additionSchema + productSchema
 }

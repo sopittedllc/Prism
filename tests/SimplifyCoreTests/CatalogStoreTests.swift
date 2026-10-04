@@ -49,6 +49,80 @@ private func storedDateEvent(_ node: String, id: String = "event", source: Strin
 }
 private let evidenceNow = Date(timeIntervalSince1970: 400)
 
+@Test func pluginProductOwnsFreshFormatsAndKeepsEarliestDate() async throws {
+    let f = try StoreFixture(); defer { f.clean() }
+    let a = try f.file("Glow.component"), b = try f.file("Glow.vst3")
+    var first = Asset(kind: .plugin, path: a.path, name: "Glow AU", format: "component",
+                      bundleIdentifier: "com.example.glow", logicalBytes: 12, classification: "fixture")
+    first.finderDateAdded = Date(timeIntervalSince1970: 100)
+    var second = Asset(kind: .plugin, path: b.path, name: "Glow VST3", format: "vst3",
+                       bundleIdentifier: "com.example.glow", logicalBytes: 20, classification: "fixture")
+    second.finderDateAdded = Date(timeIntervalSince1970: 200)
+    var request = ScanRequest(); request.plugins = [f.root]
+    let scope = CatalogScope(request)
+    let snapshot = try await f.store.ingest(f.report([first, second]), scope: scope, at: Date(timeIntervalSince1970: 300))
+    let ids = Set(snapshot.report.assets.compactMap(\.pluginProductID))
+    #expect(ids.count == 1)
+    let id = try #require(ids.first)
+    #expect(snapshot.pluginProductDates[id] == first.finderDateAdded)
+    #expect(snapshot.pluginProductNames[id] == "Glow AU")
+    #expect(try f.scalar("SELECT COUNT(*) FROM plugin_installations") == "2")
+    #expect(try f.scalar("SELECT COUNT(*) FROM plugin_products") == "1")
+    let later = try await f.store.ingest(f.report([second]), scope: scope, at: Date(timeIntervalSince1970: 400))
+    #expect(later.pluginProductDates[id] == first.finderDateAdded)
+    #expect(later.pluginProductNames[id] == "Glow AU")
+    #expect(later.report.assets.first(where: { $0.path == b.path })?.pluginProductID == id)
+}
+
+@Test func removalInOneScopeKeepsProductActiveWhenAnotherScopeHasCurrentFormat() async throws {
+    let f = try StoreFixture(); defer { f.clean() }
+    let a = try f.file("One/Glow.component"), b = try f.file("Two/Glow.vst3")
+    let au = Asset(kind: .plugin, path: a.path, name: "Glow", format: "component", bundleIdentifier: "com.example.glow", logicalBytes: 1, classification: "fixture")
+    let vst = Asset(kind: .plugin, path: b.path, name: "Glow", format: "vst3", bundleIdentifier: "com.example.glow", logicalBytes: 1, classification: "fixture")
+    var firstRequest = ScanRequest(); firstRequest.plugins = [a.deletingLastPathComponent()]
+    var secondRequest = ScanRequest(); secondRequest.plugins = [b.deletingLastPathComponent()]
+    let firstScope = CatalogScope(firstRequest), secondScope = CatalogScope(secondRequest)
+    _ = try await f.store.ingest(f.report([au]), scope: firstScope)
+    _ = try await f.store.ingest(f.report([vst]), scope: secondScope)
+    try await f.store.recordRemovalIntent(paths: [a.path])
+    try await f.store.finalizePluginRemoval(attempted: [a.path], succeeded: [a.path], scope: firstScope)
+    #expect(try f.scalar("SELECT archived FROM plugin_products") == "0")
+    #expect(try await f.store.load(scope: secondScope)?.report.assets.count == 1)
+}
+
+@Test func corruptV4PluginPayloadRollsBackProductMigration() async throws {
+    let f = try StoreFixture(); defer { f.clean() }
+    let path = try f.file("Broken.vst3")
+    let asset = Asset(kind: .plugin, path: path.path, name: "Broken", format: "vst3",
+                      bundleIdentifier: "com.example.broken", logicalBytes: 1, classification: "fixture")
+    var request = ScanRequest(); request.plugins = [f.root]
+    let scope = CatalogScope(request)
+    _ = try await f.store.ingest(f.report([asset]), scope: scope)
+    try f.sql("DROP TABLE plugin_installations; DROP TABLE plugin_products; PRAGMA user_version=4; UPDATE scope_members SET payload='{broken' WHERE node_id IN (SELECT id FROM nodes WHERE kind='plugin')")
+    do { _ = try await CatalogStore(url: f.database).load(scope: scope); Issue.record("Corrupt migration unexpectedly succeeded") }
+    catch { #expect(try f.scalar("PRAGMA user_version") == "4") }
+}
+
+@Test func optInRealCatalogProductMigrationCopy() async throws {
+    guard let source = ProcessInfo.processInfo.environment["PRISM_PRODUCT_MIGRATION_COPY"] else { return }
+    let url = URL(fileURLWithPath: source)
+    _ = try await CatalogStore(url: url).load(scope: CatalogScope(ScanRequest()))
+    var db: OpaquePointer?
+    defer { sqlite3_close(db) }
+    #expect(sqlite3_open_v2(url.path, &db, SQLITE_OPEN_READONLY, nil) == SQLITE_OK)
+    func count(_ sql: String) throws -> Int {
+        var statement: OpaquePointer?
+        defer { sqlite3_finalize(statement) }
+        guard sqlite3_prepare_v2(db, sql, -1, &statement, nil) == SQLITE_OK,
+              sqlite3_step(statement) == SQLITE_ROW else { throw CatalogStoreError.invalid }
+        return Int(sqlite3_column_int(statement, 0))
+    }
+    #expect(try count("PRAGMA user_version") == 5)
+    #expect(try count("SELECT COUNT(*) FROM plugin_installations") == 61)
+    #expect(try count("SELECT COUNT(*) FROM plugin_products") == 30)
+    #expect(try count("SELECT COUNT(*) FROM date_evidence") == 30)
+}
+
 @Test func dateHistorySurvivesReopenMoveOfflineAndBackupButNotIdentityReplacement() async throws {
     let f = try StoreFixture(); defer { f.clean() }
     let path = try f.file("Product.nicnt")
@@ -173,7 +247,7 @@ private let evidenceNow = Date(timeIntervalSince1970: 400)
         INSERT INTO metadata_overrides VALUES('legacy-subject','legacy','{"sentinel":"unchanged"}');
         """)
     #expect(try await f.store.dateEvidence(for: "legacy", asOf: evidenceNow).isEmpty)
-    #expect(try f.scalar("PRAGMA user_version") == "4")
+    #expect(try f.scalar("PRAGMA user_version") == "5")
     #expect(try f.scalar("SELECT first_seen || ',' || last_seen || ',' || baseline FROM nodes") == "100.0,200.0,1")
     #expect(try f.scalar("SELECT payload FROM metadata_overrides") == "{\"sentinel\":\"unchanged\"}")
     let backups = try FileManager.default.contentsOfDirectory(at: f.database.deletingLastPathComponent(), includingPropertiesForKeys: nil).filter { $0.lastPathComponent.hasPrefix("catalog-v2-backup-") }
@@ -654,12 +728,12 @@ private let evidenceNow = Date(timeIntervalSince1970: 400)
     let node = try #require(saved.report.assets.first?.catalogID)
     try await f.store.appendDateEvidence([storedDateEvent(node)], asOf: evidenceNow)
     // A schema3 fixture has the same inventory/date ledger but neither schema4 table.
-    try f.sql("DROP TABLE node_addition_bounds; DROP TABLE scan_coverage; PRAGMA user_version=3;")
+    try f.sql("DROP TABLE plugin_installations; DROP TABLE plugin_products; DROP TABLE node_addition_bounds; DROP TABLE scan_coverage; PRAGMA user_version=3;")
     let restored = try #require(try await f.store.load(scope: f.scope))
     #expect(restored.observations[node]?.addition?.basis == .presentBy)
     #expect(restored.observations[node]?.addition?.upper == evidenceNow)
     #expect(try await f.store.dateEvidence(for: node, asOf: evidenceNow).count == 1)
-    #expect(try f.scalar("PRAGMA user_version") == "4")
+    #expect(try f.scalar("PRAGMA user_version") == "5")
     let backups = try FileManager.default.contentsOfDirectory(at: f.database.deletingLastPathComponent(), includingPropertiesForKeys: nil).filter { $0.lastPathComponent.hasPrefix("catalog-v3-backup-") }
     #expect(backups.count == 1)
 }
@@ -703,7 +777,7 @@ private let evidenceNow = Date(timeIntervalSince1970: 400)
             #expect(try f.scalar("SELECT count(*) FROM sqlite_master WHERE name='scan_coverage'") == "0")
         } else {
             #expect(try await f.store.dateEvidence(for: "legacy", asOf: evidenceNow) == [event])
-            #expect(try f.scalar("PRAGMA user_version") == "4")
+            #expect(try f.scalar("PRAGMA user_version") == "5")
         }
     }
 }

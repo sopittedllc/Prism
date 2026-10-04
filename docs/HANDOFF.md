@@ -1,4 +1,4 @@
-# Prism development handoff — 2026-10-03
+# Prism development handoff — 2026-10-04
 
 This is a portable checkpoint for continuing on a Mac without the external
 Samples drive. The project is a native macOS Swift package and AppKit preview,
@@ -17,7 +17,8 @@ acceptance criterion remains open.
   show incomplete/unavailable scope, and preserve stale catalog history when a
   volume is offline.
 - The native browser has Plugins, Samples and Libraries, name/tag search,
-  column sorting, hierarchy, contextual details, source labels, local settings,
+  sortable Tags, Date added and Last used columns, hierarchy, a compact Your Sound
+  inspector, local settings,
   editable tags/metadata with Undo, and measured size where available. Plugin
   formats and installations can be reviewed and moved to Trash with identity
   checks. Sample/library removal is not implemented. Sizes are observations,
@@ -25,10 +26,12 @@ acceptance criterion remains open.
 - The app preview was renamed Prism and packages the supplied logo. Settings
   persist Light (default), Dark or Match system appearance. Compact setup and
   inspector tag pills support keyboard interaction; category-scoped scans keep
-  other categories visible. Plugin products group installed formats. Date added
-  distinguishes a known exact day from **By** (present no later than that day)
-  and **During** (appeared between observations); neither label turns first
-  discovery into a proven original acquisition date.
+  other categories visible. Schema v5 stores one durable plugin product with
+  subordinate formats, one tag owner and retained qualified dates/use. Plugin
+  Date added uses the earliest qualified Finder file-location date, falling back
+  to confirmed addition; it is not an installation claim. The normal inspector
+  has no Show Details history wall. First indexed and observed arrival remain
+  separate evidence in Scan details/model history.
 - Catalog inventory, setup, tags and immutable date evidence persist locally.
   Recorded package receipts can support a labeled installation/update date;
   first discovery is separate; original Date added remains unknown without a
@@ -49,7 +52,7 @@ lineage or that an old event belongs to a copied bundle.
 | Host | Admitted plugin evidence | Important limit |
 | --- | --- | --- |
 | Ableton Live 12.4.5/12.4.6 | Completed VST3 document restore; separately, manual create with matching Going-to-create, successful processor load, and Created records, bound by exact VST3 class/cache identity. Native Pro-Q 4 create/delete-before-save control passed. | No arbitrary Live version, player instrument, sample, audible output or universal history claim. Startup load chatter and failed restores are excluded. |
-| Cubase 15.0.30 | VST3 Add candidate promoted only after project activation and successful Project Status: Load in Usage Logger, with exact cache tuple/path binding. Scan-only control was negative. | Native manual Add/Remove occurred on a disposable track, but Add has no proven plugin-instance success token; manual use is not admitted. Logging may be disabled or unavailable. |
+| Cubase Pro 15.0.5.121 | Native keyed VST3 Add candidates promoted only after matching project activation and successful keyed Project Status: Load in Usage Logger, with exact cache tuple/path binding. The before/after saved Glow reopen capture parsed as zero/one qualified use. Older flattened fixtures remain supported separately. | Native manual Add/Remove occurred on a disposable track, but Add has no proven plugin-instance success token; manual use is not admitted. Logging may be disabled or unavailable. Native grammar is qualified only for this captured version. |
 | Logic Pro | Current mixer accessibility observation of an AU plugin group with bypass/open controls, persisted as an observed-use event. | Polling/AX observation can miss brief use; coverage is limited to exposed mixer controls. There is no guaranteed instantiation event stream or full historical Logic project coverage. Requires Accessibility. |
 | Pro Tools 24.10.2 | AAX Host Instantiate candidates within a completed session restore, source-local clock v2 and exact unique installed-AAX name binding. Full native restore of Pro-Q 4, Kontakt 8 and Diva passed parse, store/reopen and presentation checks. | Name binding is product association, not a stable plugin ID. Startup failure and host-internal AudioInjection remain excluded/unbound. Native manual Pro-Q 4 insert then FreePlugIn on a temporary track was visually confirmed, but had no distinct completion token and is not admitted. Legacy v1 dates remain readable history but cannot set Last used. |
 
@@ -63,6 +66,16 @@ Kontakt library candidate nor project modification time may be promoted to
 instrument usage. Other player-specific instruments remain open.
 
 ## Evidence and limits on this checkpoint
+
+Continuation on the second Mac found that actual Cubase Pro 15.0.5.121 reports use
+keyed children and numeric report IDs, while the old parser expected flattened fields.
+The saved Glow reopen control now parses and survives isolated catalog replay/reopen.
+Cubase/Logic absolute dates use the viewer's local calendar day and later instants win
+same-day ties; Live/Pro Tools civil clocks remain unchanged. The continuation suite
+passed 233 tests; an earlier pre-existing randomized Live test failure passed on rerun.
+See [the repair plan](../.work/active/cubase-native-restore.md) and
+`.workflow/evidence/cubase-native-restore/task.json` for recorded gates, including the
+required user check of the packaged preview. The parent task remains open.
 
 The last pre-handoff configured run recorded **226 passing generic Swift tests**,
 a release build, app packaging, and a separate opt-in native Pro Tools restore-v2

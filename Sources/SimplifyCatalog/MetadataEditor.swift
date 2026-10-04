@@ -16,7 +16,7 @@ import SimplifyCore
     private var target: Asset { targets[max(0, installationMenu.indexOfSelectedItem)] }
     public init(model: CatalogModel, node: CatalogOutlineNode) {
         self.model = model; self.node = node
-        targets = node.kind == .plugin ? (node.asset.flatMap(model.product)?.installations ?? [node.asset!]) : [node.asset!]
+        targets = [node.asset!]
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 660, height: node.kind == .sample ? 620 : 500), styleMask: [.titled], backing: .buffered, defer: false)
         window.title = "Edit musical metadata"; window.isReleasedWhenClosed = false
         super.init(window: window)

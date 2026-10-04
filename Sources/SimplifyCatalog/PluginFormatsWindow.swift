@@ -12,6 +12,7 @@ import SimplifyCore
     public private(set) var results: [PluginRemovalResult] = []
     public private(set) var isWorking = false
     public private(set) var installerLabels: [NSTextField] = []
+    public private(set) var finderButtons: [NSButton] = []
     private let model: CatalogModel
     private let message = label("", size: 12, secondary: true)
     private let summary = label("", size: 12, secondary: true)
@@ -39,11 +40,17 @@ import SimplifyCore
             toggle.setAccessibilityLabel("Remove " + PluginProduct.formatName(installation.format) + " at " + installation.path)
             choices.append(toggle)
             let path = label(installation.path, size: 11, secondary: true); path.maximumNumberOfLines = 2; path.lineBreakMode = .byTruncatingMiddle; path.toolTip = installation.path; path.isSelectable = true
-            let receipt = label(model.installerRecordDetail(installation), size: 11, secondary: true)
+            let finder = NSButton(title: "Show in Finder", target: self, action: #selector(revealInstallation(_:)))
+            finder.tag = index; finder.bezelStyle = .rounded; finder.controlSize = .small
+            finder.toolTip = installation.path
+            finder.setAccessibilityLabel("Show " + PluginProduct.formatName(installation.format) + " in Finder")
+            finderButtons.append(finder)
+            let receipt = label("", size: 11, secondary: true)
             receipt.isSelectable = true; installerLabels.append(receipt)
-            let row = column([toggle, receipt, path], spacing: 4); rows.addArrangedSubview(row)
+            let location = NSStackView(views: [path, finder]); location.spacing = 8
+            let row = column([toggle, receipt, location], spacing: 4); rows.addArrangedSubview(row)
             row.widthAnchor.constraint(equalTo: rows.widthAnchor).isActive = true
-            for view in [toggle, receipt, path] { view.widthAnchor.constraint(equalTo: row.widthAnchor).isActive = true; view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal) }
+            for view in [toggle, receipt, location] { view.widthAnchor.constraint(equalTo: row.widthAnchor).isActive = true; view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal) }
         }
         selectedButton.target = self; selectedButton.action = #selector(reviewSelected); selectedButton.bezelStyle = .rounded
         allButton.target = self; allButton.action = #selector(reviewAll); allButton.bezelStyle = .rounded
@@ -59,7 +66,8 @@ import SimplifyCore
     /// Keep an open review sheet consistent with async evidence refresh/invalidation.
     public func refreshInstallerRecords() {
         for (index, installation) in product.installations.enumerated() {
-            installerLabels[index].stringValue = model.additionDate(installation, grouped: false).detail + "\n" + model.installerRecordDetail(installation)
+            installerLabels[index].stringValue = "Size: " + model.pluginSize(installation, grouped: false).value
+                + (installation.catalogStale == true ? " · Not observed in latest scan" : "")
             installerLabels[index].setAccessibilityLabel(PluginProduct.formatName(installation.format) + ". " + installerLabels[index].stringValue)
         }
     }
@@ -116,4 +124,8 @@ import SimplifyCore
         }
     }
     @objc public func closeSheet() { guard !isWorking, let window else { return }; window.sheetParent?.endSheet(window) }
+    @objc private func revealInstallation(_ sender: NSButton) {
+        guard product.installations.indices.contains(sender.tag) else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: product.installations[sender.tag].path)])
+    }
 }

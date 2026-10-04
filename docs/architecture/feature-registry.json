@@ -673,7 +673,7 @@
         },
         "accessibility": {
           "decision": "included",
-          "reason": "Cached/stale/errors use existing native status and inspector text; no new custom controls."
+          "reason": "Cached/stale/errors use existing native status and inspector text. Measured plugin logical bytes and grouped Partial/Unknown coverage appear in row, inspector and format details; no new custom controls."
         },
         "privacy": {
           "decision": "included",
@@ -1033,7 +1033,7 @@
         },
         "migration": {
           "decision": "included",
-          "reason": "SQLite v1/v2/v3 to v4 uses a writer reservation, verified pre-migration backup and atomic migration; unsupported versions remain untouched. Schema4 adds exact-root scan coverage and node addition bounds; legacy first_seen projects only as a present-by upper bound. Receipt provenance remains additive and legacy records decode with nil provenance. Optional hostUsage provenance is additive; legacy records decode nil. Source-local clock components never populate absolute eventDate."
+          "reason": "SQLite v1-v4 migrates transactionally to v5 with a verified pre-migration backup. Existing source-bound evidence and exact-root scan bounds remain intact; future versions remain untouched."
         },
         "undo": {
           "decision": "excluded",
@@ -1053,7 +1053,7 @@
         },
         "accessibility": {
           "decision": "included",
-          "reason": "Date added and Last used cells/inspector expose precision, product-class scope, format coverage, saved/checking/unavailable/partial states and sort semantics."
+          "reason": "One short qualified Date added and Last used value appears per sound. Finder Date Added covers physical plugins, samples, libraries and exact instruments when available; historical plugin dates and valid use persist on the canonical product. Unknown and saved values are labeled without an inspector history wall."
         },
         "privacy": {
           "decision": "included",
@@ -1066,6 +1066,62 @@
         "export_import": {
           "decision": "included",
           "reason": "Existing consistent local SQLite backup includes the ledger and optional receipt provenance; no import/merge feature. Optional host provenance and addition bounds are included in the same backup."
+        }
+      }
+    },
+    {
+      "id": "catalog.plugin_products",
+      "value_type": "object",
+      "default": {},
+      "introduced_in": 5,
+      "policies": {
+        "preset": {
+          "decision": "excluded",
+          "reason": "Inventory is not an audio preset; no preset serializer."
+        },
+        "project_persistence": {
+          "decision": "excluded",
+          "reason": "Local application catalog, never a DAW project."
+        },
+        "default_reset": {
+          "decision": "included",
+          "reason": "Empty on first run. Session Reset does not delete the durable catalog."
+        },
+        "migration": {
+          "decision": "included",
+          "reason": "Schema v5 transactionally migrates v1-v4 physical plugin rows to one durable product with subordinate format installations; a verified pre-migration backup preserves source data and unknown future versions remain untouched."
+        },
+        "undo": {
+          "decision": "included",
+          "reason": "One product-owned user tag edit is durable and undoable; physical format evidence remains immutable."
+        },
+        "automation": {
+          "decision": "excluded",
+          "reason": "Store API is internal to scan/restore, no external automation commands."
+        },
+        "copy_paste": {
+          "decision": "excluded",
+          "reason": "No structured catalog clipboard; existing selectable text only."
+        },
+        "sync": {
+          "decision": "excluded",
+          "reason": "Local storage only; no account or synchronization."
+        },
+        "accessibility": {
+          "decision": "included",
+          "reason": "One canonical product row shows tags, qualified Date added and Last used, and measured size; Manage formats exposes physical paths and removal actions."
+        },
+        "privacy": {
+          "decision": "included",
+          "reason": "0700 catalog directory and 0600 database, local paths only, no network transmission."
+        },
+        "analytics": {
+          "decision": "excluded",
+          "reason": "No telemetry collected."
+        },
+        "export_import": {
+          "decision": "included",
+          "reason": "Consistent local SQLite backup API; no import/merge UI yet."
         }
       }
     }

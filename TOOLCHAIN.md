@@ -64,6 +64,12 @@ It requires the private capture and matching installed AAX controls, but does
 not launch Pro Tools; `PRISM_PROTOOLS_RESTORE_FIXTURE_DIR` may point to a copied private
 capture directory. Generic `swift test` does not enable this check.
 
+`cubase-native-restore-runtime` runs `env PRISM_CUBASE_NATIVE_RESTORE_RUNTIME=1 swift test --filter nativeCubaseRestoreRuntime`.
+This opt-in check reads private before/after saved-reopen captures and the current
+Cubase VST3 cache. It requires an exact one-class Glow binding and leaves the user
+catalog, installed plugins, and Cubase untouched. Generic tests skip the private
+check when the environment variable is absent.
+
 `PRISM_KONTAKT_TABLE_RUNTIME=1` enables separate private Kontakt state/table
 controls. The Accordion manifest-binding check additionally requires
 `PRISM_KONTAKT_MANIFEST_PATH` set to a local `Accordion.nicnt`; without it the

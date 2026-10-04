@@ -54,6 +54,17 @@ public struct MusicalMetadata: Codable, Sendable, Equatable {
     /// Suggestions are local label evidence, never claims about a loaded patch.
     public static func suggested(name: String, tags: [String], kind: AssetKind) -> Self {
         let text = MusicalSearch.normalized(([name] + tags).joined(separator: " "))
+        let padded = " " + text + " "
+        var result = Self()
+        for facet in fields(for: kind) {
+            let values = (suggestionVocabulary[facet] ?? []).compactMap { value, needle in
+                padded.contains(" " + needle + " ") || padded.contains(" " + needle + "s ") ? value : nil
+            }
+            if !values.isEmpty { result[facet] = values }
+        }
+        return result
+    }
+    private static let suggestionVocabulary: [MusicalFacet: [(String, String)]] = {
         let vocabulary: [MusicalFacet: [String]] = [
             .instrument: ["accordion", "banjo", "guitar", "piano", "organ", "violin", "viola", "cello", "bass", "strings", "brass", "woodwinds", "flute", "clarinet", "oboe", "bassoon", "trumpet", "trombone", "tuba", "horn", "percussion", "drums", "choir", "vocal", "synth", "harp", "mandolin", "ukulele"],
             .technique: ["legato", "sustain", "staccato", "spiccato", "pizzicato", "tremolo", "trill", "muted", "sul ponticello", "sul tasto", "marcato"],
@@ -63,17 +74,8 @@ public struct MusicalMetadata: Codable, Sendable, Equatable {
             .sampleType: ["loop", "one shot", "phrase"],
             .function: ["eq", "equalizer", "reverb", "delay", "compressor", "limiter", "saturation", "distortion", "filter"]
         ]
-        var result = Self()
-        for facet in fields(for: kind) {
-            let values = (vocabulary[facet] ?? []).filter { value in
-                let needle = MusicalSearch.normalized(value)
-                return (" " + text + " ").contains(" " + needle + " ")
-                    || (" " + text + " ").contains(" " + needle + "s ")
-            }
-            if !values.isEmpty { result[facet] = values }
-        }
-        return result
-    }
+        return vocabulary.mapValues { $0.map { ($0, MusicalSearch.normalized($0)) } }
+    }()
     private static func fields(for kind: AssetKind) -> [MusicalFacet] { MusicalFacet.fields(for: kind) }
 }
 
@@ -91,6 +93,25 @@ public enum MusicalSearch {
             if term.allSatisfy(\.isNumber) || term.count == 1 { return words.contains(term) }
             return haystack.contains(term)
         }
+    }
+}
+
+/// Presentation only: tag identity, search, and saved metadata retain their original spelling.
+public enum MusicalTagDisplay {
+    private static let acronyms: Set<String> = ["BPM", "MIDI", "FX", "EQ", "EDM", "DAW", "VST", "AU", "AAX", "CLAP"]
+
+    public static func title(_ value: String) -> String {
+        value.split(separator: " ", omittingEmptySubsequences: false).map { phrase in
+            phrase.split(separator: "-", omittingEmptySubsequences: false).map { part in
+                let word = String(part)
+                guard let first = word.first else { return word }
+                let upper = word.uppercased()
+                if acronyms.contains(upper) { return upper }
+                // Existing mixed case includes key notation such as F#m and product names.
+                if word.dropFirst().contains(where: \.isUppercase) && upper != word { return word }
+                return first.uppercased() + word.dropFirst().lowercased()
+            }.joined(separator: "-")
+        }.joined(separator: " ")
     }
 }
 

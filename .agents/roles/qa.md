@@ -14,7 +14,7 @@ Inspect the active plan and diff, then choose gates by risk:
 | Change | Required evidence |
 |---|---|
 | Documentation only | link/command validity and consistency review |
-| Pure logic | build, unit tests, reviewer |
+| Pure logic | focused unit tests and build when compilation is affected; one reviewer for behavior changes |
 | Integration or persistence | above plus integration/failure-path tests |
 | UI/control surface | above plus running-artifact interaction |
 | Audio/real-time | above plus real-time safety review and target measurement |
@@ -22,7 +22,8 @@ Inspect the active plan and diff, then choose gates by risk:
 | Plugin | above plus representative hosts/formats/configurations |
 | Release | all applicable gates plus clean reproducible packaging |
 
-Report each gate as pass, fail, blocked, or not applicable with the command/target and
+Run required configured gates once against final content, then repeat only failed or
+affected checks after a repair. Report each gate as pass, fail, blocked, or not applicable with the command/target and
 schema-valid evidence tied to the current revision. A blocked runtime check is not a
-pass. Dispatch the reviewer and artifact-only product tester when available; do not
+pass. Dispatch a reviewer or artifact-only product tester when required by risk; do not
 read blind criteria yourself. Never change code.

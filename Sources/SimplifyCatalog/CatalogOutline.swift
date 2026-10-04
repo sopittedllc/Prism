@@ -15,27 +15,33 @@ import SimplifyCore
     public let children: [CatalogOutlineNode]
     public let searchText: String
     public let metadataOnlyMatch: Bool
+    public let pluginSizeBytes: Int?
+    public let pluginSizeLabel: String?
     public var stale: Bool { asset?.catalogStale == true || instrument?.catalogStale == true }
     public var initiallyExpanded: Bool { kind == .maker || kind == .unidentified || kind == .root }
     public var isGroup: Bool { kind == .maker || kind == .unidentified || kind == .root || kind == .folder }
     public var displayName: String { title + (stale ? " · Not observed" : "") }
     public var sizeText: String {
         if kind == .instrument { return "Shared with library" }
-        if kind == .library || kind == .plugin { return "Not measured" }
+        if kind == .library { return asset?.logicalBytes.map { ByteCountFormatter.string(fromByteCount: Int64($0), countStyle: .file) } ?? "Not measured" }
+        if kind == .plugin { return pluginSizeLabel ?? "Unknown" }
         return asset?.logicalBytes.map { ByteCountFormatter.string(fromByteCount: Int64($0), countStyle: .file) } ?? "—"
     }
     init(id: String, locatorKey: String? = nil, kind: Kind, title: String, breadcrumb: [String],
          location: String? = nil, asset: Asset? = nil, instrument: LibraryInstrument? = nil,
-         children: [CatalogOutlineNode] = [], searchText: String = "", metadataOnlyMatch: Bool = false) {
+         children: [CatalogOutlineNode] = [], searchText: String = "", metadataOnlyMatch: Bool = false,
+         pluginSizeBytes: Int? = nil, pluginSizeLabel: String? = nil) {
         self.id = id; self.locatorKey = locatorKey ?? id; self.kind = kind; self.title = title
         self.breadcrumb = breadcrumb; self.location = location; self.asset = asset
         self.instrument = instrument; self.children = children; self.searchText = searchText
         self.metadataOnlyMatch = metadataOnlyMatch
+        self.pluginSizeBytes = pluginSizeBytes; self.pluginSizeLabel = pluginSizeLabel
     }
     func replacingChildren(_ children: [CatalogOutlineNode], metadataOnly: Bool = false) -> CatalogOutlineNode {
         CatalogOutlineNode(id: id, locatorKey: locatorKey, kind: kind, title: title, breadcrumb: breadcrumb,
                            location: location, asset: asset, instrument: instrument, children: children,
-                           searchText: searchText, metadataOnlyMatch: metadataOnly)
+                           searchText: searchText, metadataOnlyMatch: metadataOnly,
+                           pluginSizeBytes: pluginSizeBytes, pluginSizeLabel: pluginSizeLabel)
     }
 }
 
@@ -57,15 +63,18 @@ import SimplifyCore
     }
     public static func build(assets: [Asset], category: AssetKind, sampleRoots: [URL] = [],
                              sort: CatalogSort = .name, reversed: Bool = false, recency: [String: Date] = [:], additions: [String: AdditionDateEvidence] = [:], usageDays: [String: String] = [:],
-                             formats: [String: String] = [:], pluginProductIDs: [String: String] = [:]) -> CatalogOutline {
+                             formats: [String: String] = [:], pluginProductIDs: [String: String] = [:], pluginNames: [String: String] = [:],
+                             pluginSizes: [String: PluginSizePresentation] = [:], tags: [String: String] = [:]) -> CatalogOutline {
         func ordered(_ values: [CatalogOutlineNode]) -> [CatalogOutlineNode] {
-            values.sorted { CatalogOrdering.precedes($0, $1, sort: sort, reversed: reversed, dates: recency, formats: formats, additions: additions, usageDays: usageDays) }
+            values.sorted { CatalogOrdering.precedes($0, $1, sort: sort, reversed: reversed, dates: recency, formats: formats, additions: additions, usageDays: usageDays, tags: tags) }
         }
         let assets = assets.filter { $0.kind == category }
         if category == .plugin {
             return CatalogOutline(roots: ordered(assets.map {
-                CatalogOutlineNode(id: key(["plugin", pluginProductIDs[$0.path] ?? $0.selectionKey]), kind: .plugin, title: $0.name,
-                                   breadcrumb: [$0.name], location: $0.path, asset: $0)
+                CatalogOutlineNode(id: key(["plugin", pluginProductIDs[$0.path] ?? $0.selectionKey]), kind: .plugin, title: pluginNames[$0.path] ?? $0.name,
+                                   breadcrumb: [pluginNames[$0.path] ?? $0.name], location: $0.path, asset: $0,
+                                   pluginSizeBytes: pluginSizes[$0.path]?.completeBytes,
+                                   pluginSizeLabel: pluginSizes[$0.path]?.value)
             }))
         }
         if category == .library {
@@ -94,12 +103,18 @@ import SimplifyCore
                     searchText: productText)
                 groups[groupID, default: []].append(library); groupNames[groupID] = groupName
             }
-            return CatalogOutline(roots: ordered(groups.map { id, items in
+            let hierarchy = CatalogOutline(roots: ordered(groups.map { id, items in
                 let title = groupNames[id]!
                 return CatalogOutlineNode(id: id, kind: items.first?.asset?.libraryMetadata?.identity.map {
                     $0.evidence == .manifest || $0.evidence == .vendorCatalog ? .maker : .unidentified
                 } ?? .unidentified, title: title, breadcrumb: [title], children: ordered(items))
             }))
+            if sort == .tags || sort == .installed {
+                return CatalogOutline(roots: ordered(hierarchy.nodes.filter {
+                    $0.kind == .instrument || ($0.kind == .library && $0.children.isEmpty)
+                }))
+            }
+            return hierarchy
         }
         final class Folder {
             let path: String
@@ -151,9 +166,13 @@ import SimplifyCore
                 title: title, breadcrumb: breadcrumb, location: folder.path, children: ordered(subfolders + files),
                 searchText: root)
         }
-        return CatalogOutline(roots: ordered(folders.map { node($0.value, root: $0.key, context: [], isRoot: true) }))
+        let hierarchy = CatalogOutline(roots: ordered(folders.map { node($0.value, root: $0.key, context: [], isRoot: true) }))
+        if sort == .tags || sort == .installed {
+            return CatalogOutline(roots: ordered(hierarchy.nodes.filter { $0.kind == .sample }))
+        }
+        return hierarchy
     }
-    public func filtered(query: String, sort: CatalogSort = .name, reversed: Bool = false, recency: [String: Date] = [:], additions: [String: AdditionDateEvidence] = [:], usageDays: [String: String] = [:],
+    public func filtered(query: String, sort: CatalogSort = .name, reversed: Bool = false, recency: [String: Date] = [:], additions: [String: AdditionDateEvidence] = [:], usageDays: [String: String] = [:], tags: [String: String] = [:],
                          pluginMatches: (Asset) -> Bool = { _ in true }, isFiltering: Bool = false,
                          nodeMatches: ((CatalogOutlineNode) -> Bool)? = nil) -> CatalogOutline {
         guard !query.isEmpty || isFiltering else { return self }
@@ -161,7 +180,7 @@ import SimplifyCore
             // Flat results retain their original breadcrumbs and physical locators.
             let results = nodes.filter { $0.kind == .sample && (nodeMatches?($0) ?? MusicalSearch.matches(query, in: $0.searchText)) }
             return CatalogOutline(roots: results.sorted {
-                CatalogOrdering.precedes($0, $1, sort: sort, reversed: reversed, dates: recency, additions: additions, usageDays: usageDays)
+                CatalogOrdering.precedes($0, $1, sort: sort, reversed: reversed, dates: recency, additions: additions, usageDays: usageDays, tags: tags)
             })
         }
         func filter(_ node: CatalogOutlineNode) -> CatalogOutlineNode? {
@@ -237,13 +256,14 @@ import SimplifyCore
 @MainActor enum CatalogOrdering {
     static func precedes<T: Comparable>(title: String, id: String, size: T?, date: Date?, format: String,
         otherTitle: String, otherID: String, otherSize: T?, otherDate: Date?, otherFormat: String,
-        sort: CatalogSort, reversed: Bool, addition: AdditionDateEvidence? = nil, otherAddition: AdditionDateEvidence? = nil, usageDay: String? = nil, otherUsageDay: String? = nil) -> Bool {
+        sort: CatalogSort, reversed: Bool, addition: AdditionDateEvidence? = nil, otherAddition: AdditionDateEvidence? = nil, usageDay: String? = nil, otherUsageDay: String? = nil, tags: String? = nil, otherTags: String? = nil) -> Bool {
         func compare<V: Comparable>(_ a: V?, _ b: V?, ascending: Bool) -> Bool? {
             if a == b { return nil }
             guard let a else { return false }; guard let b else { return true }
             return ascending ? a < b : a > b
         }
         if sort == .recency, let result = compare(usageDay, otherUsageDay, ascending: reversed) { return result }
+        if sort == .tags, let result = compare(tags, otherTags, ascending: !reversed) { return result }
         if sort == .size, let result = compare(size, otherSize, ascending: reversed) { return result }
         if [.recency, .firstFound, .installed].contains(sort), let result = compare(date, otherDate, ascending: reversed) { return result }
         if sort == .installed {
@@ -258,21 +278,22 @@ import SimplifyCore
         return result == .orderedSame ? id < otherID : (sort == .name && reversed ? result == .orderedDescending : result == .orderedAscending)
     }
     static func precedes(_ a: CatalogOutlineNode, _ b: CatalogOutlineNode, sort: CatalogSort, reversed: Bool,
-                         dates: [String: Date], formats: [String: String] = [:], additions: [String: AdditionDateEvidence] = [:], usageDays: [String: String] = [:]) -> Bool {
+                         dates: [String: Date], formats: [String: String] = [:], additions: [String: AdditionDateEvidence] = [:], usageDays: [String: String] = [:], tags: [String: String] = [:]) -> Bool {
         if a.isGroup != b.isGroup { return a.isGroup }
         func format(_ node: CatalogOutlineNode) -> String {
             if let value = formats[node.location ?? ""] { return value }
             if let instrument = node.instrument { return URL(fileURLWithPath: instrument.path).pathExtension.uppercased() }
             return node.asset?.libraryMetadata?.player ?? node.asset?.format.uppercased() ?? ""
         }
-        return precedes(title: a.title, id: a.id, size: a.kind == .sample ? a.asset?.logicalBytes : nil,
-            date: a.isGroup || a.kind == .instrument ? nil : dates[a.location ?? ""], format: format(a),
-            otherTitle: b.title, otherID: b.id, otherSize: b.kind == .sample ? b.asset?.logicalBytes : nil,
-            otherDate: b.isGroup || b.kind == .instrument ? nil : dates[b.location ?? ""], otherFormat: format(b),
+        return precedes(title: a.title, id: a.id, size: a.kind == .sample ? a.asset?.logicalBytes : a.kind == .plugin ? a.pluginSizeBytes : nil,
+            date: a.isGroup ? nil : dates[a.location ?? ""], format: format(a),
+            otherTitle: b.title, otherID: b.id, otherSize: b.kind == .sample ? b.asset?.logicalBytes : b.kind == .plugin ? b.pluginSizeBytes : nil,
+            otherDate: b.isGroup ? nil : dates[b.location ?? ""], otherFormat: format(b),
             sort: a.isGroup ? .name : sort, reversed: a.isGroup && sort != .name ? false : reversed,
-            addition: a.isGroup || a.kind == .instrument ? nil : additions[a.location ?? ""],
-            otherAddition: b.isGroup || b.kind == .instrument ? nil : additions[b.location ?? ""],
+            addition: a.isGroup ? nil : additions[a.location ?? ""],
+            otherAddition: b.isGroup ? nil : additions[b.location ?? ""],
             usageDay: a.kind == .plugin ? usageDays[a.location ?? ""] : nil,
-            otherUsageDay: b.kind == .plugin ? usageDays[b.location ?? ""] : nil)
+            otherUsageDay: b.kind == .plugin ? usageDays[b.location ?? ""] : nil,
+            tags: tags[a.location ?? ""], otherTags: tags[b.location ?? ""])
     }
 }

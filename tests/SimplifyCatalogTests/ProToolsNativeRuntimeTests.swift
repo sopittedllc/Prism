@@ -111,7 +111,7 @@ private struct ProToolsNativeRestoreSummary: Decodable {
         let history = try await CatalogStore(url: isolatedCatalog).latestHostUsage(for: [id], asOf: later)
         #expect(history[Data(id.utf8)] == saved)
         let presentation = UsageDatePresentation(record: saved)
-        #expect(presentation.value == "2026-10-03\nPro Tools local")
+        #expect(presentation.value == "2026-10-03")
         #expect(presentation.detail.contains("Pro Tools session restore"))
         #expect(presentation.detail.contains("time zone unknown"))
     }

@@ -37,7 +37,7 @@ private func sample(_ path: String, bytes: Int = 1) -> Asset {
     let instrument = try #require(tree.nodes.first { $0.title == "Low Winds" })
     #expect(instrument.breadcrumb == ["8Dio", "CAGE Winds", "Low Winds"])
     #expect(instrument.sizeText == "Shared with library")
-    #expect(tree.nodes.filter { $0.kind == .library }.allSatisfy { $0.sizeText == "Not measured" })
+    #expect(tree.nodes.filter { $0.kind == .library }.allSatisfy { $0.sizeText == "17 bytes" })
     #expect(tree.roots.allSatisfy { $0.location == nil })
 }
 

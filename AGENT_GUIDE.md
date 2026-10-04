@@ -7,10 +7,11 @@ Build the user's real workflow, not the fastest visible approximation. Read
 and linkage; it is not evidence that the product works.
 
 **Proven, systemic UI/UX is a project tentpole.** User-facing work follows
-`docs/ui-ux/`. Treat visible defects as potential system defects: inventory every
-semantic peer, repair the governing token/component/pattern, verify all consumers, and
-update the design system and regression suite. When knowledge is missing, research
-current authoritative guidance and at least three comparable use cases before deciding.
+`docs/ui-ux/`. For a bounded fix, inspect the affected semantic peers and verify
+the shared behavior; update design guidance only when its contract changes. Use the
+full UI research and visual matrix for new or materially changed interaction/design
+systems. When that design knowledge is missing, research current authoritative
+guidance and three comparable use cases before deciding.
 
 **Cross-cutting completeness is a project tentpole.** New settings and stateful
 features follow `docs/architecture/STATE_COMPLETENESS.md`. Every state field has one
@@ -34,25 +35,29 @@ plan; verified tool output outranks prose that has become stale.
 
 ## Default workflow
 
-Use the smallest workflow proportionate to the risk. Do not perform ceremony for a
-typo, but do not skip a gate for behavior changes.
+Use one bounded path through the work. A trivial reversible edit (tier 0) needs a
+brief task note, the relevant check, and a self-review. An understood internal
+behavior change (tier 1) needs concise acceptance criteria, focused tests, and one
+fresh read-only code review; do not commission separate research and specification
+critique without a real unknown. A user-facing, architectural, compatibility, or
+real-target change (tier 2) keeps its plan critique, independent review, and
+applicable runtime gate. Tier 3 keeps explicit authority and release review.
 
-1. **Frame** — restate the user outcome and inspect adjacent code/configuration.
-2. **Research** — for unfamiliar domains or third-party APIs, use authoritative
-   sources and record consequential findings in the plan.
-3. **Plan** — for non-trivial work, create `.work/active/<feature>.md` and
-   `.workflow/active-task.json`. A specification critic must pass it. Tiers 0–1
-   proceed autonomously; ask only about unresolved tier-2 product intent.
-4. **Implement** — make the smallest coherent change that meets the approved
-   acceptance criteria. Record discoveries without expanding scope.
-5. **Verify** — run the commands in `TOOLCHAIN.md`; test failure paths and boundaries.
-6. **Review** — use a fresh read-only review pass. Findings cite file and line.
-7. **Runtime validate** — run on the real target for UI, audio, hardware, timing, or
-   integration changes. Ask the user for checks only an available client cannot perform.
-8. **Repair** — a failed gate goes through diagnosis, bounded repair, and downstream
-   regression reruns without asking the user to troubleshoot.
-9. **Close** — `scripts/workflow_gate.py check-complete` must pass. Update durable
-   documents only when warranted. Tier-3 actions still require explicit authority.
+Frame the outcome, inspect only adjacent code and relevant guidance, implement the
+smallest complete change, then run focused tests during development. Run the required
+configured gates once after source and prose are final. Focused repair checks cover
+the failed and affected behavior first; the repository-wide evidence fingerprint may
+still require final gate reruns after any subsequent edit. Diagnose repeated failures
+or scope growth before adding
+agents or expanding the plan. `scripts/workflow_gate.py check-complete` remains the
+final completion check. Ask the user for real GUI checks when only they can perform
+them; use existing smoke coverage and do not build a new GUI harness for one fix.
+
+Use standard speed by default; change speed only when a specific task warrants it.
+Aim to halve elapsed time and account usage on the next three comparable tasks.
+Record only each task's start/end weekly usage-meter reading and elapsed time in its
+handoff, noting that other account activity may affect the meter. This is a target,
+not a promised saving or a new tracking system.
 
 ## Authority and autonomy
 
@@ -61,8 +66,8 @@ external actions. Agents own implementation mechanics and ordinary troubleshooti
 Use `.workflow/policy.json`:
 
 - Tier 0: trivial, reversible changes; autonomous verification.
-- Tier 1: reversible internal behavior; autonomous after research, critique, tests,
-  and independent review.
+- Tier 1: understood reversible internal behavior; autonomous after focused tests
+  and one independent read-only review.
 - Tier 2: user-facing, architectural, compatibility, privacy, or real-target behavior;
   ask only if product intent is materially ambiguous, then verify all applicable gates.
 - Tier 3: publishing, release, upload, credentials, spending, destructive history,
@@ -97,7 +102,10 @@ A valid implementation plan includes:
 - runtime/manual checks;
 - resume notes.
 
-Do not make a plan merely to satisfy process. Keep small work small.
+For tier 0, a task note can be one sentence. For tier 1, use a short plan only when
+needed to hold acceptance criteria or resume state. The full plan contract applies
+to tier 2–3 and genuinely unfamiliar work. Do not make a plan merely to satisfy
+process.
 
 ## Engineering standards
 
@@ -165,11 +173,14 @@ not isolation.
 
 ## Cross-client collaboration
 
-Read `.workflow/collaboration.json` and `docs/CROSS_CLIENT_WORKFLOW.md`. The configured
-primary client coordinates by default; both Claude Code and Codex remain supported.
-Use the other client for specification critique and fresh read-only review when the
-policy requires it. Never allow simultaneous writers in one worktree. A handoff updates
-the active plan, resume notes, and affected-file list before the second client begins.
+Read `.workflow/collaboration.json` and `docs/CROSS_CLIENT_WORKFLOW.md`. One Sol
+driver handles routine coding by default. Use Luna for simple bounded tasks and
+Astra for brief architecture decisions or escalation; do not keep Astra in the
+routine tool and gate loop. Keep one writer per worktree. Delegate only when the
+task benefits from it or a required independent gate needs it. Give a delegate a
+short task-specific handoff: outcome, relevant paths, constraints, current evidence,
+and next action. Do not forward full conversation history by default. Use a single
+concise return handoff. Both Claude Code and Codex remain supported.
 
 Record the acting client and role in plans, critiques, reviews, and manual evidence.
 Cross-client agreement is still model judgment and never substitutes for an objective

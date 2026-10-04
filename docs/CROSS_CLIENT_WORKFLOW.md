@@ -7,28 +7,30 @@ other client. `.workflow/collaboration.json` is the machine-readable source of t
 ## Default sequence
 
 ```text
-primary client frames and plans
+one driver frames and implements
           ↓
-other client critiques the specification
+focused tests during development
           ↓
-primary client implements
+one independent read-only review when required
           ↓
-other client performs a fresh read-only review
-          ↓
-shared deterministic gates verify the result
+final applicable gates and real-target check
 ```
 
-For `balanced`, choose either client as the driver for each task and record that choice
-in the active plan. The other client should critique or review whenever it is
-available. Cross-client review improves independence but never replaces tests,
-runtime validation, or deterministic gates.
+For `balanced`, use a Sol driver for routine coding, Luna for simple bounded work,
+and Astra for brief architecture decisions or escalation. The configured driver may
+complete tier-0 work directly. Tier-1 behavior still gets one fresh read-only code
+review; tier-2/3 work keeps its plan critique and applicable runtime checks. A
+reviewer can be independent without switching clients. Request cross-client review
+when the change or uncertainty benefits from it. Cross-client opinion never replaces
+tests, runtime validation, or deterministic gates.
 
 ## Single-writer rule
 
-Never let Claude and Codex edit the same worktree concurrently. A handoff must leave
-the worktree coherent, update the active plan's resume notes, and identify uncommitted
-files. Parallel read-only research or review is allowed. Use separate Git worktrees if
-two clients must implement independent alternatives.
+Never let Claude and Codex edit the same worktree concurrently. For a transfer, send
+one short task-specific handoff with the outcome, affected files, constraints,
+verified evidence, and next action; identify uncommitted work. Do not copy the full
+conversation into a new agent by default. Parallel read-only review is allowed.
+Use separate Git worktrees for truly independent implementation alternatives.
 
 ## Provenance
 

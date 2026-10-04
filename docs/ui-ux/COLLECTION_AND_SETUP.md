@@ -1,6 +1,6 @@
 # Collection and setup design
 
-The earlier screen stacked navigation, actions, status and details vertically. The replacement gives the collection most space: a compact branded sidebar, list and contextual inspector. Setup uses a single native locations list and an explicit Scan. Samples alone show project recency; plugin/library reference availability remains in the inspector.
+The earlier screen stacked navigation, actions, status and details vertically. The replacement gives the collection most space: a compact branded sidebar, list and contextual inspector. Setup uses a single native locations list and an explicit Scan. Samples alone show project recency; plugin/library history is shown only when a qualified use exists.
 
 Research: [Apple onboarding](https://developer.apple.com/design/human-interface-guidelines/onboarding?changes=_7), [Finder views](https://support.apple.com/en-kg/guide/mac-help/mchldaafb302/mac), [XO sample folders](https://support.xlnaudio.com/hc/en-us/articles/16920660349085-Adding-your-own-samples), [DaisyDisk scan scope](https://daisydiskapp.com/guide/1/en/DisksOverview/). The recurring patterns are brief interactive setup, explicit scan scope, a persistent collection hierarchy, and contextual details. Applying these together is a Simplify design inference, not proof of usability. Official source details and alternatives are in the task research evidence.
 
@@ -34,8 +34,8 @@ files were found or inventing a percentage. No hard I/O timeout is imposed.
 The determinate bar renders the exact numeric percentage without interpolation.
 
 ## Product-level plugins and explicit removal
-Plugin rows represent compatible name/bundle-ID groups, preserving all installed
-formats in the inspector. Unknown/conflicting identities remain separate. Manage
+Plugin rows represent one durable product identified by verified product-specific
+bundle identity, with physical formats as attributes. Unknown/conflicting identities remain separate. Manage
 formats opens a740pt sheet with default Keep choices, selected/all review actions,
 full selectable paths in confirmation, and per-installation failure recovery.
 Only reviewed unchanged plugin bundle directories move to macOS Trash. No automatic
@@ -71,15 +71,15 @@ not enumerated by this presentation layer. Equal root names include a distinguis
 
 Disclosure uses native controls and arrow keys. Rows keep the shared 38pt height and 8pt
 text inset; each depth adds 16pt native indentation. Maker/folder selection describes the
-group; maker groups have no Finder action. Instrument details retain maker/library
+group; maker groups have no Finder action. Instrument rows retain maker/library
 breadcrumb, inherited context tags, exact locator and Unknown usage. Library installed
 size stays Not measured until measured storage accounting lands; instrument size is Shared
 with library. Header ordering applies consistently to sibling rows.
 
 Library search retains only matching instruments and their ancestors; metadata-only library
-hits explicitly say Library tags match and do not invent installed patches. Query text
-is emphasized in names/details. Sample search is flat with a root-relative breadcrumb line; format and details identify audio files.
-sorting applies across roots. Full location remains in details/tooltips. Search has separate
+hits do not invent installed patches. One-letter name prefixes work during typing;
+numeric and typed tag tokens retain exact matching. Sample search is flat with a
+root-relative breadcrumb line and cross-root sorting. Full location remains in Finder tooltips. Search has separate
 navigation state, so no-match → clear and category roundtrips preserve browsing position.
 View state is session-only and resets on a new launch; inventory remains durable.
 
@@ -90,18 +90,17 @@ or sort dropdowns. Names include maker and parent library context; paths and int
 classification prose do not match. Instrument searches require an instrument-local
 name/tag match to avoid promoting unrelated siblings.
 
-Column headers toggle native sort descriptors. Names and formats start ascending;
+Column headers toggle native sort descriptors. Names and Tags start ascending;
 sizes and dates start descending. Unknowns follow known values in both directions.
 Groups stay ahead of children and ties use stable names/identities. Sorting preserves
 selection and expansions. Installed dates remain Unknown until verified; sample Project
 recency is explicitly a modification-time proxy. First observation never fills Installed.
 
-The inspector shows one format subtitle, effective tags, compact lifecycle/size facts,
-necessary library context and availability. Location sits immediately beside Show in
-Finder; full selectable wrapping paths remain visible in a bounded scrolling section. Each
-plugin format has its own path and matching Finder action. No Technical details sheet, duplicate Audio file prose, repeated
-format section or provenance essay. Edit tags opens the existing draft sheet; Undo is
-shown when available. Plugin format management remains available.
+The inspector shows the selected sound, its format subtitle, effective tags, and short
+Last used, Date added, and Size values. Show in Finder serves sample and library items;
+Manage formats keeps every plugin installation's path and Finder action accessible.
+There is no Show Details disclosure or history body. Edit tags opens the existing
+draft sheet; Undo is shown when available.
 
 Tag settings opens a transient popover containing the existing opt-in online preference,
 retry, status and selected-product provenance. No preference semantics change. Sources
@@ -130,12 +129,11 @@ pill reserves a remove button revealed on hover or keyboard focus. A trailing + 
 single-tag category/value draft. Add and removal persist immediately, with one Undo.
 The advanced field editor lives in Tag settings for restoring suggestions.
 
-Plugin pills show a category/value union across current formats. Each add/remove changes
-only that tag in each applicable installation's own effective category. All writes and
-Undo are atomic, preserve unrelated differences, and retain explicit empty arrays to
-suppress suggestions. Failure leaves data and Undo unchanged. No-op formats keep their
-suggestion behavior. Scope is disclosed in tooltips and the Add draft. Future formats
-are not promised propagation. No files are removed by a tag action.
+Plugin pills show one product-owned tag set, including canonical suggestions from all
+current formats. Each add/remove writes the product once and has one Undo. Explicit
+empty overrides suppress suggestions. The same tags drive the visible Tags column,
+alphabetical sort, and search, including after a new format or restart. No files are
+removed by a tag action.
 
 ## Settings and appearance
 Sidebar Settings… and application-menu Settings… (Command-comma) open the same sheet.
@@ -164,20 +162,14 @@ Soundtoys grouping recognizes verified com.soundtoys.<format>.<product> identiti
 keeping Deluxe, version and publisher differences separate.
 
 
-## Installer-record date presentation
-Plugin tables label the date column **Installer record**. Samples/libraries label their
-independent unknown acquisition field **Date added**. Header clicks sort actual event
-times newest/oldest with unknowns last. Grouped plugins show the latest typed receipt
-among exact constituent installations; the inspector states the winning format and
-Records for X of Y installations. Equal dates resolve by exact node/source/event bytes.
-Date added and Last used remain independent, with no receipt fallback.
-
-The inspector explains once that a record can describe an install or update. The existing
-format sheet shows each installation's receipt date, package version and selectable
-source ID, and refreshes while open. Cell accessibility describes full dates and coverage;
-partial coverage never depends only on hover/color. Numeric dates follow locale ordering.
-At compact sizes plugin Size and Last used columns share the width adjustment needed
-for the full Installer record header and its sort indicator. The standard38pt rows remain.
+## Qualified dates and product ownership
+The visible Date added column uses a qualified date, never a receipt, scan, birth,
+modification, or use timestamp. Known dates sort first in either direction. Plugin
+product identity, canonical name, tags and earliest qualified date live in one
+durable product row; formats are physical installations below it. The v4→v5
+migration preserves old format evidence and metadata, with a verified backup.
+One product retains its ID, tags, date and valid use history after a format is removed.
+The format sheet concentrates on paths, sizes, availability and reviewed removal.
 
 Atomic background projection reloads after restore, inventory save and receipt collection.
 Known history remains during source checking/failure; incomplete lookup gets explicit
@@ -197,21 +189,34 @@ accessibility labels and compact/light/dark layout; human VoiceOver and older sy
 remain outside this scoped runtime validation.
 
 ### Date added precision (supersedes receipt table column)
-Use Date added in every category. Exact evidence displays a date; observed arrival
-displays During or a two-line range; known presence displays By. Initial inventories
-never look newly acquired. Details explain arrival/return may be a move or restored
-copy and older acquisition may be unknown. Receipt history remains secondary in the
-inspector and per-format sheet. Sort upper bounds, then lower/precision, unknownlast;
-help explicitly distinguishes latest possible addition from actual acquisition order.
-Group bounds use conservative interval arithmetic across every installation. Unknown
-instrument dates never inherit their library/player's date. Shared cells permit two
-lines to keep both range endpoints and qualifiers at1040px. See addition-date-bounds plan.
+For plugins, Date added uses Finder's `kMDItemDateAdded`: the date a file moved into
+its current location. It can differ among formats and does not prove installation.
+Show the earliest available Finder date ever qualified for the product, tied to its
+exact installation when recorded; if unavailable, retain a confirmed addition record
+when one exists. Never substitute birth, modification, scan, receipt or use time.
+The selected summary shows one date with source explanation in accessibility text.
+Unknown dates sort last in either direction. Physically located samples, libraries
+and instruments also use their own available Finder Date Added; virtual/shared
+entities remain Unknown. First indexed, observed arrival and receipt records remain
+separate internal evidence, not inspector prose.
+Instruments never inherit their library/player's date. Apple defines the Finder
+metadata as the date moved into the current location and notes that it may be
+absent: [kMDItemDateAdded](https://developer.apple.com/documentation/coreservices/kmditemdateadded).
 
-### Last used with a DAW-local clock
-Qualified Live VST3 completed session restores display the reported calendar date and
-DAW local on two lines. Details identify the host, unknown timezone, product-class
-scope, partial coverage and saved history. Never interpret this civil timestamp in the
-current Mac timezone. Plugin Last used sorts reported calendar days, unknown last in
+Plugin bundles in AU, VST2, VST3, AAX and CLAP use bounded metadata-only logical-byte
+measurement. A grouped product shows a complete total only when every installation
+was measured; otherwise the row says Partial or Unknown and the inspector qualifies
+any known subtotal. Saved catalogs retain the last measured value with a saved-state
+qualifier. These values do not claim reclaimable physical disk space. Library size
+remains Not measured and instrument size remains Shared with library.
+
+### Last used with host-qualified clocks
+Qualified host use displays the calendar date alone. Accessibility text identifies the host and source clock limits. Never interpret this civil timestamp in the
+current Mac timezone. Pro Tools likewise retains its source-local civil day. Cubase
+and Logic report absolute instants; show their Gregorian day in this Mac's local
+display timezone. Within Cubase or Logic, later instants win same-day ties. Across
+host families, retain stable family priority because civil clocks are incomparable.
+Plugin Last used sorts these calendar days, unknown last in
 both directions; sample Project recency remains explicitly separate. Instrument and
 library usage never inherit player use. Usage unknown filters only rows without
 qualified positive history; it is not an inactivity or safe-removal filter.

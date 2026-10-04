@@ -17,14 +17,16 @@ Two primary jobs govern the interface: reclaim storage from infrequently used co
 and discover recently added content or a specific instrument already in the collection.
 Libraries browse as maker → library → instrument, while Individual Samples mirrors the
 chosen folder trees. Library footprint belongs to the whole installed library, not each
-patch. Tags are inherited with durable editable user overrides. The researched redesign
-contract is [.work/active/library-catalog-redesign.md](.work/active/library-catalog-redesign.md);
-its proposed implementation remains outstanding.
+patch. Tags are inherited with durable editable user overrides. The current basic
+catalog contract is [.work/active/catalog-basics-product-model.md](.work/active/catalog-basics-product-model.md):
+one durable plugin product owns its formats, tags, and qualified history. Missing
+source data stays Unknown; broader host and individual-sound usage gates remain open.
 
 1. Discover installed plugins and choose one or more sample and library folders,
    including local Splice downloads and external drives.
-2. Browse Plugins, Samples, and Libraries; filter by type, maker, player, and location.
-3. Sort by referencing-project recency and size. Unknown coverage stays visibly unknown.
+2. Browse Plugins, Individual Samples, and Libraries; search names and tags.
+3. Sort sounds by Tags, Date added, Last used, size, or name. Sample project recency
+   remains a separately labeled reference proxy. Unknown coverage stays visible.
 4. Review selected files and dependencies before removing unwanted items.
 5. Routinely detect additions and offer a batched classification queue, with manual
    tags or optional web-assisted metadata suggestions.

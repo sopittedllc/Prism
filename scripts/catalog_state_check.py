@@ -34,5 +34,5 @@ assert set(expected_catalog) == set(actual_catalog)
 for key in expected_catalog:
     for field in ('value_type', 'default', 'introduced_in'):
         assert expected_catalog[key][field] == actual_catalog[key][field]
-assert native['catalog_schema_version'] == 4
+assert native['catalog_schema_version'] == 5
 print('Catalog persistence: PASS (exact IDs/defaults and all cross-cutting decisions)')

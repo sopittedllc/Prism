@@ -39,21 +39,22 @@ import SimplifyCore
     private var tracking: NSTrackingArea?
     public init(facet: MusicalFacet, value: String, editable: Bool, scope: String, remove: @escaping () -> Void) {
         self.facet = facet; self.value = value; self.remove = remove
-        title = NSTextField(labelWithString: value)
+        let display = MusicalTagDisplay.title(value)
+        title = NSTextField(labelWithString: display)
         super.init(frame: .zero)
         wantsLayer = true; layer?.cornerRadius = 12
         title.font = .systemFont(ofSize: 11, weight: .medium); title.lineBreakMode = .byTruncatingTail
-        toolTip = facet.title + ": " + value + (scope.isEmpty ? "" : " · " + scope)
-        title.setAccessibilityLabel(facet.title + ": " + value)
+        toolTip = facet.title + ": " + display + (scope.isEmpty ? "" : " · " + scope)
+        title.setAccessibilityLabel(facet.title + ": " + display)
         removeButton.isBordered = false; removeButton.image = NSImage(systemSymbolName: "xmark", accessibilityDescription: nil)
         removeButton.imageScaling = .scaleProportionallyDown; removeButton.isEnabled = editable
         removeButton.target = self; removeButton.action = #selector(removeTag)
-        removeButton.setAccessibilityLabel("Remove " + value + ", " + facet.title + (scope.isEmpty ? "" : ", from all installed formats"))
+        removeButton.setAccessibilityLabel("Remove " + display + ", " + facet.title + (scope.isEmpty ? "" : ", from all installed formats"))
         addSubview(title); addSubview(removeButton)
         updateColor()
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
-    public override var intrinsicContentSize: NSSize { NSSize(width: min(228, ceil((value as NSString).size(withAttributes: [.font: title.font!]).width) + 56), height: 25) }
+    public override var intrinsicContentSize: NSSize { NSSize(width: min(228, ceil((title.stringValue as NSString).size(withAttributes: [.font: title.font!]).width) + 56), height: 25) }
     public override func layout() {
         super.layout()
         title.frame = NSRect(x: 10, y: 5, width: max(0, bounds.width - 34), height: 15)

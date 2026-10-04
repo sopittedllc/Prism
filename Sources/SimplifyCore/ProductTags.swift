@@ -153,14 +153,25 @@ public enum ProductTagClient {
 
 public actor ProductTagStore {
     public let url: URL
-    private struct Envelope: Codable { let version: Int; let records: [ProductTagRecord] }
+    private struct Envelope: Codable {
+        let version: Int
+        let records: [ProductTagRecord]
+        let failures: [String: Date]?
+    }
     public init(url: URL) { self.url = url }
-    public func load() throws -> [String: ProductTagRecord] {
-        guard FileManager.default.fileExists(atPath: url.path) else { return [:] }
+    private func envelope() throws -> Envelope? {
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
         guard LibraryMetadataReader.safe(url),
               let data = try? BoundedFile.read(url, limit: 262_144),
               let envelope = try? JSONDecoder().decode(Envelope.self, from: data), envelope.version == 1,
-              envelope.records.count <= 64 else { throw ProductTagError.invalidCache }
+              envelope.records.count <= 64, (envelope.failures?.count ?? 0) <= 64,
+              (envelope.failures ?? [:]).allSatisfy({ id, date in
+                  ProductTagSources.all.contains { $0.id == id } && date.timeIntervalSince1970 > 0 && date <= Date().addingTimeInterval(300)
+              }) else { throw ProductTagError.invalidCache }
+        return envelope
+    }
+    public func load() throws -> [String: ProductTagRecord] {
+        guard let envelope = try envelope() else { return [:] }
         var result: [String: ProductTagRecord] = [:]
         var seen = Set<String>()
         for record in envelope.records {
@@ -176,15 +187,31 @@ public actor ProductTagStore {
         }
         return result
     }
+    public func recentFailures(asOf date: Date = Date()) throws -> [String: Date] {
+        _ = try load()
+        return (try envelope()?.failures ?? [:]).filter { date.timeIntervalSince($0.value) < 24 * 3600 }
+    }
+    public func markFailure(_ sourceID: String, at date: Date = Date()) throws {
+        let records = try load()
+        guard ProductTagSources.all.contains(where: { $0.id == sourceID }) else { throw ProductTagError.invalidCache }
+        var failures = try envelope()?.failures ?? [:]
+        failures[sourceID] = date
+        try write(Envelope(version: 1, records: records.values.sorted { $0.sourceID < $1.sourceID }, failures: failures))
+    }
     public func save(_ records: [String: ProductTagRecord]) throws {
         _ = try load() // Preserve unreadable/future caches.
         guard records.count <= 64, records.allSatisfy({ key, record in
             key == record.sourceID && record.fetchedAt.timeIntervalSince1970 > 0 && record.fetchedAt <= Date().addingTimeInterval(300) && ProductTagSources.all.contains { $0.id == key && $0.descriptionDigest == record.descriptionDigest }
         }) else { throw ProductTagError.invalidCache }
+        var failures = try envelope()?.failures ?? [:]
+        for id in records.keys { failures.removeValue(forKey: id) }
+        try write(Envelope(version: 1, records: records.values.sorted { $0.sourceID < $1.sourceID }, failures: failures))
+    }
+    private func write(_ envelope: Envelope) throws {
         let parent = url.deletingLastPathComponent()
         try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
         guard LibraryMetadataReader.safe(parent) else { throw ProductTagError.invalidCache }
-        let data = try JSONEncoder().encode(Envelope(version: 1, records: records.values.sorted { $0.sourceID < $1.sourceID }))
+        let data = try JSONEncoder().encode(envelope)
         try data.write(to: url, options: .atomic)
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
     }

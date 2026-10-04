@@ -1,4 +1,5 @@
 import Foundation
+import AppKit
 import CSQLite
 import Darwin
 import Testing
@@ -14,6 +15,104 @@ private final class CatalogFixture {
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try Data(value.utf8).write(to: url); return url
     }
+}
+
+@Test @MainActor func startupRefreshScansEveryConfiguredCategoryOnce() async throws {
+    let f = try CatalogFixture()
+    try f.file("Plugins/Test.vst3/Contents/Info.plist", "<plist><dict><key>CFBundleIdentifier</key><string>example.test</string></dict></plist>")
+    try f.file("Samples/First.wav")
+    let model = CatalogModel(); model.setStandardPlugins(false)
+    model.addRoots([f.root.appendingPathComponent("Plugins")], kind: .plugins)
+    model.addRoots([f.root.appendingPathComponent("Samples")], kind: .samples)
+    model.scan(scannedKinds: [.plugin]); try await finish(model)
+    #expect(model.report?.assets.filter { $0.kind == .sample }.isEmpty == true)
+    model.refreshConfiguredCollectionAfterRestore(); try await finish(model)
+    #expect(model.report?.assets.filter { $0.kind == .sample }.count == 1)
+    #expect(model.report?.assets.filter { $0.kind == .plugin }.count == 1)
+}
+
+@Test @MainActor func tagCapitalizationChangesPresentationOnly() {
+    #expect(MusicalTagDisplay.title("dark warm") == "Dark Warm")
+    #expect(MusicalTagDisplay.title("one-shot") == "One-Shot")
+    #expect(MusicalTagDisplay.title("bpm midi fx") == "BPM MIDI FX")
+    #expect(MusicalTagDisplay.title("c#m F#m Cm LoFi") == "C#m F#m Cm LoFi")
+    let pill = TagPill(facet: .technique, value: "sul ponticello", editable: true, scope: "", remove: {})
+    #expect(pill.value == "sul ponticello")
+    #expect(pill.toolTip?.contains("Sul Ponticello") == true)
+    #expect(pill.removeButton.accessibilityLabel()?.contains("Sul Ponticello") == true)
+    #expect(MusicalSearch.matches("sul ponticello", in: pill.value))
+}
+
+@Test @MainActor func compactInspectorKeepsFormatActionsReachableAtMinimumWindowSize() async throws {
+    let f = try CatalogFixture()
+    for ext in ["component", "vst3", "aaxplugin"] {
+        try f.file("Plugins/Glow.\(ext)/Contents/Info.plist", """
+        <?xml version="1.0"?><plist version="1.0"><dict><key>CFBundleIdentifier</key><string>org.example.glow</string></dict></plist>
+        """)
+    }
+    let model = CatalogModel()
+    model.setStandardPlugins(false)
+    model.addRoots([f.root.appendingPathComponent("Plugins")], kind: .plugins)
+    model.scan(scannedKinds: [.plugin]); try await finish(model)
+    let controller = CatalogWindow(model: model)
+    let window = try #require(controller.window)
+    window.setContentSize(NSSize(width: 1040, height: 680))
+    controller.refresh()
+    controller.table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+    window.contentView?.layoutSubtreeIfNeeded()
+    func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
+    let views = descendants(try #require(window.contentView))
+    #expect(!views.compactMap { $0 as? NSButton }.contains { $0.title == "Show details" })
+    #expect(!controller.formatsButton.isHidden && controller.formatsButton.isEnabled)
+    let content = try #require(window.contentView)
+    #expect(content.bounds.contains(controller.formatsButton.convert(controller.formatsButton.bounds, to: content)))
+    #expect(controller.inspectorSummaryText.contains("Date added   " + model.additionDate(model.pluginProducts[0].representative).value))
+    #expect(controller.inspectorSummaryText.contains("Size   "))
+    let last = try #require(controller.table.tableColumns.firstIndex { $0.identifier.rawValue == "reference" })
+    #expect(controller.table.rect(ofColumn: last).maxX <= controller.table.visibleRect.maxX)
+    controller.showFormats()
+    let sheet = try #require(controller.formatsWindow?.window?.contentView)
+    let finderButtons = descendants(sheet).compactMap { $0 as? NSButton }.filter { $0.title == "Show in Finder" }
+    #expect(finderButtons.count == 3)
+    #expect(finderButtons.allSatisfy { $0.toolTip?.hasPrefix(f.root.path) == true })
+}
+
+@Test @MainActor func flatLibraryDateAndTagSortCountShownInstrumentsAndKeepContext() async throws {
+    let f = try CatalogFixture()
+    try f.file("Libraries/Colors/Colors.nicnt", "<ProductHints><Product><Name>Colors</Name><Company>Example</Company></Product></ProductHints>")
+    try f.file("Libraries/Colors/Violin.nki")
+    let model = CatalogModel(); model.setStandardPlugins(false)
+    model.addRoots([f.root.appendingPathComponent("Libraries")], kind: .libraries)
+    model.scan(scannedKinds: [.library]); try await finish(model)
+    model.category = .library
+    let controller = CatalogWindow(model: model)
+    for sort in [CatalogSort.tags, .installed] {
+        model.sort = sort; controller.refresh()
+        #expect(model.outline.roots.contains { $0.kind == .instrument })
+        func descendants(_ view: NSView) -> [NSView] { [view] + view.subviews.flatMap(descendants) }
+        let labels = descendants(try #require(controller.window?.contentView)).compactMap { ($0 as? NSTextField)?.stringValue }
+        #expect(labels.contains("1 sound"))
+        let instrument = try #require(model.outline.roots.first { $0.kind == .instrument })
+        #expect(instrument.breadcrumb.contains("Colors"))
+        #expect(instrument.breadcrumb.contains("Violin"))
+    }
+}
+
+@Test @MainActor func sampleSearchKeepsNumericExactnessNamePrefixesAndEditedTags() async throws {
+    let f = try CatalogFixture()
+    try f.file("Samples/Percussion 0.wav"); try f.file("Samples/Percussion 10.wav")
+    let catalog = CatalogStore(url: f.root.appendingPathComponent("catalog.sqlite"))
+    let model = CatalogModel(catalogStore: catalog); model.setStandardPlugins(false)
+    model.addRoots([f.root.appendingPathComponent("Samples")], kind: .samples)
+    model.scan(scannedKinds: [.sample]); try await finish(model)
+    model.category = .sample
+    model.query = "p"; #expect(model.outline.roots.count == 2)
+    model.query = "Percussion 0"; #expect(model.outline.roots.count == 1)
+    let sample = try #require(model.report?.assets.first { $0.name == "Percussion 0" })
+    try await model.saveMetadata(MusicalMetadata(fields: ["character": ["airy"]]), subject: try #require(model.subject(asset: sample)))
+    model.query = "airy"; #expect(model.outline.roots.count == 1)
+    try await model.undoMetadata()
+    model.query = "airy"; #expect(model.outline.roots.isEmpty)
 }
 
 @MainActor private func finish(_ model: CatalogModel) async throws {
@@ -423,24 +522,82 @@ private final class CatalogFixture {
     let original = try #require(m.report?.assets.first)
     let subject = try #require(m.subject(asset: original))
     try await m.saveMetadata(MusicalMetadata(fields: ["character": ["warm"]]), subject: subject)
+    m.query = "e warm"; #expect(m.outline.roots.count == 1)
+    m.query = "x warm"; #expect(m.outline.roots.isEmpty)
+    m.query = ""
     try f.file("Plugins/Example.component/Contents/Info.plist", "<plist><dict><key>CFBundleIdentifier</key><string>com.fixture.example.au</string></dict></plist>")
     m.scan(); try await finish(m)
     #expect(m.pluginProducts.count == 1)
     let added = try #require(m.report?.assets.first { $0.format == "component" })
     let addedSubject = try #require(m.subject(asset: added))
     try await m.saveMetadata(MusicalMetadata(fields: ["character": ["dark"]]), subject: addedSubject)
-    m.musicalFilter = ["character": "warm"]; #expect(m.outline.nodes.count == 1)
+    #expect(subject.key == addedSubject.key)
+    m.musicalFilter = ["character": "warm"]; #expect(m.outline.nodes.isEmpty)
     m.musicalFilter = ["character": "dark"]; #expect(m.outline.nodes.count == 1)
-    #expect(m.metadataOverrides[subject.key]?[.character] == ["warm"])
     #expect(m.metadataOverrides[addedSubject.key]?[.character] == ["dark"])
     m.musicalFilter = [:]; m.recentOnly = true; #expect(m.outline.nodes.isEmpty)
-    m.recentOnly = false; m.query = "warm"; #expect(m.outline.nodes.count == 1)
+    m.recentOnly = false; m.query = "dark"; #expect(m.outline.nodes.count == 1)
     try await catalog.recordRemovalIntent(paths: [added.path])
     let reopened = CatalogModel(catalogStore: catalog); reopened.standardPlugins = false
     reopened.addRoots([f.root.appendingPathComponent("Plugins")], kind: .plugins)
     await reopened.restoreSavedCatalog()
-    reopened.query = "warm"; #expect(reopened.outline.nodes.count == 1)
-    #expect(reopened.metadataOverrides[subject.key]?[.character] == ["warm"])
+    reopened.query = "dark"; #expect(reopened.outline.nodes.count == 1)
+    #expect(reopened.metadataOverrides[subject.key]?[.character] == ["dark"])
+}
+
+@Test @MainActor func productNameAndConfirmedDateSurviveRemovalOfSourceFormat() async throws {
+    let f = try CatalogFixture()
+    for (name, ext) in [("Glow AU", "component"), ("Glow VST3", "vst3")] {
+        try f.file("Plugins/\(name).\(ext)/Contents/Info.plist", "<plist><dict><key>CFBundleIdentifier</key><string>com.fixture.glow</string></dict></plist>")
+    }
+    let root = f.root.appendingPathComponent("Plugins")
+    let catalog = CatalogStore(url: f.root.appendingPathComponent("catalog.sqlite"))
+    let model = CatalogModel(catalogStore: catalog); model.setStandardPlugins(false); model.addRoots([root], kind: .plugins)
+    model.scan(scannedKinds: [.plugin]); try await finish(model)
+    let original = try #require(model.pluginProducts.first)
+    let source = try #require(original.installations.first { $0.name == original.name })
+    let survivor = try #require(original.installations.first { $0.path != source.path })
+    let date = Date(timeIntervalSince1970: 1_700_000_000)
+    try await catalog.appendDateEvidence([AssetDateEvidence(sourceID: "fixture.original", evidenceID: "source-only",
+        subjectID: try #require(source.catalogID), kind: .confirmedAddition, eventDate: date, ingestedAt: Date())], asOf: Date())
+    await model.reloadInstallerRecords()
+    // Finder can supersede a confirmed source; either way the product date must remain qualified.
+    let before = try #require(model.additionEvidence(survivor)?.upper)
+    try await catalog.recordRemovalIntent(paths: [source.path])
+    var request = ScanRequest(); request.plugins = [root]
+    try await catalog.finalizePluginRemoval(attempted: [source.path], succeeded: [source.path], scope: CatalogScope(request))
+    let reopened = CatalogModel(catalogStore: catalog); reopened.setStandardPlugins(false); reopened.addRoots([root], kind: .plugins)
+    await reopened.restoreSavedCatalog()
+    let remaining = try #require(reopened.pluginProducts.first)
+    #expect(remaining.installations.count == 1 && remaining.installations[0].path == survivor.path)
+    #expect(remaining.id == original.id && remaining.name == original.name)
+    #expect(reopened.outline.roots.first?.title == original.name)
+    #expect(reopened.additionEvidence(remaining.representative)?.upper == before)
+}
+
+@Test @MainActor func missingSetupRecoversSavedScopeButExplicitOrCorruptSetupDoesNot() async throws {
+    let f = try CatalogFixture()
+    try f.file("Plugins/Glow.vst3/Contents/Info.plist", "<plist><dict><key>CFBundleIdentifier</key><string>com.fixture.glow</string></dict></plist>")
+    let root = f.root.appendingPathComponent("Plugins")
+    let catalog = CatalogStore(url: f.root.appendingPathComponent("catalog.sqlite"))
+    let setup = SetupStore(url: f.root.appendingPathComponent("setup.json"))
+    let first = CatalogModel(catalogStore: catalog); first.setStandardPlugins(false); first.addRoots([root], kind: .plugins)
+    first.scan(scannedKinds: [.plugin]); try await finish(first)
+    let recovered = CatalogModel(store: setup, catalogStore: catalog)
+    await recovered.restoreSavedCatalog()
+    #expect(recovered.onboardingCompleted && recovered.report?.assets.count == 1)
+    #expect(recovered.roots[.plugins] == [root] && !recovered.standardPlugins)
+    let configured = CatalogModel(store: setup, catalogStore: catalog)
+    let draft = configured.setupDraft(); draft.standardPlugins = false
+    draft.addRoots([f.root.appendingPathComponent("Different")], kind: .plugins)
+    try configured.acceptSetup(draft, remember: true)
+    let explicit = CatalogModel(store: setup, catalogStore: catalog)
+    await explicit.restoreSavedCatalog()
+    #expect(explicit.report == nil && explicit.roots[.plugins] == [f.root.appendingPathComponent("Different")])
+    try Data("{broken".utf8).write(to: setup.url)
+    let corrupt = CatalogModel(store: setup, catalogStore: catalog)
+    await corrupt.restoreSavedCatalog()
+    #expect(corrupt.report == nil && corrupt.setupNotice != nil)
 }
 
 @Test @MainActor func usageUnknownIsDistinctNavigationAndDoesNotInventDates() async throws {
@@ -454,8 +611,8 @@ private final class CatalogFixture {
     #expect(model.hasFilters && model.navigationQuery != browse)
     #expect(model.visibleAssets.count == 1)
     let node = try #require(model.outline.nodes.first(where: { $0.kind == .plugin }))
-    #expect(model.tagSummary(node).contains("strings"))
-    #expect(model.tagSummary(node).contains("warm"))
+    #expect(model.tagSummary(node).contains("Strings"))
+    #expect(model.tagSummary(node).contains("Warm"))
     #expect(!model.metadataDetail(node).contains(f.root.path))
     model.musicalFilter = ["instrument": "accordion"]
     #expect(model.outline.nodes.isEmpty)
@@ -607,15 +764,15 @@ private actor TagCancellationProbe {
     let before = m.metadataOverrides
     let node = try #require(m.outline.roots.first)
     try await m.changeTag("airy", facet: .character, removing: false, node: node)
+    #expect(sa.key == sb.key)
     #expect(m.effectiveMetadata(asset: a)[.character] == ["airy", "dark"])
-    #expect(m.effectiveMetadata(asset: b)[.character] == ["airy", "warm"])
+    #expect(m.effectiveMetadata(asset: b)[.character] == ["airy", "dark"])
     #expect(m.metadataOverrides[sa.key]?[.technique] == ["legato"])
     let reopened = model(); await reopened.restoreSavedCatalog()
     #expect(reopened.metadataOverrides == m.metadataOverrides)
     try await m.undoMetadata(); #expect(m.metadataOverrides == before)
-    try await m.changeTag("warm", facet: .character, removing: true, node: node)
-    #expect(m.metadataOverrides[sa.key] == before[sa.key])
-    #expect(m.metadataOverrides[sb.key]?[.character] == [])
+    try await m.changeTag("dark", facet: .character, removing: true, node: node)
+    #expect(m.metadataOverrides[sa.key]?[.character] == [])
     let suppressed = model(); await suppressed.restoreSavedCatalog()
     #expect(suppressed.effectiveMetadata(asset: b)[.character] == [])
     try await m.undoMetadata(); #expect(m.metadataOverrides == before)
@@ -625,9 +782,9 @@ private actor TagCancellationProbe {
     } catch {}
     let rolledBack = model(); await rolledBack.restoreSavedCatalog()
     #expect(rolledBack.metadataOverrides == before)
-    try await m.changeTag("DARK", facet: .character, removing: false, node: node)
-    #expect(m.metadataOverrides[sa.key] == before[sa.key])
-    #expect(m.effectiveMetadata(asset: b)[.character]?.contains("DARK") == true)
+    try await m.changeTag("bright", facet: .character, removing: false, node: node)
+    #expect(m.metadataOverrides[sa.key]?[.character]?.contains("bright") == true)
+    #expect(m.effectiveMetadata(asset: b)[.character]?.contains("bright") == true)
     try await m.undoMetadata(); #expect(m.metadataOverrides == before)
 }
 
@@ -902,8 +1059,9 @@ private func presentationReceipt(_ asset: Asset, id: String, seconds: Double) th
     #expect(model.installerDate(echo).date == Date(timeIntervalSince1970: 200))
     #expect(model.installerDate(echo).detail.contains("Records for 1 of 2 installations"))
     #expect(model.installerDate(vst, grouped: false).date == nil)
-    #expect(model.installerDate(echo).accessibility.contains("not original Date added"))
-    #expect(model.additionDate(echo).value.hasPrefix("By "))
+    #expect(model.installerDate(echo).accessibility.contains("separate from Finder Date Added"))
+    #expect(model.additionDate(echo).value == "Unknown")
+    #expect(model.additionDate(echo).detail.contains("First indexed"))
     model.scan(scannedKinds: [.sample])
     #expect(model.installerDate(echo).date != nil)
     try await finish(model)
@@ -970,15 +1128,15 @@ private actor InstallerReadGate {
     _ = try await store.ingest(Scanner().scan(request), scope: scope, at: Date(timeIntervalSince1970: 200), additionContext: AdditionScanContext(scope: scope, startedAt: Date(timeIntervalSince1970: 190)))
     let model = CatalogModel(catalogStore: store); model.setStandardPlugins(false); model.addRoots([root], kind: .samples)
     await model.restoreSavedCatalog(); model.category = .sample; model.sort = .installed
-    #expect(model.visibleAssets.map(\.name) == ["Later", "Earlier"])
+    #expect(model.visibleAssets.map(\.name) == ["Earlier", "Later"])
     model.sortReversed = true
     #expect(model.visibleAssets.map(\.name) == ["Earlier", "Later"])
     let earlier = try #require(model.report?.assets.first { $0.name == "Earlier" })
     let later = try #require(model.report?.assets.first { $0.name == "Later" })
-    #expect(model.additionDate(earlier).value.hasPrefix("By "))
-    #expect(model.additionDate(later).value.hasPrefix("During\n"))
-    #expect(model.additionDate(later).detail.contains("move or restored copy"))
-    #expect(model.additionDate(earlier).detail.contains("may have been added earlier"))
+    #expect(model.additionDate(earlier).value == "Unknown")
+    #expect(model.additionDate(later).value == "Unknown")
+    #expect(model.additionDate(later).detail.contains("Observed arrival"))
+    #expect(model.additionDate(earlier).detail.contains("First indexed"))
 }
 
 @Test @MainActor func additionBoundsRetainValidAbsenceThroughNoScanSettingsRoundtrip() async throws {
@@ -995,10 +1153,12 @@ private actor InstallerReadGate {
     _ = try f.file("A/New.wav")
     model.scan(scannedKinds: [.sample]); try await finish(model)
     let asset = try #require(model.report?.assets.first { $0.name == "New" })
-    let bounds = try #require(model.additionEvidence(asset))
+    let id = try #require(asset.catalogID)
+    let bounds = try #require(model.catalogObservations[id]?.addition)
     #expect(bounds.basis == .observedArrival)
     #expect(try #require(bounds.lower) <= baseline)
-    #expect(model.additionDate(asset).detail.contains("move or restored copy"))
+    #expect(model.additionDate(asset).value == "Unknown")
+    #expect(model.additionDate(asset).detail.contains("Observed arrival"))
 }
 
 @Test @MainActor func libraryAdditionUsesCatalogSelectionIdentity() async throws {
@@ -1009,8 +1169,108 @@ private actor InstallerReadGate {
     model.addRoots([f.root.appendingPathComponent("Libraries")], kind: .libraries)
     model.scan(scannedKinds: [.library]); try await finish(model)
     let asset = try #require(model.report?.assets.first { $0.kind == .library })
-    #expect(model.additionDate(asset).value.hasPrefix("By "))
-    #expect(model.lastUsed(asset).value == "Unknown")
+    #expect(model.additionDate(asset).value == "Unknown")
+    #expect(model.additionDate(asset).detail.contains("First indexed"))
+    #expect(model.lastUsed(asset).value == "Not recorded")
+}
+
+@Test @MainActor func pluginSizesAndOriginalDatesGroupConservativelyAcrossFormatsAndReopen() async throws {
+    let f = try CatalogFixture(), store = CatalogStore(url: f.root.appendingPathComponent("Private/catalog.sqlite"))
+    for format in ["component", "vst3", "aaxplugin"] {
+        _ = try f.file("Plugins/Glow.\(format)/Contents/Info.plist",
+                       "<plist><dict><key>CFBundleIdentifier</key><string>example.glow</string></dict></plist>")
+        _ = try f.file("Plugins/Glow.\(format)/Contents/Plugin", String(repeating: "x", count: 100))
+    }
+    for format in ["component", "vst3"] {
+        _ = try f.file("Plugins/Partial.\(format)/Contents/Info.plist",
+                       "<plist><dict><key>CFBundleIdentifier</key><string>example.partial</string></dict></plist>")
+    }
+    _ = try f.file("Plugins/Partial.vst3/Contents/Plugin", String(repeating: "x", count: 20))
+    let linked = try f.file("Plugins/Partial.component/Contents/Plugin", "x")
+    try FileManager.default.createSymbolicLink(at: linked.deletingLastPathComponent().appendingPathComponent("Alias"), withDestinationURL: linked)
+    let root = f.root.appendingPathComponent("Plugins")
+    let model = CatalogModel(catalogStore: store)
+    model.setStandardPlugins(false); model.addRoots([root], kind: .plugins)
+    model.scan(scannedKinds: [.plugin]); try await finish(model)
+    let glow = try #require(model.pluginProducts.first { $0.name == "Glow" })
+    let partial = try #require(model.pluginProducts.first { $0.name == "Partial" })
+    #expect(glow.installations.count == 3)
+    let expected = glow.installations.compactMap(\.logicalBytes).reduce(0, +)
+    #expect(expected > 300 && model.pluginSize(glow.representative).completeBytes == expected)
+    #expect(model.pluginSize(partial.representative).completeBytes == nil)
+    #expect(model.pluginSize(partial.representative).value == "Partial")
+    #expect(model.pluginSize(partial.representative).detail.contains("Known subtotal"))
+    #expect(model.additionDate(glow.representative).evidence?.basis == .exact || model.additionDate(glow.representative).value == "Unknown")
+    #expect(model.outline.roots.first { $0.title == "Glow" }?.sizeText == model.pluginSize(glow.representative).value)
+    model.sort = .size
+    #expect(model.visibleAssets.map(\.name) == ["Glow", "Partial"])
+    model.sortReversed = true
+    #expect(model.visibleAssets.map(\.name) == ["Glow", "Partial"])
+    let original = Date(timeIntervalSince1970: 1_700_000_000)
+    let additions = try glow.installations.enumerated().map { index, asset -> AssetDateEvidence in
+        let id = try #require(asset.catalogID)
+        return AssetDateEvidence(sourceID: "fixture.confirmed-original", evidenceID: "glow-\(index)", subjectID: id,
+                                 kind: .confirmedAddition, eventDate: original.addingTimeInterval(Double(index)), ingestedAt: Date())
+    }
+    try await store.appendDateEvidence([additions[0]], asOf: Date())
+    await model.reloadInstallerRecords()
+    #expect(model.additionDate(glow.representative).evidence?.upper != nil)
+    try await store.appendDateEvidence(Array(additions.dropFirst()), asOf: Date())
+    await model.reloadInstallerRecords()
+    #expect(model.additionDate(glow.representative).evidence?.basis == .exact)
+    #expect(model.additionDate(glow.representative).evidence?.upper == original)
+    let reopened = CatalogModel(catalogStore: store)
+    reopened.setStandardPlugins(false); reopened.addRoots([root], kind: .plugins)
+    await reopened.restoreSavedCatalog()
+    let savedGlow = try #require(reopened.pluginProducts.first { $0.name == "Glow" })
+    #expect(reopened.pluginSize(savedGlow.representative).completeBytes == expected)
+    #expect(reopened.pluginSize(savedGlow.representative).detail.contains("Saved size; scan to verify"))
+    #expect(reopened.additionDate(savedGlow.representative).evidence?.upper == original)
+}
+
+@Test @MainActor func finderDateAddedUsesEarliestAvailableFormatAndSurvivesReopen() async throws {
+    let f = try CatalogFixture(), store = CatalogStore(url: f.root.appendingPathComponent("Private/catalog.sqlite"))
+    for ext in ["component", "vst3", "aaxplugin"] {
+        _ = try f.file("Plugins/Glow.\(ext)/Contents/Info.plist",
+            "<plist><dict><key>CFBundleIdentifier</key><string>org.example.glow</string></dict></plist>")
+    }
+    let root = f.root.appendingPathComponent("Plugins")
+    let model = CatalogModel(catalogStore: store)
+    model.setStandardPlugins(false); model.addRoots([root], kind: .plugins)
+    model.scan(scannedKinds: [.plugin]); try await finish(model)
+    var assets = try #require(model.report?.assets)
+    let earliest = Date(timeIntervalSince1970: 1_762_480_000)
+    for index in assets.indices {
+        if assets[index].format == "aaxplugin" { assets[index].finderDateAdded = earliest }
+        if assets[index].format == "vst3" { assets[index].finderDateAdded = earliest.addingTimeInterval(3600) }
+    }
+    var request = ScanRequest(); request.plugins = [root]
+    _ = try await store.ingest(try #require(model.report).replacingAssets(assets), scope: CatalogScope(request), scannedKinds: [.plugin])
+    let reopened = CatalogModel(catalogStore: store)
+    reopened.setStandardPlugins(false); reopened.addRoots([root], kind: .plugins)
+    await reopened.restoreSavedCatalog()
+    let glow = try #require(reopened.pluginProducts.first { $0.name == "Glow" })
+    #expect(glow.installations.count == 3 && glow.installations.filter { $0.finderDateAdded != nil }.count == 2)
+    #expect(reopened.additionDate(glow.representative).evidence?.upper == earliest)
+    #expect(reopened.additionDate(glow.representative).detail.contains("Finder Date Added"))
+    #expect(reopened.additionDate(glow.representative).value != "Unknown")
+    #expect(reopened.pluginSize(glow.representative).completeBytes != nil)
+}
+
+@Test @MainActor func pluginArrivalRemainsLabeledSeparatelyFromFinderDateAdded() async throws {
+    let f = try CatalogFixture(), store = CatalogStore(url: f.root.appendingPathComponent("Private/catalog.sqlite"))
+    let root = f.root.appendingPathComponent("Plugins")
+    _ = try f.file("Plugins/Glow.vst3/Contents/Info.plist",
+        "<plist><dict><key>CFBundleIdentifier</key><string>org.example.glow</string></dict></plist>")
+    let model = CatalogModel(catalogStore: store)
+    model.setStandardPlugins(false); model.addRoots([root], kind: .plugins)
+    model.scan(scannedKinds: [.plugin]); try await finish(model)
+    _ = try f.file("Plugins/Glow.component/Contents/Info.plist",
+        "<plist><dict><key>CFBundleIdentifier</key><string>org.example.glow</string></dict></plist>")
+    model.scan(scannedKinds: [.plugin]); try await finish(model)
+    let glow = try #require(model.pluginProducts.first { $0.name == "Glow" })
+    #expect(glow.installations.count == 2)
+    #expect(model.additionDate(glow.representative).detail.contains("Observed arrival"))
 }
 
 @Test @MainActor func usageCivilProjectionSortsFiltersAndRestoresWithoutUTCInference() async throws {
@@ -1032,7 +1292,7 @@ private actor InstallerReadGate {
     model.sortReversed = true
     #expect(model.visibleAssets.map(\.name) == ["Earlier", "Later", "Unknown"])
     let later = try #require(model.report?.assets.first { $0.name == "Later" })
-    #expect(model.lastUsed(later).value == "2026-09-25\nDAW local")
+    #expect(model.lastUsed(later).value == "2026-09-25")
     #expect(model.lastUsed(later).detail.contains("product history"))
     let manual = try HostUsageProvenance(hostVersion: "12.4.6", classID: "12345678-1234-5678-ABCD-123456789ABC",
         pluginVersion: "1.0", localTime: SourceLocalTime("2026-09-25T12:00:00.000000"),
@@ -1059,11 +1319,63 @@ private actor InstallerReadGate {
     let record = AssetDateEvidence(sourceID: CubasePluginUse.sourceID, evidenceID: use.eventID, subjectID: id, kind: .confirmedUse, eventDate: use.reportedDate, ingestedAt: Date(timeIntervalSince1970: 1_790_474_025), cubaseUsage: use)
     try await store.appendDateEvidence([record], asOf: Date(timeIntervalSince1970: 1_790_474_025))
     await model.reloadUsage()
-    #expect(model.lastUsed(asset).value.contains("Cubase local"))
+    #expect(!model.lastUsed(asset).value.contains("Local time"))
     #expect(model.lastUsed(asset).detail.contains("Cubase project load"))
     let bound = CubaseBoundPluginUse(use: use, pluginPath: asset.path, cid: String(repeating: "A", count: 32))
     let replay = try await store.recordCubaseUsage(bound, for: id, at: Date(timeIntervalSince1970: 1_790_474_085))
     #expect(replay == record)
+}
+
+@Test @MainActor func groupedAbsoluteHostUsageChoosesLaterInstant() async throws {
+    let f = try CatalogFixture(), store = CatalogStore(url: f.root.appendingPathComponent("Private/catalog.sqlite"))
+    for product in ["Cubase", "Logic"] {
+        for ext in ["component", "vst3"] {
+            _ = try f.file("Plugins/\(product).\(ext)/Contents/Info.plist",
+                           "<plist><dict><key>CFBundleIdentifier</key><string>example.\(product)</string></dict></plist>")
+        }
+    }
+    let model = CatalogModel(catalogStore: store)
+    model.setStandardPlugins(false)
+    model.addRoots([f.root.appendingPathComponent("Plugins")], kind: .plugins)
+    model.scan(scannedKinds: [.plugin]); try await finish(model)
+    let assets = try #require(model.report?.assets)
+    let base = Date(timeIntervalSince1970: 1_790_345_600)
+    let early = base, late = base.addingTimeInterval(1)
+    let logicTimes = try #require((1...60).compactMap { delta -> (LogicPluginUse, LogicPluginUse)? in
+        let first = LogicPluginUse(name: "Logic", reportedDate: base)
+        let second = LogicPluginUse(name: "Logic", reportedDate: base.addingTimeInterval(Double(delta)))
+        return first.eventID < second.eventID ? (first, second) : nil
+    }.first)
+    var records: [AssetDateEvidence] = []
+    for product in ["Cubase", "Logic"] {
+        let pair = assets.filter { $0.name == product }.sorted { $0.format < $1.format }
+        #expect(pair.count == 2)
+        for (index, asset) in pair.enumerated() {
+            let id = try #require(asset.catalogID)
+            if product == "Cubase" {
+                let use = CubasePluginUse(name: product, vendor: "Fixture", version: "1", architecture: "arm64",
+                    eventID: index == 0 ? "a-cubase" : "z-cubase", projectID: "project",
+                    reportedMilliseconds: Int64((index == 0 ? early : late).timeIntervalSince1970 * 1_000))
+                records.append(AssetDateEvidence(sourceID: CubasePluginUse.sourceID, evidenceID: use.eventID,
+                    subjectID: id, kind: .confirmedUse, eventDate: use.reportedDate, ingestedAt: Date(), cubaseUsage: use))
+            } else {
+                let use = index == 0 ? logicTimes.0 : logicTimes.1
+                records.append(AssetDateEvidence(sourceID: LogicPluginUse.sourceID, evidenceID: use.eventID,
+                    subjectID: id, kind: .confirmedUse, eventDate: use.reportedDate, ingestedAt: Date(), logicUsage: use))
+            }
+        }
+    }
+    try await store.appendDateEvidence(records, asOf: Date())
+    await model.reloadUsage()
+    for product in ["Cubase", "Logic"] {
+        let pair = assets.filter { $0.name == product }.sorted { $0.format < $1.format }
+        let first = try #require(pair.first), second = try #require(pair.last)
+        let secondID = try #require(second.catalogID)
+        let expected = try #require(records.first { $0.subjectID == secondID })
+        #expect(model.usageRecord(first) == expected)
+        #expect(model.usageRecord(second) == expected)
+        #expect(try await store.latestHostUsage(for: [secondID], asOf: Date())[Data(secondID.utf8)] == expected)
+    }
 }
 
 @Test @MainActor func aaxAndLogicUsageSurviveReplayAndReachCatalog() async throws {

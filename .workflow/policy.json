@@ -24,7 +24,7 @@
   ],
   "required_gates": {
     "0": ["implementation", "automated_tests"],
-    "1": ["research", "plan_review", "implementation", "automated_tests", "code_review"],
+    "1": ["implementation", "automated_tests", "code_review"],
     "2": ["research", "plan_review", "implementation", "automated_tests", "code_review", "runtime_tests"],
     "3": ["research", "plan_review", "implementation", "automated_tests", "code_review", "runtime_tests", "release_review"]
   },

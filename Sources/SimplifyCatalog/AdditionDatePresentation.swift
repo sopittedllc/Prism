@@ -8,12 +8,13 @@ public struct AdditionDatePresentation: Sendable {
     public let detail: String
     public let accessibility: String
 
-    init(evidence: AdditionDateEvidence?, coverage: String = "", saved: Bool = false, checking: Bool = false) {
+    init(evidence: AdditionDateEvidence?, coverage: String = "", saved: Bool = false, checking: Bool = false, observation: String = "", finderDateAdded: Bool = false, finderSourceExpected: Bool = false) {
         self.evidence = evidence
         guard let evidence else {
             value = checking ? "Checking…" : "Unknown"
-            detail = checking ? "Checking current collection…" : "Addition history isn’t available."
-            accessibility = "Date added, " + [detail, coverage, saved ? "Saved history; current installation not verified." : ""].filter { !$0.isEmpty }.joined(separator: "\n")
+            detail = [checking ? "Checking current collection…" : finderSourceExpected ? "Finder Date Added is unavailable for this file." : "Original Date added is unknown.", coverage, observation,
+                      saved ? "Saved history; current installation not verified." : ""].filter { !$0.isEmpty }.joined(separator: "\n")
+            accessibility = "Date added, " + value + ". " + detail
             return
         }
         func short(_ date: Date) -> String { date.formatted(date: .numeric, time: .omitted) }
@@ -23,8 +24,8 @@ public struct AdditionDatePresentation: Sendable {
         switch evidence.basis {
         case .exact:
             value = short(evidence.upper)
-            explanation = "Added on " + full(evidence.upper) + "."
-            visible = "Added on " + evidence.upper.formatted(date: .abbreviated, time: .omitted) + "."
+            explanation = (finderDateAdded ? "Finder Date Added " : "Added on ") + full(evidence.upper) + "."
+            visible = (finderDateAdded ? "Finder Date Added " : "Added on ") + evidence.upper.formatted(date: .abbreviated, time: .omitted) + "."
         case .presentBy:
             value = "By " + short(evidence.upper)
             explanation = "Present by " + full(evidence.upper) + ". It may have been added earlier."
@@ -40,7 +41,7 @@ public struct AdditionDatePresentation: Sendable {
             visible = "Appeared " + period + ". May be a move or restored copy."
             explanation = "Appeared in monitored folders between " + full(lower) + " and " + full(evidence.upper) + ". This may be a move or restored copy."
         }
-        detail = [visible, coverage, saved ? "Saved history; current installation not verified." : ""].filter { !$0.isEmpty }.joined(separator: "\n")
-        accessibility = "Date added, " + [explanation, coverage, saved ? "Saved history; current installation not verified." : ""].filter { !$0.isEmpty }.joined(separator: "\n")
+        detail = [visible, coverage, observation, saved ? "Saved history; current installation not verified." : ""].filter { !$0.isEmpty }.joined(separator: "\n")
+        accessibility = "Date added, " + [explanation, coverage, observation, saved ? "Saved history; current installation not verified." : ""].filter { !$0.isEmpty }.joined(separator: "\n")
     }
 }

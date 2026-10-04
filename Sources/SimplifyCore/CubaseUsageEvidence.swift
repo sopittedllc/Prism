@@ -23,7 +23,7 @@ public enum CubaseUsageLog {
     public static let maximumBytes = 64 * 1024 * 1024
     public static let maximumLines = 100_000
 
-    private struct Record: Decodable {
+    struct Record: Decodable {
         let type: String?
         let report: String?
         let time: Int64?
@@ -35,11 +35,18 @@ public enum CubaseUsageLog {
         let version: String?
         let architecture: String?
         let status: String?
+        let productName: String?
+        let productVersion: String?
+        let reportUID: Int64?
+        let reportKey: String?
+        let stringValue: String?
         enum CodingKeys: String, CodingKey {
             case type = "smtg_type", report = "smtg_report_name", time = "smtg_time",
                  event = "smtg_event_uid", instance = "smtg_instance_uid",
                  project = "smtg_project_uid", name = "Name", vendor = "Vendor", version = "Version",
-                 architecture = "Architecture", status = "Status Code"
+                 architecture = "Architecture", status = "Status Code",
+                 productName = "smtg_product_name", productVersion = "smtg_product_version",
+                 reportUID = "smtg_report_uid", reportKey = "smtg_report_key", stringValue = "smtg_string"
         }
     }
     private struct Candidate {
@@ -50,12 +57,39 @@ public enum CubaseUsageLog {
         guard data.count <= maximumBytes, let text = String(data: data, encoding: .utf8), !data.contains(0) else {
             throw AssetDateEvidenceError.invalidProvenance
         }
-        var output: [CubasePluginUse] = []; var candidates: [Candidate] = []
+        var output: [CubasePluginUse] = [], nativeOutput: [CubasePluginUse] = []; var candidates: [Candidate] = []
         var projectID = "", activated = false, instance = ""; var lines = 0
-        for raw in text.split(separator: "\n", omittingEmptySubsequences: true) {
+        var native = NativeCubaseUsageReader()
+        var nativeMode = false, supportedNative = false
+        let rawLines = text.split(separator: "\n", omittingEmptySubsequences: false)
+        for (index, raw) in rawLines.enumerated() {
+            if raw.isEmpty && index == rawLines.count - 1 && text.hasSuffix("\n") { break }
+            // Native output requires a committed line terminator. Legacy flattened
+            // records retain their original valid-final-line behavior.
+            if index == rawLines.count - 1 && !text.hasSuffix("\n") && nativeMode { break }
             lines += 1; guard lines <= maximumLines, raw.utf8.count <= 256 * 1024 else { throw AssetDateEvidenceError.tooManyRecords }
-            guard let record = try? JSONDecoder().decode(Record.self, from: Data(raw.utf8)), let time = record.time else { continue }
-            if record.type == "instance_begin" { instance = record.instance ?? ""; candidates.removeAll(); projectID = ""; activated = false; continue }
+            let decoded = try? JSONDecoder().decode(Record.self, from: Data(raw.utf8))
+            guard let record = decoded, let time = record.time else {
+                if nativeMode && supportedNative { throw AssetDateEvidenceError.invalidProvenance }
+                continue
+            }
+            if record.type == "instance_begin" {
+                if nativeMode && supportedNative { try native.finish(into: &nativeOutput) }
+                nativeMode = record.productName != nil || record.productVersion != nil
+                if record.productName == "Cubase Pro", record.productVersion == "15.0.5.121",
+                   let uid = record.instance, uid.utf8.count > 256 {
+                    throw AssetDateEvidenceError.tooManyRecords
+                }
+                supportedNative = nativeMode && record.productName == "Cubase Pro" && record.productVersion == "15.0.5.121"
+                    && validUID(record.instance)
+                native = NativeCubaseUsageReader(instance: supportedNative ? record.instance! : "")
+                instance = record.instance ?? ""; candidates.removeAll(); projectID = ""; activated = false
+                continue
+            }
+            if nativeMode {
+                if supportedNative { try native.consume(record: record, into: &nativeOutput) }
+                continue
+            }
             if record.type == "project_added" { projectID = record.project ?? record.event ?? ""; candidates.removeAll(); activated = false; continue }
             if record.type == "project_activated" { if !projectID.isEmpty { activated = true }; continue }
             if record.report == "Plugin Instance Info: VST - Add",
@@ -76,6 +110,21 @@ public enum CubaseUsageLog {
                 candidates.removeAll(); activated = false
             }
         }
+        if nativeMode && supportedNative { try native.finish(into: &nativeOutput) }
+        var nativeSeen: [String: CubasePluginUse] = [:]
+        for use in nativeOutput {
+            if let previous = nativeSeen[use.eventID] {
+                guard previous == use else { throw AssetDateEvidenceError.conflictingEvidenceID }
+            } else {
+                nativeSeen[use.eventID] = use
+                output.append(use)
+            }
+        }
         return output
+    }
+
+    static func validUID(_ value: String?) -> Bool {
+        guard let value, !value.isEmpty, value.utf8.count <= 256 else { return false }
+        return !value.unicodeScalars.contains { CharacterSet.controlCharacters.contains($0) }
     }
 }

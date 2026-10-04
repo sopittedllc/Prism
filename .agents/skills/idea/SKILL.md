@@ -5,7 +5,8 @@ argument-hint: <creative idea or improvement>
 disable-model-invocation: true
 ---
 
-Use the orchestrator agent for `$ARGUMENTS`. Preserve the user's creative intent.
+Use one Sol driver for `$ARGUMENTS`; reserve the orchestrator role for material
+architecture uncertainty or escalation. Preserve the user's creative intent.
 Generate objective acceptance criteria, classify the risk tier, and proceed without
 asking about implementation mechanics. Ask only when a material product choice has no
 safe reversible default or when tier-3 authority is required. Continue through repair

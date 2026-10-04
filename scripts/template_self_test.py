@@ -29,7 +29,17 @@ def run(*argv: str, cwd: Path = ROOT, expected: int = 0) -> subprocess.Completed
 
 
 def validate_json_files(root: Path) -> None:
-    for path in root.rglob("*.json"):
+    if (root / ".git").exists():
+        listed = subprocess.run(
+            ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z", "--", "*.json"],
+            cwd=root, capture_output=True, check=True,
+        )
+        paths = (root / os.fsdecode(raw) for raw in listed.stdout.split(b"\0") if raw)
+    else:
+        paths = root.rglob("*.json")
+    for path in paths:
+        if not path.is_file():
+            continue
         json.loads(path.read_text(encoding="utf-8"))
 
 

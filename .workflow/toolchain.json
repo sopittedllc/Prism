@@ -133,6 +133,17 @@
         "nativeProToolsRestoreV2Runtime"
       ],
       "timeout_seconds": 300
+    },
+    "cubase-native-restore-runtime": {
+      "argv": [
+        "env",
+        "PRISM_CUBASE_NATIVE_RESTORE_RUNTIME=1",
+        "swift",
+        "test",
+        "--filter",
+        "nativeCubaseRestoreRuntime"
+      ],
+      "timeout_seconds": 300
     }
   }
 }

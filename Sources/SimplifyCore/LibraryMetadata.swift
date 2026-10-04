@@ -23,6 +23,8 @@ public struct LibraryInstrument: Codable, Sendable {
     public let tags: [String]
     public var vendorID: String? = nil
     public var catalogStale: Bool? = nil
+    /// Finder date for an exact physical instrument file, when available.
+    public var finderDateAdded: Date? = nil
     /// Known physical members only, not a claim of exhaustive dependencies or ownership.
     /// SINE includes each installed mic's metadata and archive; nil means not established.
     public var contentPaths: [String]? = nil

@@ -48,10 +48,10 @@
     },
     "numeric_unit_formatting": {
       "counts": "localized formatted integers",
-      "size": "ByteCountFormatter; unknown shown as dash / not measured",
+      "size": "ByteCountFormatter for measured plugin-bundle logical bytes; grouped totals require every installation measured. Partial/Unknown groups disclose only qualified known subtotals. Library footprint remains Not measured; instrument storage is Shared with library.",
       "recency": "project modification date proxy; samples only",
       "installer_record": "Plugin installer history appears in inspector/per-format details, independent of Date added and Last used.",
-      "addition_bounds": "Date added preserves precision: exact numeric date, During date or two-line arrival range, By date for present-by bounds. Sort upper bound, lower bound, precision then stable name/identity; disclose actual acquisition order may differ. Instruments never inherit library/player dates."
+      "addition_bounds": "Plugin Date added uses exact Finder file-location Date Added metadata and shows the earliest available current format date, with source disclosed in Details. It is not an installation claim. Confirmed original addition remains a fallback when Finder metadata is absent; scan, birth, modification, receipt, and use dates never substitute. Other categories use confirmed original addition. Unknown dates sort last; instruments never inherit library/player dates."
     }
   },
   "components": [

@@ -1,0 +1,20 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "cleanup-essentials",
+  "gate": "addition_bounds_runtime",
+  "status": "failed",
+  "revision": "content:196d21365928cd29529fd04cfd7f68368fdbb821facd4d7b7efc09d66e8c8e5b",
+  "timestamp": "2026-09-27T01:30:46.649942+00:00",
+  "producer": "scripts/run_check.py",
+  "client": "automation",
+  "checks": [
+    {
+      "name": "catalog-runtime",
+      "status": "failed",
+      "command": "[\"build/Prism.app/Contents/MacOS/Prism\", \"--ui-smoke\", \"captures/catalog\"]",
+      "exit_code": 1,
+      "log": ".workflow/evidence/cleanup-essentials/logs/catalog-runtime.log"
+    }
+  ]
+}

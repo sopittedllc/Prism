@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "record_type": "user_supplied_fixture_provenance",
+  "timestamp": "2026-09-26T19:54:16.277404+00:00",
+  "source": "User clarification in conversation",
+  "fixtures": {
+    "Ableton Live": {
+      "starting_point": "new empty project"
+    },
+    "Logic Pro": {
+      "starting_point": "new empty project"
+    },
+    "Pro Tools": {
+      "starting_point": "new empty project"
+    },
+    "Cubase": {
+      "starting_point": "template"
+    }
+  },
+  "interpretation": "Cubase additional product records may derive from the template. This does not establish active track membership or successful loading.",
+  "next_control": "Compare Cubase with an unchanged save from the same starting template and with host-saved removal controls; retain new-project baselines for the other hosts."
+}

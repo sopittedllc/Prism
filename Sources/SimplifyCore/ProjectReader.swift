@@ -232,13 +232,26 @@ private final class AbletonDelegate: NSObject, XMLParserDelegate {
     var references: [ProjectReference] = []
     var validRoot = false
     var rejected = false
+    private var supportsVst3Candidates = false
 
     func parser(_ parser: XMLParser, didStartElement name: String, namespaceURI: String?,
                 qualifiedName: String?, attributes: [String: String]) {
-        if stack.isEmpty { validRoot = name == "Ableton" }
+        if stack.isEmpty {
+            validRoot = name == "Ableton"
+            // Host-generated Live 12 fixture, not a vendor-stable XML schema.
+            // Unknown schemas retain existing sample coverage, not guessed plugins.
+            supportsVst3Candidates = validRoot && attributes["MajorVersion"] == "5"
+                && attributes["MinorVersion"] == "12.0_12402"
+                && attributes["Creator"]?.hasPrefix("Ableton Live 12.") == true
+        }
         stack.append(name)
         guard stack.count <= 128 else { rejected = true; parser.abortParsing(); return }
         guard let value = attributes["Value"], !value.isEmpty else { return }
+        if supportsVst3Candidates, isDirectTrackVst3Name,
+           !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            references.append(ProjectReference(kind: .plugin, value: value, resolvedPath: nil,
+                evidence: "ALS Live 12 direct-track Vst3PluginInfo/Name candidate; saved descriptor only, installed identity and successful load unverified"))
+        }
         if stack.suffix(3).elementsEqual(["SampleRef", "FileRef", name]), ["Path", "RelativePath"].contains(name) {
             // Even absolute ALS paths may be stale after collect-and-save. Report candidates,
             // but do not auto-match until FileRef path-type semantics are verified.
@@ -258,6 +271,18 @@ private final class AbletonDelegate: NSObject, XMLParserDelegate {
             references.append(ProjectReference(kind: .plugin, value: value, resolvedPath: nil,
                                                evidence: "ALS VstPluginInfo/PlugName saved descriptor; installation identity unresolved"))
         }
+    }
+
+    /// Only the demonstrated direct track route. No browser, history, preset,
+    /// master or nested-rack guesses; bypassed/placeholder declarations remain
+    /// candidates, never evidence of a successful load.
+    private var isDirectTrackVst3Name: Bool {
+        guard stack.count == 11,
+              stack.prefix(3).elementsEqual(["Ableton", "LiveSet", "Tracks"]),
+              ["AudioTrack", "MidiTrack", "ReturnTrack"].contains(stack[3]) else { return false }
+        return stack.suffix(7).elementsEqual([
+            "DeviceChain", "DeviceChain", "Devices", "PluginDevice", "PluginDesc", "Vst3PluginInfo", "Name",
+        ])
     }
 
     func parser(_ parser: XMLParser, didEndElement: String, namespaceURI: String?, qualifiedName: String?) {

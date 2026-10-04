@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "task_id": "cleanup-essentials",
+  "gate": "pt_track_source_review",
+  "status": "passed",
+  "revision": "content:fe5c88b1aa11fd7bfd6590d78ba379c7951fb3a7407c06f2962611d969e60dd2",
+  "timestamp": "2026-09-26T22:25:36.290245+00:00",
+  "producer": "codex /root/container_review",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "Fresh read-only source review passed without blockers",
+      "status": "passed"
+    },
+    {
+      "name": "Independent debug replay matched four real exports, full event fields and row joins",
+      "status": "passed"
+    }
+  ]
+}

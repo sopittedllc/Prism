@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "task_id": "cleanup-essentials",
+  "gate": "installer_date_source_review",
+  "status": "passed",
+  "revision": "content:e363e416fbd6ef21b3cc3ac5a99fe0e4a046afeeb2486a4be0e7ca870c4667b9",
+  "timestamp": "2026-09-27T00:50:26.370607+00:00",
+  "producer": "Codex container_review",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "Independent source/state pass after preserving per-format status and current-node freshness",
+      "status": "passed"
+    },
+    {
+      "name": "Atomic bounded projection, generation guards, sorting, no cross-kind inheritance",
+      "status": "passed"
+    }
+  ]
+}

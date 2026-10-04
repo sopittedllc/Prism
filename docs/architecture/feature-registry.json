@@ -360,6 +360,276 @@
           "reason": "No GUI state export/import; CLI reports are separate immutable observations."
         }
       }
+    },
+    {
+      "default": false,
+      "id": "recent_only",
+      "value_type": "boolean",
+      "introduced_in": 1,
+      "policies": {
+        "preset": {
+          "decision": "excluded",
+          "reason": "Collection browsing is not an audio preset. No serializer exists."
+        },
+        "project_persistence": {
+          "decision": "excluded",
+          "reason": "Browsing filters, selection and ordering are session-only; setup alone persists."
+        },
+        "default_reset": "included",
+        "migration": {
+          "decision": "excluded",
+          "reason": "No persisted schema or prior released state exists."
+        },
+        "undo": {
+          "decision": "excluded",
+          "reason": "View navigation/filter changes can be directly reversed; no document mutation."
+        },
+        "automation": {
+          "decision": "excluded",
+          "reason": "No DAW automation surface for browser state."
+        },
+        "copy_paste": {
+          "decision": "excluded",
+          "reason": "Native search/path text controls handle text; no structured state clipboard."
+        },
+        "sync": {
+          "decision": "excluded",
+          "reason": "Local session only; no account or sync."
+        },
+        "accessibility": "included",
+        "privacy": "included",
+        "analytics": {
+          "decision": "excluded",
+          "reason": "No telemetry is collected."
+        },
+        "export_import": {
+          "decision": "excluded",
+          "reason": "No GUI state export/import; CLI reports are separate immutable observations."
+        }
+      }
+    },
+    {
+      "default": {},
+      "id": "musical_filter",
+      "value_type": "object",
+      "introduced_in": 1,
+      "policies": {
+        "preset": {
+          "decision": "excluded",
+          "reason": "Collection browsing is not an audio preset. No serializer exists."
+        },
+        "project_persistence": {
+          "decision": "excluded",
+          "reason": "Browsing filters, selection and ordering are session-only; setup alone persists."
+        },
+        "default_reset": "included",
+        "migration": {
+          "decision": "excluded",
+          "reason": "No persisted schema or prior released state exists."
+        },
+        "undo": {
+          "decision": "excluded",
+          "reason": "View navigation/filter changes can be directly reversed; no document mutation."
+        },
+        "automation": {
+          "decision": "excluded",
+          "reason": "No DAW automation surface for browser state."
+        },
+        "copy_paste": {
+          "decision": "excluded",
+          "reason": "Native search/path text controls handle text; no structured state clipboard."
+        },
+        "sync": {
+          "decision": "excluded",
+          "reason": "Local session only; no account or sync."
+        },
+        "accessibility": "included",
+        "privacy": "included",
+        "analytics": {
+          "decision": "excluded",
+          "reason": "No telemetry is collected."
+        },
+        "export_import": {
+          "decision": "excluded",
+          "reason": "No GUI state export/import; CLI reports are separate immutable observations."
+        }
+      }
+    },
+    {
+      "default": "all",
+      "id": "usage_filter",
+      "value_type": "enumeration",
+      "introduced_in": 1,
+      "policies": {
+        "preset": {
+          "decision": "excluded",
+          "reason": "Collection browsing is not an audio preset. No serializer exists."
+        },
+        "project_persistence": {
+          "decision": "excluded",
+          "reason": "Browsing filters, selection and ordering are session-only; setup alone persists."
+        },
+        "default_reset": "included",
+        "migration": {
+          "decision": "excluded",
+          "reason": "No persisted schema or prior released state exists."
+        },
+        "undo": {
+          "decision": "excluded",
+          "reason": "View navigation/filter changes can be directly reversed; no document mutation."
+        },
+        "automation": {
+          "decision": "excluded",
+          "reason": "No DAW automation surface for browser state."
+        },
+        "copy_paste": {
+          "decision": "excluded",
+          "reason": "Native search/path text controls handle text; no structured state clipboard."
+        },
+        "sync": {
+          "decision": "excluded",
+          "reason": "Local session only; no account or sync."
+        },
+        "accessibility": "included",
+        "privacy": "included",
+        "analytics": {
+          "decision": "excluded",
+          "reason": "No telemetry is collected."
+        },
+        "export_import": {
+          "decision": "excluded",
+          "reason": "No GUI state export/import; CLI reports are separate immutable observations."
+        }
+      }
+    },
+    {
+      "default": false,
+      "id": "online_tags",
+      "value_type": "boolean",
+      "introduced_in": 1,
+      "policies": {
+        "preset": {
+          "decision": "excluded",
+          "reason": "Collection browsing is not an audio preset. No serializer exists."
+        },
+        "project_persistence": "included",
+        "default_reset": "included",
+        "migration": "included",
+        "undo": {
+          "decision": "excluded",
+          "reason": "View navigation/filter changes can be directly reversed; no document mutation."
+        },
+        "automation": {
+          "decision": "excluded",
+          "reason": "No DAW automation surface for browser state."
+        },
+        "copy_paste": {
+          "decision": "excluded",
+          "reason": "Native search/path text controls handle text; no structured state clipboard."
+        },
+        "sync": {
+          "decision": "excluded",
+          "reason": "Local session only; no account or sync."
+        },
+        "accessibility": "included",
+        "privacy": "included",
+        "analytics": {
+          "decision": "excluded",
+          "reason": "No telemetry is collected."
+        },
+        "export_import": {
+          "decision": "excluded",
+          "reason": "No GUI state export/import; CLI reports are separate immutable observations."
+        }
+      }
+    },
+    {
+      "default": false,
+      "id": "sort_reversed",
+      "value_type": "boolean",
+      "introduced_in": 1,
+      "policies": {
+        "preset": {
+          "decision": "excluded",
+          "reason": "Collection browsing is not an audio preset. No serializer exists."
+        },
+        "project_persistence": {
+          "decision": "excluded",
+          "reason": "Browsing filters, selection and ordering are session-only; setup alone persists."
+        },
+        "default_reset": "included",
+        "migration": {
+          "decision": "excluded",
+          "reason": "No persisted schema or prior released state exists."
+        },
+        "undo": {
+          "decision": "excluded",
+          "reason": "View navigation/filter changes can be directly reversed; no document mutation."
+        },
+        "automation": {
+          "decision": "excluded",
+          "reason": "No DAW automation surface for browser state."
+        },
+        "copy_paste": {
+          "decision": "excluded",
+          "reason": "Native search/path text controls handle text; no structured state clipboard."
+        },
+        "sync": {
+          "decision": "excluded",
+          "reason": "Local session only; no account or sync."
+        },
+        "accessibility": "included",
+        "privacy": "included",
+        "analytics": {
+          "decision": "excluded",
+          "reason": "No telemetry is collected."
+        },
+        "export_import": {
+          "decision": "excluded",
+          "reason": "No GUI state export/import; CLI reports are separate immutable observations."
+        }
+      }
+    },
+    {
+      "default": "light",
+      "id": "appearance",
+      "value_type": "enumeration",
+      "introduced_in": 1,
+      "policies": {
+        "preset": {
+          "decision": "excluded",
+          "reason": "Collection browsing is not an audio preset. No serializer exists."
+        },
+        "project_persistence": "included",
+        "default_reset": "included",
+        "migration": "included",
+        "undo": {
+          "decision": "excluded",
+          "reason": "Settings preview uses draft Cancel rollback; appearance is not document history."
+        },
+        "automation": {
+          "decision": "excluded",
+          "reason": "No DAW automation surface for browser state."
+        },
+        "copy_paste": {
+          "decision": "excluded",
+          "reason": "Native search/path text controls handle text; no structured state clipboard."
+        },
+        "sync": {
+          "decision": "excluded",
+          "reason": "Local session only; no account or sync."
+        },
+        "accessibility": "included",
+        "privacy": "included",
+        "analytics": {
+          "decision": "excluded",
+          "reason": "No telemetry is collected."
+        },
+        "export_import": {
+          "decision": "excluded",
+          "reason": "No GUI state export/import; CLI reports are separate immutable observations."
+        }
+      }
     }
   ],
   "catalog_fields": [
@@ -584,6 +854,218 @@
         "export_import": {
           "decision": "included",
           "reason": "Consistent local SQLite backup API; no import/merge UI yet."
+        }
+      }
+    },
+    {
+      "id": "catalog.musical_metadata",
+      "value_type": "object",
+      "default": {},
+      "introduced_in": 2,
+      "policies": {
+        "preset": {
+          "decision": "excluded",
+          "reason": "Inventory is not an audio preset; no preset serializer."
+        },
+        "project_persistence": {
+          "decision": "excluded",
+          "reason": "Local application catalog, never a DAW project."
+        },
+        "default_reset": {
+          "decision": "included",
+          "reason": "Empty on first run. Session Reset does not delete the durable catalog."
+        },
+        "migration": "included",
+        "undo": "included",
+        "automation": {
+          "decision": "excluded",
+          "reason": "Store API is internal to scan/restore, no external automation commands."
+        },
+        "copy_paste": {
+          "decision": "excluded",
+          "reason": "No structured catalog clipboard; existing selectable text only."
+        },
+        "sync": {
+          "decision": "excluded",
+          "reason": "Local storage only; no account or synchronization."
+        },
+        "accessibility": {
+          "decision": "included",
+          "reason": "Cached/stale/errors use existing native status and inspector text; no new custom controls."
+        },
+        "privacy": {
+          "decision": "included",
+          "reason": "0700 catalog directory and 0600 database, local paths only, no network transmission."
+        },
+        "analytics": {
+          "decision": "excluded",
+          "reason": "No telemetry collected."
+        },
+        "export_import": {
+          "decision": "included",
+          "reason": "Consistent local SQLite backup API; no import/merge UI yet."
+        }
+      }
+    },
+    {
+      "id": "catalog.root_baselines",
+      "value_type": "object",
+      "default": {},
+      "introduced_in": 2,
+      "policies": {
+        "preset": {
+          "decision": "excluded",
+          "reason": "Inventory is not an audio preset; no preset serializer."
+        },
+        "project_persistence": {
+          "decision": "excluded",
+          "reason": "Local application catalog, never a DAW project."
+        },
+        "default_reset": {
+          "decision": "included",
+          "reason": "Empty on first run. Session Reset does not delete the durable catalog."
+        },
+        "migration": "included",
+        "undo": {
+          "decision": "excluded",
+          "reason": "Derived scan observations and recoverable removal intents; no editable user tags in this increment."
+        },
+        "automation": {
+          "decision": "excluded",
+          "reason": "Store API is internal to scan/restore, no external automation commands."
+        },
+        "copy_paste": {
+          "decision": "excluded",
+          "reason": "No structured catalog clipboard; existing selectable text only."
+        },
+        "sync": {
+          "decision": "excluded",
+          "reason": "Local storage only; no account or synchronization."
+        },
+        "accessibility": {
+          "decision": "included",
+          "reason": "Cached/stale/errors use existing native status and inspector text; no new custom controls."
+        },
+        "privacy": {
+          "decision": "included",
+          "reason": "0700 catalog directory and 0600 database, local paths only, no network transmission."
+        },
+        "analytics": {
+          "decision": "excluded",
+          "reason": "No telemetry collected."
+        },
+        "export_import": {
+          "decision": "included",
+          "reason": "Consistent local SQLite backup API; no import/merge UI yet."
+        }
+      }
+    },
+    {
+      "id": "catalog.product_tags",
+      "value_type": "object",
+      "default": {},
+      "introduced_in": 2,
+      "policies": {
+        "preset": {
+          "decision": "excluded",
+          "reason": "Inventory is not an audio preset; no preset serializer."
+        },
+        "project_persistence": {
+          "decision": "excluded",
+          "reason": "Local application catalog, never a DAW project."
+        },
+        "default_reset": {
+          "decision": "included",
+          "reason": "Empty on first run. Session Reset does not delete the durable catalog."
+        },
+        "migration": {
+          "decision": "included",
+          "reason": "Separate version1 sidecar; reject future/invalid versions without replacement. SQLite unchanged."
+        },
+        "undo": {
+          "decision": "excluded",
+          "reason": "Derived vendor cache is not a user edit; disabling online tags excludes its suggestions."
+        },
+        "automation": {
+          "decision": "excluded",
+          "reason": "Store API is internal to scan/restore, no external automation commands."
+        },
+        "copy_paste": {
+          "decision": "excluded",
+          "reason": "No structured catalog clipboard; existing selectable text only."
+        },
+        "sync": {
+          "decision": "excluded",
+          "reason": "Local storage only; no account or synchronization."
+        },
+        "accessibility": {
+          "decision": "included",
+          "reason": "Cached/stale/errors use existing native status and inspector text; no new custom controls."
+        },
+        "privacy": "included",
+        "analytics": {
+          "decision": "excluded",
+          "reason": "No telemetry collected."
+        },
+        "export_import": {
+          "decision": "included",
+          "reason": "Consistent local SQLite backup API; no import/merge UI yet."
+        }
+      }
+    },
+    {
+      "id": "catalog.date_evidence",
+      "value_type": "object",
+      "default": {},
+      "introduced_in": 3,
+      "policies": {
+        "preset": {
+          "decision": "excluded",
+          "reason": "Evidence is local catalog history, not an audio preset."
+        },
+        "project_persistence": {
+          "decision": "excluded",
+          "reason": "Stored in the private application catalog, never a DAW project."
+        },
+        "default_reset": {
+          "decision": "included",
+          "reason": "Empty on migration/first run. Session reset retains durable evidence. Automatic receipt work is cancelled and its transient coverage summary cleared on reset; committed history remains. Derived date projections and loading/error generations are transient and cleared on reset. Addition bounds and scan coverage remain in local catalog history; coverage stores root physical identity, exclusions, policy and scan interval. Live use polling and projection tasks cancel on reset, scope change and removal; reset clears transient usage state but retains committed history."
+        },
+        "migration": {
+          "decision": "included",
+          "reason": "SQLite v1/v2/v3 to v4 uses a writer reservation, verified pre-migration backup and atomic migration; unsupported versions remain untouched. Schema4 adds exact-root scan coverage and node addition bounds; legacy first_seen projects only as a present-by upper bound. Receipt provenance remains additive and legacy records decode with nil provenance. Optional hostUsage provenance is additive; legacy records decode nil. Source-local clock components never populate absolute eventDate."
+        },
+        "undo": {
+          "decision": "excluded",
+          "reason": "Immutable source evidence, no user-edit or correction feature in this increment."
+        },
+        "automation": {
+          "decision": "excluded",
+          "reason": "Internal cancellable receipt and Live use collectors only. Sources checked every 60 seconds while app open; no background service or external command."
+        },
+        "copy_paste": {
+          "decision": "excluded",
+          "reason": "No evidence clipboard interface."
+        },
+        "sync": {
+          "decision": "excluded",
+          "reason": "Local only; no account or synchronization."
+        },
+        "accessibility": {
+          "decision": "included",
+          "reason": "Date added and Last used cells/inspector expose precision, product-class scope, format coverage, saved/checking/unavailable/partial states and sort semantics."
+        },
+        "privacy": {
+          "decision": "included",
+          "reason": "Private local SQLite database; no raw DAW logs or telemetry transmitted. Receipt package IDs, versions and local bundle paths remain private in this ledger and its backups. Local Live logs/cache are read only; retained host version, VST3 CID, local date and stable event hashes exclude raw project paths/logs. No uploads."
+        },
+        "analytics": {
+          "decision": "excluded",
+          "reason": "No analytics or telemetry collected."
+        },
+        "export_import": {
+          "decision": "included",
+          "reason": "Existing consistent local SQLite backup includes the ledger and optional receipt provenance; no import/merge feature. Optional host provenance and addition bounds are included in the same backup."
         }
       }
     }

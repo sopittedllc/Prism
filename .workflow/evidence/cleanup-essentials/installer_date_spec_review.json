@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "task_id": "cleanup-essentials",
+  "gate": "installer_date_spec_review",
+  "status": "passed",
+  "revision": "content:e363e416fbd6ef21b3cc3ac5a99fe0e4a046afeeb2486a4be0e7ca870c4667b9",
+  "timestamp": "2026-09-27T00:50:26.337164+00:00",
+  "producer": "Codex group_source_review",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "Approved exact-source projection, atomic read, byte identities, locale ordering and live-sheet refresh contract",
+      "status": "passed"
+    }
+  ]
+}

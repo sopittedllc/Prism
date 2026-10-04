@@ -1,0 +1,182 @@
+{
+  "schema_version": 1,
+  "task_id": "composer-discovery-v1",
+  "title": "Musical metadata editing, search and truthful recent discoveries",
+  "risk_tier": 2,
+  "domains": [
+    "ui-ux",
+    "stateful-feature"
+  ],
+  "state": "complete",
+  "base_revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+  "product_decisions_needed": [],
+  "acceptance_criteria": [
+    {
+      "id": "C1",
+      "statement": "Root history and per-root baselines preserve offline content and truthful newness",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/composer-discovery-v1/automated_tests.json",
+        ".workflow/evidence/composer-discovery-v1/runtime_tests.json",
+        ".workflow/evidence/composer-discovery-v1/source-review-report.json",
+        ".workflow/evidence/composer-discovery-v1/ux-review-report.json"
+      ]
+    },
+    {
+      "id": "C2",
+      "statement": "Musical metadata edits, suppression and Undo survive catalog persistence and scans",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/composer-discovery-v1/automated_tests.json",
+        ".workflow/evidence/composer-discovery-v1/runtime_tests.json",
+        ".workflow/evidence/composer-discovery-v1/source-review-report.json",
+        ".workflow/evidence/composer-discovery-v1/ux-review-report.json"
+      ]
+    },
+    {
+      "id": "C3",
+      "statement": "Shared search, musical filters and recent discoveries work in the native collection",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/composer-discovery-v1/automated_tests.json",
+        ".workflow/evidence/composer-discovery-v1/runtime_tests.json",
+        ".workflow/evidence/composer-discovery-v1/source-review-report.json",
+        ".workflow/evidence/composer-discovery-v1/ux-review-report.json"
+      ]
+    },
+    {
+      "id": "C4",
+      "statement": "Migration, state contract, automated and native runtime evidence pass applicable gates",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/composer-discovery-v1/automated_tests.json",
+        ".workflow/evidence/composer-discovery-v1/runtime_tests.json",
+        ".workflow/evidence/composer-discovery-v1/source-review-report.json",
+        ".workflow/evidence/composer-discovery-v1/ux-review-report.json"
+      ]
+    }
+  ],
+  "gates": {
+    "research": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/composer-discovery-v1/research.json"
+      ],
+      "revision": "content:7e67a2a7258455ef635b1e5f6b46adbf5a2f223b87a183800a10c0b4792abcbd",
+      "agent": "codex-verification"
+    },
+    "plan_review": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/composer-discovery-v1/plan_review.json"
+      ],
+      "revision": "content:7e67a2a7258455ef635b1e5f6b46adbf5a2f223b87a183800a10c0b4792abcbd",
+      "agent": "codex-independent-review"
+    },
+    "implementation": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/composer-discovery-v1/implementation.json"
+      ],
+      "revision": "content:7e67a2a7258455ef635b1e5f6b46adbf5a2f223b87a183800a10c0b4792abcbd",
+      "agent": "codex-verification"
+    },
+    "automated_tests": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/composer-discovery-v1/automated_tests.json"
+      ],
+      "revision": "content:7e67a2a7258455ef635b1e5f6b46adbf5a2f223b87a183800a10c0b4792abcbd",
+      "agent": "scripts/run_check.py"
+    },
+    "code_review": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/composer-discovery-v1/code_review.json"
+      ],
+      "revision": "content:7e67a2a7258455ef635b1e5f6b46adbf5a2f223b87a183800a10c0b4792abcbd",
+      "agent": "codex-independent-review"
+    },
+    "runtime_tests": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/composer-discovery-v1/runtime_tests.json"
+      ],
+      "revision": "content:7e67a2a7258455ef635b1e5f6b46adbf5a2f223b87a183800a10c0b4792abcbd",
+      "agent": "scripts/run_check.py"
+    },
+    "ui_research": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/composer-discovery-v1/ui_research.json"
+      ],
+      "revision": "content:7e67a2a7258455ef635b1e5f6b46adbf5a2f223b87a183800a10c0b4792abcbd",
+      "agent": "codex-verification"
+    },
+    "design_system_audit": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/composer-discovery-v1/design_system_audit.json"
+      ],
+      "revision": "content:7e67a2a7258455ef635b1e5f6b46adbf5a2f223b87a183800a10c0b4792abcbd",
+      "agent": "codex-verification"
+    },
+    "accessibility": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/composer-discovery-v1/accessibility.json"
+      ],
+      "revision": "content:7e67a2a7258455ef635b1e5f6b46adbf5a2f223b87a183800a10c0b4792abcbd",
+      "agent": "codex-verification"
+    },
+    "visual_regression": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/composer-discovery-v1/visual_regression.json"
+      ],
+      "revision": "content:7e67a2a7258455ef635b1e5f6b46adbf5a2f223b87a183800a10c0b4792abcbd",
+      "agent": "codex-verification"
+    },
+    "ux_review": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/composer-discovery-v1/ux_review.json"
+      ],
+      "revision": "content:7e67a2a7258455ef635b1e5f6b46adbf5a2f223b87a183800a10c0b4792abcbd",
+      "agent": "codex-independent-review"
+    },
+    "state_coverage": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/composer-discovery-v1/state_coverage.json"
+      ],
+      "revision": "content:7e67a2a7258455ef635b1e5f6b46adbf5a2f223b87a183800a10c0b4792abcbd",
+      "agent": "codex-verification"
+    },
+    "preset_roundtrip": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/composer-discovery-v1/preset_roundtrip.json"
+      ],
+      "revision": "content:7e67a2a7258455ef635b1e5f6b46adbf5a2f223b87a183800a10c0b4792abcbd",
+      "agent": "codex-verification"
+    },
+    "state_migration": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/composer-discovery-v1/state_migration.json"
+      ],
+      "revision": "content:7e67a2a7258455ef635b1e5f6b46adbf5a2f223b87a183800a10c0b4792abcbd",
+      "agent": "codex-verification"
+    },
+    "state_integration": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/composer-discovery-v1/state_integration.json"
+      ],
+      "revision": "content:7e67a2a7258455ef635b1e5f6b46adbf5a2f223b87a183800a10c0b4792abcbd",
+      "agent": "codex-verification"
+    }
+  },
+  "current_revision": "content:7e67a2a7258455ef635b1e5f6b46adbf5a2f223b87a183800a10c0b4792abcbd"
+}

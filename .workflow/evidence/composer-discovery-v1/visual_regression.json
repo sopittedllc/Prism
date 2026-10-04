@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "composer-discovery-v1",
+  "gate": "visual_regression",
+  "status": "passed",
+  "revision": "content:7e67a2a7258455ef635b1e5f6b46adbf5a2f223b87a183800a10c0b4792abcbd",
+  "timestamp": "2026-09-26T02:06:27.078126+00:00",
+  "producer": "codex-verification",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "visual_regression-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/composer-discovery-v1/visual-report.json",
+        "sha256": "2b4d9836a625ae253a07300f30515781d22b6ee49a44cb0234156a304efdede8"
+      }
+    }
+  ]
+}

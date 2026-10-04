@@ -11,7 +11,7 @@ public final class Scanner {
     /// Optional read-only vendor catalog location; injectable for fixture validation.
     public init(sineDatabase: URL = LibraryMetadataReader.sineDatabase) { self.sineDatabase = sineDatabase }
 
-    public func scan(_ request: ScanRequest, inventory: (@Sendable (InventorySnapshot) -> Void)? = nil, progress: (@Sendable (ScanProgress) -> Void)? = nil) -> ScanReport {
+    public func scan(_ request: ScanRequest, scannedKinds: Set<AssetKind> = Set(AssetKind.allCases), inventory: (@Sendable (InventorySnapshot) -> Void)? = nil, progress: (@Sendable (ScanProgress) -> Void)? = nil) -> ScanReport {
         let start = Date()
         var assets: [String: Asset] = [:]
         var projects: [String: ProjectReport] = [:]
@@ -53,7 +53,8 @@ public final class Scanner {
             return sampleDepth >= libraryDepth && sampleDepth >= 0
         }
 
-        func issue(_ url: URL, _ reason: String) { issues.append(ScanIssue(path: url.path, reason: reason)) }
+        var issueKind: AssetKind = .plugin
+        func issue(_ url: URL, _ reason: String) { issues.append(ScanIssue(path: url.path, reason: reason, kind: issueKind)) }
         func add(_ url: URL, _ kind: AssetKind, _ classification: String, _ isDirectory: Bool, bytes: Int? = nil) {
             assets[kind.rawValue + ":" + url.path] = Asset(kind: kind, path: url.path,
                 name: url.deletingPathExtension().lastPathComponent, format: url.pathExtension.lowercased(),
@@ -131,6 +132,8 @@ public final class Scanner {
 
         for (mode, roots) in [("plugins", request.plugins),
                               ("samples", request.samples), ("projects", request.projects)] {
+            issueKind = mode == "plugins" ? .plugin : .sample
+            guard scannedKinds.contains(issueKind) else { continue }
             categoryEntries = 0; limitReported = false
             if mode == "projects" { publishInventory(force: true) }
             for raw in roots.sorted(by: { $0.path < $1.path }) {
@@ -145,9 +148,12 @@ public final class Scanner {
                 walk(root, mode: mode, depth: 0)
             }
         }
-        for asset in LibraryDiscovery.scan(request, sineDatabase: sineDatabase, issues: &issues) {
-            assets["library:" + asset.selectionKey] = asset
-            publishInventory()
+        if scannedKinds.contains(.library) {
+            var libraryIssues: [ScanIssue] = []
+            for asset in LibraryDiscovery.scan(request, sineDatabase: sineDatabase, issues: &libraryIssues) {
+                assets["library:" + asset.selectionKey] = asset; publishInventory()
+            }
+            issues += libraryIssues.map { ScanIssue(path: $0.path, reason: $0.reason, kind: .library) }
         }
         publishInventory(complete: true, force: true)
         publish(.inspecting, 0, candidates.count, candidates.first?.url.path, force: true)
@@ -159,7 +165,7 @@ public final class Scanner {
                 let report = ProjectReader.read(candidate.url)
                 projects[candidate.url.path] = report
                 if report.coverage == "failed" || report.coverage == "unsupported" {
-                    issue(candidate.url, "Project reference coverage: " + report.coverage)
+                    issues.append(ScanIssue(path: candidate.url.path, reason: "Project reference coverage: " + report.coverage, kind: .sample))
                 }
             }
             publish(.inspecting, index + 1, candidates.count, candidate.url.path, force: index + 1 == candidates.count)

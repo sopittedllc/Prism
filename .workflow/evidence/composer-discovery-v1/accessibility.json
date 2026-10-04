@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "composer-discovery-v1",
+  "gate": "accessibility",
+  "status": "passed",
+  "revision": "content:7e67a2a7258455ef635b1e5f6b46adbf5a2f223b87a183800a10c0b4792abcbd",
+  "timestamp": "2026-09-26T02:06:26.991861+00:00",
+  "producer": "codex-verification",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "accessibility-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/composer-discovery-v1/accessibility-report.json",
+        "sha256": "9b07f6031b57d5757b2d522b1870cefbc53bc6954a6a914b5c0fc1001b3c13ac"
+      }
+    }
+  ]
+}

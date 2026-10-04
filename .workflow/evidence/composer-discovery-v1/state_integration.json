@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "composer-discovery-v1",
+  "gate": "state_integration",
+  "status": "passed",
+  "revision": "content:7e67a2a7258455ef635b1e5f6b46adbf5a2f223b87a183800a10c0b4792abcbd",
+  "timestamp": "2026-09-26T02:06:27.507851+00:00",
+  "producer": "codex-verification",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "state_integration-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/composer-discovery-v1/state-report.json",
+        "sha256": "0eb64e49d0f905749145b4bfa49c7d4209fb4bb67b2d46c252156f786024cd6d"
+      }
+    }
+  ]
+}

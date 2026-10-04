@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "task_id": "cleanup-essentials",
+  "gate": "automatic_receipt_source_review",
+  "status": "passed",
+  "revision": "content:bb761288456a3d64cbc086476db06dd3910bbc3eaa43ffa1cc97e32f28be3f7e",
+  "timestamp": "2026-09-27T00:12:55.824769+00:00",
+  "producer": "codex /root/container_review",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "Fresh source/state review passed: strict discovery, exact observation/binding, bounded command diagnostics and cancellation",
+      "status": "passed"
+    },
+    {
+      "name": "Settings/root/removal cancellation tests corrected to use configured URL; real scan-model native test reviewed",
+      "status": "passed"
+    },
+    {
+      "name": "Transient coverage summary and existing ledger state policies reviewed; original-addition/use/UI claims excluded",
+      "status": "passed"
+    },
+    {
+      "name": "Sources/SimplifyCore/PackageReceiptCollector.swift SHA256 163683fdfa33a8aac3d4e2b4b917ddbcaff7ec4726e3d33fb5bc0172d1cfb1c3",
+      "status": "passed"
+    },
+    {
+      "name": "Sources/SimplifyCore/BoundedCommand.swift SHA256 d691092ae20c74700ee9221d49d004bf19e44701f148d3704d88c9470a96279e",
+      "status": "passed"
+    },
+    {
+      "name": "Sources/SimplifyCore/CatalogStore.swift SHA256 56cf014bb5ca3eaf252eca36b570dc56684c9ad1e146eba5d81c3b3cab8e9ab6",
+      "status": "passed"
+    },
+    {
+      "name": "Sources/SimplifyCatalog/CatalogModel.swift SHA256 45b340bd2eba065d1477121cc91b6b105940e5e08375ee8eac3a89875c9db5a4",
+      "status": "passed"
+    },
+    {
+      "name": "tests/SimplifyCatalogTests/CatalogTests.swift SHA256 4458d8fee20ca056b130c8697648f7894da209ceff56416948e488062dbb08b0",
+      "status": "passed"
+    }
+  ]
+}

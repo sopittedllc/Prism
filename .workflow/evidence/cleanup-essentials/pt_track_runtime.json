@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "task_id": "cleanup-essentials",
+  "gate": "pt_track_runtime",
+  "status": "passed",
+  "revision": "content:fe5c88b1aa11fd7bfd6590d78ba379c7951fb3a7407c06f2962611d969e60dd2",
+  "timestamp": "2026-09-26T22:25:36.290343+00:00",
+  "producer": "codex /root",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "Pro Tools 24.10.2 native isolated mute and track-clear controls; no source audio deletion",
+      "status": "passed"
+    },
+    {
+      "name": "Debug/release full-field replay: 2 baseline, 2 plugin-removed, 2 muted, 0 pool-only events; pools each 1 file/2 clips",
+      "status": "passed"
+    },
+    {
+      "name": "Control input hashes/mtimes and all 14 original fixture hashes unchanged",
+      "status": "passed"
+    },
+    {
+      "name": "124 tests and eight configured checks passed; ordinary ProjectReader remains unsupported; no Last used/catalog admission",
+      "status": "passed"
+    }
+  ]
+}

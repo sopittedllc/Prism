@@ -34,3 +34,13 @@ reference inspector; setup-long-folders exercises10 roots, Remove focus and
 740pt sheet bound; setup-save-error retains all recovery actions; plugins-dark
 uses a long instrument name; table alignment rects assert8pt horizontal padding
 and vertical centering. Compare captures visually; no pixel-diff certification.
+
+Installer-record fixtures add light1220, dark1040, saved light1040, unavailable1040 and live740pt format sheet captures. Header/date measured widths include en_US/de_DE/ar_SA/th_TH examples; known/unknown ordering uses actual header input and preserves selection. Source coverage appears visibly and in accessibility labels.
+
+Addition precision: native addition-arrival-light and addition-range-dark-compact
+exercise During and cross-year ranges, column/AX precision, existing By bounds and
+retained selection. Inspector and format sheet retain installer history separately.
+
+Live positive use: last-used-live-light and last-used-live-dark-compact exercise
+qualified source-local date, product scope, unknown-last ordering in both directions,
+selection retention, accessible source/timezone explanation and full two-line text.

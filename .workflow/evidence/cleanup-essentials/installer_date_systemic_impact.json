@@ -1,0 +1,41 @@
+{
+  "task_id": "cleanup-essentials",
+  "symptom": "Retained receipt dates were invisible and date sort had no evidence",
+  "semantic_role": "Installer evidence date and status",
+  "authority": "docs/ui-ux/COLLECTION_AND_SETUP.md",
+  "searches": [
+    "Installed, sortDates, dateSummary, PluginFormatsWindow, firstFound"
+  ],
+  "included_consumers": [
+    "CatalogStore atomic projection",
+    "CatalogModel sorting and shared presentation",
+    "CatalogWindow table inspector AX",
+    "PluginFormatsWindow live per-installation details"
+  ],
+  "excluded_consumers": [
+    {
+      "consumer": "Samples/libraries original dates",
+      "reason": "Plugin receipts do not establish their acquisition"
+    }
+  ],
+  "system_changes": [
+    "Shared immutable presentation",
+    "Atomic async projection with generation guards",
+    "Native reversible sorting and source coverage"
+  ],
+  "representative_tests": [
+    "Exact-byte identities and corruption",
+    "Unknown-last both sort directions",
+    "Captured format snapshot after offline scan",
+    "Native compact light/dark, source sheet, cached and error states"
+  ],
+  "regression_prevention": [
+    "Model/store regression tests",
+    "Native smoke assertions"
+  ],
+  "knowledge_updates": [
+    "Design system",
+    "Visual matrix",
+    "State completeness registry"
+  ]
+}

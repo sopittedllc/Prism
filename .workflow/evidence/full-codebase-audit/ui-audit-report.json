@@ -1,0 +1,27 @@
+{
+  "client": "codex",
+  "role": "independent UX/visual reviewer; source-based accessibility gap analysis",
+  "status": "audit-delivered",
+  "baseline": "893196c",
+  "coverage": [
+    "All Catalog/App UI sources inspected",
+    "32 supplied screenshot matrix images inspected",
+    "Root reran packaged native smoke successfully"
+  ],
+  "findings_in_report": [
+    "F01",
+    "F08",
+    "F09",
+    "F10",
+    "F11",
+    "F12"
+  ],
+  "full_accessibility_status": "unverified",
+  "limits": [
+    "No artifact-only VoiceOver session",
+    "No complete keyboard/open-panel workflow",
+    "No measured contrast, RTL, older OS/Intel or audio-session interference evidence",
+    "No competitor hands-on tests"
+  ],
+  "report": "REPORT.md"
+}

@@ -382,3 +382,39 @@ private final class InventoryRecorder: @unchecked Sendable {
     #expect(report.issues.contains { $0.reason.contains("Entry limit") })
     #expect(report.projects.count == 1)
 }
+
+@Test func soundtoysMiddleFormatIDsGroupWithoutMergingDeluxe() {
+    var assets: [Asset] = []
+    for (name, product) in [("Devil-Loc", "DevilLoc"), ("Devil-Loc_Deluxe", "DevilLocDeluxe")] {
+        for (format, token) in [("component", "audiounit"), ("vst", "vst"), ("vst3", "vst3"), ("aaxplugin", "aax")] {
+            assets.append(Asset(kind: .plugin, path: "/fixture/\(name).\(format)", name: name, format: format,
+                bundleIdentifier: "com.soundtoys.\(token).\(product)", logicalBytes: nil, classification: "test"))
+        }
+    }
+    let products = PluginProduct.group(assets)
+    #expect(products.count == 2 && products.allSatisfy { $0.installations.count == 4 && $0.formats == "AAX, AU, VST2, VST3" })
+    assets.append(Asset(kind: .plugin, path: "/other/Devil-Loc.vst3", name: "Devil-Loc", format: "vst3", bundleIdentifier: "com.other.vst3.DevilLoc", logicalBytes: nil, classification: "test"))
+    #expect(PluginProduct.group(assets).count == 3)
+}
+
+@Test func scopedScannerKeepsNestedRootOwnershipAndSkipsOtherRoots() throws {
+    let f = try Fixture()
+    try f.file("Sounds/Loose/Kick.wav")
+    try f.file("Sounds/Loose/Nested Library/Patch.nki")
+    try f.file("Sounds/Loose/Nested Library/C3.wav")
+    try f.file("Sounds/Strings/Violin.nki")
+    var request = ScanRequest()
+    request.samples = [f.root.appendingPathComponent("Sounds/Loose")]
+    request.libraries = [f.root.appendingPathComponent("Sounds"), f.root.appendingPathComponent("Sounds/Loose/Nested Library")]
+    request.plugins = [f.root.appendingPathComponent("MissingPlugins")]
+    request.projects = [f.root.appendingPathComponent("MissingProjects")]
+    let sample = Scanner().scan(request, scannedKinds: [.sample])
+    #expect(sample.assets.map(\.name) == ["Kick"])
+    #expect(sample.issues.allSatisfy { $0.kind == .sample && !$0.path.contains("MissingPlugins") })
+    let libraries = Scanner().scan(request, scannedKinds: [.library])
+    #expect(libraries.assets.allSatisfy { $0.kind == .library && $0.name != "Loose" })
+    #expect(libraries.assets.contains { $0.name == "Nested Library" })
+    #expect(libraries.projects.isEmpty && !libraries.issues.contains { $0.path.contains("MissingProjects") || $0.path.contains("MissingPlugins") })
+    let plugins = Scanner().scan(request, scannedKinds: [.plugin])
+    #expect(plugins.assets.isEmpty && plugins.projects.isEmpty && plugins.issues.count == 1 && plugins.issues[0].kind == .plugin)
+}

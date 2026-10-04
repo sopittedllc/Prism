@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "task_id": "cleanup-essentials",
+  "gate": "simple_browsing_review",
+  "status": "passed",
+  "revision": "content:079b6dc8dc0e7e53c4b343e1797d6a9cbcc5fa7fe3acbf5d57511823b4bc88e0",
+  "timestamp": "2026-09-26T18:18:46.906519+00:00",
+  "producer": "/root/simple_review",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "Independent scoped source, state, accessibility and eight-capture visual review; VoiceOver user testing excluded",
+      "status": "passed"
+    },
+    {
+      "name": "Actual header mouse clicks and selection retention; native smoke passed 42 captures",
+      "status": "passed"
+    },
+    {
+      "name": "86 tests plus configured builds and integration/state checks",
+      "status": "passed"
+    }
+  ]
+}

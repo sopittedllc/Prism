@@ -1,0 +1,41 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "cleanup-essentials",
+  "gate": "installer_date_build",
+  "status": "passed",
+  "revision": "content:85fede3850e777c20ac11d96cc5441f533e67848bfa7b68e2906cb1162662b6e",
+  "timestamp": "2026-09-27T00:47:05.701045+00:00",
+  "producer": "scripts/run_check.py",
+  "client": "automation",
+  "checks": [
+    {
+      "name": "build-debug",
+      "status": "passed",
+      "command": "[\"swift\", \"build\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/cleanup-essentials/logs/build-debug.log"
+    },
+    {
+      "name": "unit-tests",
+      "status": "passed",
+      "command": "[\"swift\", \"test\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/cleanup-essentials/logs/unit-tests.log"
+    },
+    {
+      "name": "build-release",
+      "status": "passed",
+      "command": "[\"swift\", \"build\", \"-c\", \"release\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/cleanup-essentials/logs/build-release.log"
+    },
+    {
+      "name": "app-package",
+      "status": "passed",
+      "command": "[\"python3\", \"scripts/build_app.py\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/cleanup-essentials/logs/app-package.log"
+    }
+  ]
+}

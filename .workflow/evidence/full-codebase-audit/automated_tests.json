@@ -1,0 +1,55 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "full-codebase-audit",
+  "gate": "automated_tests",
+  "status": "passed",
+  "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+  "timestamp": "2026-09-26T00:53:29.960905+00:00",
+  "producer": "scripts/run_check.py",
+  "client": "automation",
+  "checks": [
+    {
+      "name": "build-debug",
+      "status": "passed",
+      "command": "[\"swift\", \"build\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/full-codebase-audit/logs/build-debug.log"
+    },
+    {
+      "name": "unit-tests",
+      "status": "passed",
+      "command": "[\"swift\", \"test\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/full-codebase-audit/logs/unit-tests.log"
+    },
+    {
+      "name": "integration-tests",
+      "status": "passed",
+      "command": "[\"python3\", \"scripts/probe_smoke.py\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/full-codebase-audit/logs/integration-tests.log"
+    },
+    {
+      "name": "template-integrity",
+      "status": "passed",
+      "command": "[\"python3\", \"scripts/template_self_test.py\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/full-codebase-audit/logs/template-integrity.log"
+    },
+    {
+      "name": "adapter-integrity",
+      "status": "passed",
+      "command": "[\"python3\", \"scripts/sync_agent_adapters.py\", \"--check\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/full-codebase-audit/logs/adapter-integrity.log"
+    },
+    {
+      "name": "catalog-state",
+      "status": "passed",
+      "command": "[\"python3\", \"scripts/catalog_state_check.py\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/full-codebase-audit/logs/catalog-state.log"
+    }
+  ]
+}

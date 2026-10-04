@@ -1,0 +1,25 @@
+{
+  "client": "codex",
+  "role": "independent-ux-reviewer",
+  "reviewer": "discovery_ux_review",
+  "status": "passed",
+  "verdict": "PASS",
+  "revision": "content:7e67a2a7258455ef635b1e5f6b46adbf5a2f223b87a183800a10c0b4792abcbd",
+  "resolved": [
+    "Sample-only facet context",
+    "Active zero-match value remains selected",
+    "Musical metadata above technical provenance",
+    "Native facet selection/edit/Undo/failure retry/invalid BPM checks",
+    "Explicit light/dark composer captures"
+  ],
+  "evidence": [
+    "runtime-report.json",
+    "runtime_tests.json"
+  ],
+  "limits": [
+    "Current Mac only",
+    "No manual VoiceOver, complete keyboard-only traversal, high-contrast/zoom testing or measured contrast certification",
+    "Existing horizontal table clipping remains prior audit debt",
+    "Source/visual review plus automated native evidence, not full accessibility certification"
+  ]
+}

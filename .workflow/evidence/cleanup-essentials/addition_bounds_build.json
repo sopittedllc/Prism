@@ -1,0 +1,48 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "cleanup-essentials",
+  "gate": "addition_bounds_build",
+  "status": "passed",
+  "revision": "content:8f04b3f52d3fe1550a209e233dbf684a0b338244faf5a1f5e73a71dced013820",
+  "timestamp": "2026-09-27T01:29:42.079050+00:00",
+  "producer": "scripts/run_check.py",
+  "client": "automation",
+  "checks": [
+    {
+      "name": "build-debug",
+      "status": "passed",
+      "command": "[\"swift\", \"build\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/cleanup-essentials/logs/build-debug.log"
+    },
+    {
+      "name": "unit-tests",
+      "status": "passed",
+      "command": "[\"swift\", \"test\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/cleanup-essentials/logs/unit-tests.log"
+    },
+    {
+      "name": "catalog-state",
+      "status": "passed",
+      "command": "[\"python3\", \"scripts/catalog_state_check.py\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/cleanup-essentials/logs/catalog-state.log"
+    },
+    {
+      "name": "build-release",
+      "status": "passed",
+      "command": "[\"swift\", \"build\", \"-c\", \"release\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/cleanup-essentials/logs/build-release.log"
+    },
+    {
+      "name": "app-package",
+      "status": "passed",
+      "command": "[\"python3\", \"scripts/build_app.py\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/cleanup-essentials/logs/app-package.log"
+    }
+  ]
+}

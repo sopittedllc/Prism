@@ -1,0 +1,20 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "full-codebase-audit",
+  "gate": "installed_discovery",
+  "status": "passed",
+  "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+  "timestamp": "2026-09-26T00:57:17.770801+00:00",
+  "producer": "scripts/run_check.py",
+  "client": "automation",
+  "checks": [
+    {
+      "name": "runtime-tests",
+      "status": "passed",
+      "command": "[\"python3\", \"scripts/probe_runtime.py\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/full-codebase-audit/logs/runtime-tests.log"
+    }
+  ]
+}

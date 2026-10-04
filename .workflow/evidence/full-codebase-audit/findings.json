@@ -1,0 +1,114 @@
+{
+  "baseline": "893196c",
+  "product_fixes_made": false,
+  "findings": [
+    {
+      "id": "F01",
+      "priority": "P1",
+      "kind": "defect",
+      "evidence_grade": "E1",
+      "title": "Usage sort mislabels project modification recency"
+    },
+    {
+      "id": "F02",
+      "priority": "P1",
+      "kind": "performance",
+      "evidence_grade": "E4",
+      "title": "Main-actor tree and filtering work"
+    },
+    {
+      "id": "F03",
+      "priority": "P2",
+      "kind": "defect",
+      "evidence_grade": "E2",
+      "title": "Offline inventory hidden by unrelated scope change"
+    },
+    {
+      "id": "F04",
+      "priority": "P2",
+      "kind": "defect",
+      "evidence_grade": "E1+E2",
+      "title": "Optional-root warnings block baseline completion"
+    },
+    {
+      "id": "F05",
+      "priority": "P2",
+      "kind": "defect",
+      "evidence_grade": "E2",
+      "title": "Internal bundle updates pass removal revalidation"
+    },
+    {
+      "id": "F06",
+      "priority": "P2",
+      "kind": "defect",
+      "evidence_grade": "E2",
+      "title": "Mixed-player fallback duplicates groups"
+    },
+    {
+      "id": "F07",
+      "priority": "P2",
+      "kind": "defect",
+      "evidence_grade": "E2",
+      "title": "Malformed Soundpaint metadata lacks diagnostics"
+    },
+    {
+      "id": "F08",
+      "priority": "P2",
+      "kind": "defect",
+      "evidence_grade": "E1",
+      "title": "Scan details snapshot becomes stale"
+    },
+    {
+      "id": "F09",
+      "priority": "P2",
+      "kind": "defect",
+      "evidence_grade": "E1",
+      "title": "Refresh resets column widths"
+    },
+    {
+      "id": "F10",
+      "priority": "P2",
+      "kind": "usability",
+      "evidence_grade": "E2",
+      "title": "Compact context truncation"
+    },
+    {
+      "id": "F11",
+      "priority": "P2",
+      "kind": "recovery-gap",
+      "evidence_grade": "E1",
+      "title": "No scan cancellation"
+    },
+    {
+      "id": "F12",
+      "priority": "P2",
+      "kind": "recovery-gap",
+      "evidence_grade": "E1+E3",
+      "title": "No in-app catalog recovery"
+    },
+    {
+      "id": "F13",
+      "priority": "P2",
+      "kind": "tooling-defect",
+      "evidence_grade": "E2",
+      "title": "Completion omits backing-report integrity"
+    },
+    {
+      "id": "F14",
+      "priority": "P3",
+      "kind": "documentation",
+      "evidence_grade": "E1",
+      "title": "Umbrella product status stale"
+    }
+  ],
+  "details": "REPORT.md",
+  "capability_gaps_separate": [
+    "Editable metadata",
+    "Recent acquisitions UI",
+    "Validated mandatory-host usage",
+    "Library footprint/reclaimable accounting",
+    "Sample/library removal",
+    "Incremental indexing",
+    "Release/accessibility matrix"
+  ]
+}

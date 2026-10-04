@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "record_type": "controlled_host_validation_checkpoint",
+  "timestamp": "2026-09-26T20:17:46.620528+00:00",
+  "original_fixture_files_checked": 14,
+  "originals_unchanged": true,
+  "controls": {
+    "Ableton": {
+      "origin": "new empty project",
+      "unchanged_save": "saved Baseline.als; all three plugin candidates present",
+      "plugin_removed_save": "saved Diva-removed.als; exactly Pro-Q4 and Kontakt8 candidates; track count unchanged",
+      "kontakt_empty_save": "saved Kontakt-empty.als; empty rack visually verified, Kontakt remains; processor state shrank from 23126 to 4236 bytes",
+      "kontakt_replaced_save": "pending",
+      "failed_load": "pending",
+      "notes": "Host-generated variants required; do not synthesize project binary edits.",
+      "host_version": "12.4.6",
+      "bypassed_save": "saved Diva-bypassed.als; Diva On/Manual false and reference retained",
+      "kontakt_loaded_visual": "01_Rubbed Wineglass restored in baseline GUI"
+    },
+    "Logic": {
+      "origin": "new empty project",
+      "unchanged_save": "saved Baseline.logicx",
+      "plugin_removed_save": "saved Diva-removed.logicx; removed Diva via No Plug-in menu, exploratory embedded AU tuple absent while other two remain; framing not admitted",
+      "kontakt_empty_save": "pending",
+      "kontakt_replaced_save": "pending",
+      "failed_load": "pending",
+      "notes": "Host-generated variants required; do not synthesize project binary edits."
+    },
+    "Pro Tools": {
+      "origin": "new empty project",
+      "unchanged_save": "Baseline.ptx and official Baseline.txt export; one active AAX instance each of Q4/Kontakt8/Diva",
+      "plugin_removed_save": "Diva-removed.ptx and official Diva-removed.txt export; Diva removed via no insert; other two plugin rows retained",
+      "kontakt_empty_save": "pending",
+      "kontakt_replaced_save": "pending",
+      "failed_load": "pending",
+      "notes": "Host-generated variants required; do not synthesize project binary edits.",
+      "export_options": "All tracks; files, clips, markers, plugins, track EDL included",
+      "export_path_correction": "An initial Baseline.txt export used remembered CoreSpotlight folder; verified newly created and byte-identical to isolated export, moved into control workspace as initial-protools-export.txt. No file left there."
+    },
+    "Cubase": {
+      "origin": "template",
+      "unchanged_save": "Baseline.cpr saved from isolated template-derived project",
+      "plugin_removed_save": "Diva-track-removed.cpr saved after removing only added Diva01 track; other template records remain",
+      "kontakt_empty_save": "pending",
+      "kontakt_replaced_save": "pending",
+      "failed_load": "pending",
+      "notes": "Cubase template baseline must come from the same starting template; do not infer it by deleting arbitrary records.",
+      "starting_template_control": "User preparing fresh Empty/Loaded/Diva Removed projects; not yet received"
+    }
+  },
+  "status": "research only; no actual-last-used admission"
+}

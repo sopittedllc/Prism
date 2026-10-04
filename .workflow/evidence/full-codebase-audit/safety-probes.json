@@ -1,0 +1,65 @@
+{
+  "compile": {
+    "argv": [
+      "xcrun",
+      "swiftc",
+      "-parse-as-library",
+      "-module-cache-path",
+      "<temporary>/module-cache",
+      "-I",
+      "<repo>/.build/debug/Modules",
+      "-I",
+      "<repo>/Sources/CSQLite",
+      "-I",
+      "<repo>/Sources/CZlib",
+      "<repo>/.workflow/evidence/full-codebase-audit/safety-probes.swift",
+      "<repo>/.build/debug/SimplifyCore.build/BoundedFile.swift.o",
+      "<repo>/.build/debug/SimplifyCore.build/CatalogPersistenceRegistry.swift.o",
+      "<repo>/.build/debug/SimplifyCore.build/CatalogStore.swift.o",
+      "<repo>/.build/debug/SimplifyCore.build/LibraryDiscovery.swift.o",
+      "<repo>/.build/debug/SimplifyCore.build/LibraryMetadata.swift.o",
+      "<repo>/.build/debug/SimplifyCore.build/Models.swift.o",
+      "<repo>/.build/debug/SimplifyCore.build/PluginProduct.swift.o",
+      "<repo>/.build/debug/SimplifyCore.build/PluginRemoval.swift.o",
+      "<repo>/.build/debug/SimplifyCore.build/ProjectReader.swift.o",
+      "<repo>/.build/debug/SimplifyCore.build/Scanner.swift.o",
+      "-o",
+      "<temporary>/safety-probes"
+    ],
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  "run": {
+    "argv": [
+      "<temporary>/safety-probes"
+    ],
+    "exit_code": 0,
+    "stdout": "before_error= nil\nroot_identity_equal_after_descendant_edit= true\nvalidation_error_after_descendant_edit= nil\ninjected_trash_operation_invoked= true result_success= true\nfirst_scope_assets= 1\nsame_scope_offline_assets= 1 stale= Optional(true)\nadd_projects_scope_offline_assets= 0\n",
+    "stderr": ""
+  },
+  "schema_version": 1,
+  "timestamp": "2026-09-26T00:58:23.654739+00:00",
+  "revision": "893196ca68ab4bc353124cd479efb963db115b6d",
+  "probe_sha256": "6d35abc59ebb483f9fc29b73e060058afdc445aac43847412ed16ed6c1c7fe21",
+  "object_sha256": {
+    ".build/debug/SimplifyCore.build/BoundedFile.swift.o": "546ad46b2d0aa9e5e94a55a56bb23be6c22453f581c247c4a8b0c4b559cf31de",
+    ".build/debug/SimplifyCore.build/CatalogPersistenceRegistry.swift.o": "ad0132bc18ee1675f91a2717685f698f585fd66a5c5ac9edf8dca639cbccbb8a",
+    ".build/debug/SimplifyCore.build/CatalogStore.swift.o": "0c89a73f1434deee825b67fc01755abd31ff9b16595fcf5cf87ab30c463e5809",
+    ".build/debug/SimplifyCore.build/LibraryDiscovery.swift.o": "b24d257f47aa4ade931adac95ad4579010252d206dd512f97bb514dab26eae97",
+    ".build/debug/SimplifyCore.build/LibraryMetadata.swift.o": "26829cf12af2cba9d68dd45e53ad61471e41486df82d3c98fac0326bfe36a89c",
+    ".build/debug/SimplifyCore.build/Models.swift.o": "53eaccec196100026744fe8ab2378a5c3d56564c09d748309bd218d7f235c668",
+    ".build/debug/SimplifyCore.build/PluginProduct.swift.o": "c24344720c4cf499b5ac444f2f3db3ce8b8368268afcb04b7c6899b05385d8a7",
+    ".build/debug/SimplifyCore.build/PluginRemoval.swift.o": "e3b2d97508690500d17422be09746b5b6aa9723833c61797d8bc1caca3d1447e",
+    ".build/debug/SimplifyCore.build/ProjectReader.swift.o": "a9b4856c24b7badba84feaa175d9c22b71295fa2ddf5d0b398608c4c1b85be5d",
+    ".build/debug/SimplifyCore.build/Scanner.swift.o": "3965d27ed2ffb736fda45247a01ead12905b15bf423213685121801d98948637"
+  },
+  "limits": [
+    "Synthetic fixtures; external volume unavailability simulated by renaming own directory.",
+    "Existing debug SimplifyCore module linked; no shared build performed.",
+    "Trash operation is injected; no real Trash or user-content deletion.",
+    "No UI interaction; exercises Scanner, CatalogStore, PluginRemoval APIs."
+  ],
+  "reproduce": "Run the compile argv with a fresh temporary output/module-cache directory, then execute the resulting binary from the repository root. Object list is the existing .build/debug/SimplifyCore.build/*.o. Synthetic .cache UUID directory is created and removed automatically.",
+  "path_redaction": "Commands retain their executed argv structure and flags; replace <repo> with this checkout and <temporary> with a newly created temporary directory. Original machine-specific paths are intentionally omitted."
+}

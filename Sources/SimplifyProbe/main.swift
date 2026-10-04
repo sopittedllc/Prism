@@ -5,6 +5,11 @@ let help = """
 Simplify read-only discovery prototype
 Usage: simplify-probe [--standard-plugins] [--plugins DIR] [--samples DIR]
                           [--libraries DIR] [--projects DIR] [--metrics]
+--inspect-pro-tools-text FILE reads optional exported lists; no usage timestamps.
+--inspect-plugin-receipt PACKAGE_ID BUNDLE reads an installer record; not original Date added or use.
+--inspect-cubase-archive FILE reads partial exported-track references; no usage timestamps.
+--inspect-cubase-descriptors FILE emits unresolved diagnostic records only; never usage evidence.
+--check-product-tags validates reviewed official web sources without reading local inventory.
 Repeat folder options for multiple roots. No arguments or --help performs no scan.
 JSON includes local paths. Keep reports private. No files are changed and no plugins run.
 Project readers are experimental and partial. Recency uses project modification time,
@@ -14,6 +19,83 @@ Exit: 0 = scan finished (project coverage may be partial), 2 = issues/partial sc
 """
 
 let arguments = Array(CommandLine.arguments.dropFirst())
+if arguments.first == "--inspect-plugin-receipt" {
+    guard arguments.count == 3, arguments.dropFirst().allSatisfy({ !$0.isEmpty && !$0.hasPrefix("-") }) else {
+        FileHandle.standardError.write(Data("Expected --inspect-plugin-receipt PACKAGE_ID BUNDLE\n".utf8)); exit(64)
+    }
+    let report: PackageReceiptReport
+    do { report = try PackageReceiptReader.inspect(packageID: arguments[1], bundle: URL(fileURLWithPath: arguments[2])) }
+    catch {
+        FileHandle.standardError.write(Data("Installer record unavailable: \(error)\n".utf8)); exit(2)
+    }
+    do {
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]; encoder.dateEncodingStrategy = .iso8601
+        try FileHandle.standardOutput.write(contentsOf: encoder.encode(report) + Data([10])); exit(0)
+    } catch { exit(1) }
+}
+// Explicit network-only provider validation; no local inventory is read or transmitted.
+if arguments == ["--check-product-tags"] {
+    var failures = 0
+    for source in ProductTagSources.all {
+        do {
+            _ = try await ProductTagClient.fetch(source)
+            print("PASS \(source.id): \(source.metadata.searchText)")
+        } catch { failures += 1; print("FAIL \(source.id): \(error.localizedDescription)") }
+    }
+    exit(failures == 0 ? 0 : 2)
+}
+if arguments.first == "--inspect-pro-tools-text" {
+    guard arguments.count == 2, !arguments[1].isEmpty, !arguments[1].hasPrefix("--") else {
+        FileHandle.standardError.write(Data("Expected --inspect-pro-tools-text FILE\n".utf8))
+        exit(64)
+    }
+    let report: ProToolsSessionTextReport
+    do { report = try ProToolsSessionTextReader.inspect(URL(fileURLWithPath: arguments[1])) }
+    catch {
+        FileHandle.standardError.write(Data("Pro Tools text rejected input: \(error)\n".utf8))
+        exit(2)
+    }
+    do {
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+        try FileHandle.standardOutput.write(contentsOf: encoder.encode(report) + Data([10]))
+        exit(0)
+    } catch { exit(1) }
+}
+if arguments.first == "--inspect-cubase-archive" {
+    guard arguments.count == 2, !arguments[1].isEmpty, !arguments[1].hasPrefix("--") else {
+        FileHandle.standardError.write(Data("Expected --inspect-cubase-archive FILE\n".utf8))
+        exit(64)
+    }
+    let report: CubaseTrackArchiveReport
+    do { report = try CubaseTrackArchiveReader.inspect(URL(fileURLWithPath: arguments[1])) }
+    catch {
+        FileHandle.standardError.write(Data("Cubase archive rejected input: \(error)\n".utf8))
+        exit(2)
+    }
+    do {
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+        try FileHandle.standardOutput.write(contentsOf: encoder.encode(report) + Data([10]))
+        exit(0)
+    } catch { exit(1) }
+}
+if arguments.first == "--inspect-cubase-descriptors" {
+    guard arguments.count == 2, !arguments[1].isEmpty, !arguments[1].hasPrefix("--") else {
+        FileHandle.standardError.write(Data("Expected --inspect-cubase-descriptors FILE\n".utf8))
+        exit(64)
+    }
+    let report: CubaseDiagnosticReport
+    do {
+        report = try CubaseDiagnostics.inspect(URL(fileURLWithPath: arguments[1]))
+    } catch {
+        FileHandle.standardError.write(Data("Cubase diagnostic rejected input: \(error)\n".utf8))
+        exit(2)
+    }
+    do {
+        let encoder = JSONEncoder(); encoder.outputFormatting = [.sortedKeys]
+        try FileHandle.standardOutput.write(contentsOf: encoder.encode(report) + Data([10]))
+        exit(0)
+    } catch { exit(1) }
+}
 if arguments.count == 2, arguments[0] == "--inspect-project" {
     let report = ProjectReader.read(URL(fileURLWithPath: arguments[1]))
     let encoder = JSONEncoder(); encoder.dateEncodingStrategy = .iso8601

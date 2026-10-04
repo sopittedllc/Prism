@@ -1,193 +1,122 @@
 {
   "schema_version": 1,
-  "task_id": "catalog-hierarchy",
-  "title": "Hierarchical library and sample browsing with contextual search",
+  "task_id": "cleanup-essentials",
+  "title": "Reliable Last used and Date added: visible installer evidence",
   "risk_tier": 2,
   "domains": [
     "ui-ux",
     "stateful-feature"
   ],
-  "state": "complete",
-  "base_revision": "content:1b467370a5aa3089ac6e1240d23b285dc0acb57fa14f162e8acd4ca6a5078fe2",
+  "state": "research",
+  "base_revision": "content:7e67a2a7258455ef635b1e5f6b46adbf5a2f223b87a183800a10c0b4792abcbd",
   "product_decisions_needed": [],
   "acceptance_criteria": [
     {
-      "id": "AC1",
-      "statement": "Golden library hierarchy",
-      "status": "passed",
-      "evidence": [
-        ".workflow/evidence/catalog-hierarchy/automated_tests.json",
-        ".workflow/evidence/catalog-hierarchy/runtime_tests.json",
-        ".workflow/evidence/catalog-hierarchy/source-review-report.json",
-        ".workflow/evidence/catalog-hierarchy/ux-review-report.json"
-      ]
+      "id": "C3",
+      "statement": "Real last-used evidence across Logic Pro, Pro Tools, Ableton Live and Cubase validated",
+      "status": "pending",
+      "evidence": []
     },
     {
-      "id": "AC2",
-      "statement": "Contextual search and restoration",
-      "status": "passed",
-      "evidence": [
-        ".workflow/evidence/catalog-hierarchy/automated_tests.json",
-        ".workflow/evidence/catalog-hierarchy/runtime_tests.json",
-        ".workflow/evidence/catalog-hierarchy/source-review-report.json",
-        ".workflow/evidence/catalog-hierarchy/ux-review-report.json"
-      ]
+      "id": "PT-V2",
+      "statement": "Pro Tools restore local-clock v2 repair verified; native manual use remains unqualified",
+      "status": "pending",
+      "evidence": []
     },
     {
-      "id": "AC3",
-      "statement": "Sample root/folder hierarchy",
-      "status": "passed",
-      "evidence": [
-        ".workflow/evidence/catalog-hierarchy/automated_tests.json",
-        ".workflow/evidence/catalog-hierarchy/runtime_tests.json",
-        ".workflow/evidence/catalog-hierarchy/source-review-report.json",
-        ".workflow/evidence/catalog-hierarchy/ux-review-report.json"
-      ]
+      "id": "C5",
+      "statement": "Date added distinguishes confirmed addition, installation/update and first discovery; preserves history across rescans, moves and updates",
+      "status": "pending",
+      "evidence": []
     },
     {
-      "id": "AC4",
-      "statement": "Native interaction and truthful details",
-      "status": "passed",
-      "evidence": [
-        ".workflow/evidence/catalog-hierarchy/automated_tests.json",
-        ".workflow/evidence/catalog-hierarchy/runtime_tests.json",
-        ".workflow/evidence/catalog-hierarchy/source-review-report.json",
-        ".workflow/evidence/catalog-hierarchy/ux-review-report.json"
-      ]
+      "id": "C1",
+      "statement": "Measured sizes across plugins, samples and libraries with honest completeness",
+      "status": "pending",
+      "evidence": []
     },
     {
-      "id": "AC5",
-      "statement": "State coverage and verification",
-      "status": "passed",
-      "evidence": [
-        ".workflow/evidence/catalog-hierarchy/automated_tests.json",
-        ".workflow/evidence/catalog-hierarchy/runtime_tests.json",
-        ".workflow/evidence/catalog-hierarchy/source-review-report.json",
-        ".workflow/evidence/catalog-hierarchy/ux-review-report.json"
-      ]
+      "id": "C2",
+      "statement": "Formats and size visible; paths secondary; direct reviewed plugin removal",
+      "status": "pending",
+      "evidence": []
+    },
+    {
+      "id": "C4",
+      "statement": "Native demo, state, source and UI verification complete",
+      "status": "pending",
+      "evidence": []
     }
   ],
   "gates": {
     "research": {
-      "status": "passed",
-      "evidence": [
-        ".workflow/evidence/catalog-hierarchy/research.json"
-      ],
-      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
-      "agent": "codex-researcher"
+      "status": "pending",
+      "evidence": []
     },
     "plan_review": {
-      "status": "passed",
-      "evidence": [
-        ".workflow/evidence/catalog-hierarchy/plan_review.json"
-      ],
-      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
-      "agent": "independent-codex-critic"
+      "status": "pending",
+      "evidence": []
     },
     "implementation": {
-      "status": "passed",
-      "evidence": [
-        ".workflow/evidence/catalog-hierarchy/implementation.json"
-      ],
-      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
-      "agent": "codex-qa"
+      "status": "pending",
+      "evidence": []
     },
     "automated_tests": {
       "status": "passed",
       "evidence": [
-        ".workflow/evidence/catalog-hierarchy/automated_tests.json"
+        ".workflow/evidence/cleanup-essentials/automated_tests.json"
       ],
-      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+      "revision": "content:73d27734dc9ed56741a4769d00289e288b5e720dd2a9828cd2c502cdaa06fa51",
       "agent": "scripts/run_check.py"
     },
     "code_review": {
-      "status": "passed",
-      "evidence": [
-        ".workflow/evidence/catalog-hierarchy/code_review.json"
-      ],
-      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
-      "agent": "independent-codex-reviewer"
+      "status": "pending",
+      "evidence": []
     },
     "runtime_tests": {
-      "status": "passed",
+      "status": "failed",
       "evidence": [
-        ".workflow/evidence/catalog-hierarchy/runtime_tests.json"
+        ".workflow/evidence/cleanup-essentials/runtime_tests.json"
       ],
-      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+      "revision": "content:1da02999e5ab48da5f98b640d6262d3f313bb75bb2fdfe56ab789dacbdb1be5b",
       "agent": "scripts/run_check.py"
     },
-    "state_coverage": {
-      "status": "passed",
-      "evidence": [
-        ".workflow/evidence/catalog-hierarchy/state_coverage.json"
-      ],
-      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
-      "agent": "codex-qa"
-    },
-    "preset_roundtrip": {
-      "status": "passed",
-      "evidence": [
-        ".workflow/evidence/catalog-hierarchy/preset_roundtrip.json"
-      ],
-      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
-      "agent": "codex-qa"
-    },
-    "state_migration": {
-      "status": "passed",
-      "evidence": [
-        ".workflow/evidence/catalog-hierarchy/state_migration.json"
-      ],
-      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
-      "agent": "codex-qa"
-    },
-    "state_integration": {
-      "status": "passed",
-      "evidence": [
-        ".workflow/evidence/catalog-hierarchy/state_integration.json"
-      ],
-      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
-      "agent": "codex-qa"
-    },
     "ui_research": {
-      "status": "passed",
-      "evidence": [
-        ".workflow/evidence/catalog-hierarchy/ui_research.json"
-      ],
-      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
-      "agent": "codex-ux-researcher"
+      "status": "pending",
+      "evidence": []
     },
     "design_system_audit": {
-      "status": "passed",
-      "evidence": [
-        ".workflow/evidence/catalog-hierarchy/design_system_audit.json"
-      ],
-      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
-      "agent": "codex-qa"
+      "status": "pending",
+      "evidence": []
     },
     "accessibility": {
-      "status": "passed",
-      "evidence": [
-        ".workflow/evidence/catalog-hierarchy/accessibility.json"
-      ],
-      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
-      "agent": "codex-qa"
+      "status": "pending",
+      "evidence": []
     },
     "visual_regression": {
-      "status": "passed",
-      "evidence": [
-        ".workflow/evidence/catalog-hierarchy/visual_regression.json"
-      ],
-      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
-      "agent": "independent-codex-ux-reviewer"
+      "status": "pending",
+      "evidence": []
     },
     "ux_review": {
-      "status": "passed",
-      "evidence": [
-        ".workflow/evidence/catalog-hierarchy/ux_review.json"
-      ],
-      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
-      "agent": "independent-codex-ux-reviewer"
+      "status": "pending",
+      "evidence": []
+    },
+    "state_coverage": {
+      "status": "pending",
+      "evidence": []
+    },
+    "preset_roundtrip": {
+      "status": "pending",
+      "evidence": []
+    },
+    "state_migration": {
+      "status": "pending",
+      "evidence": []
+    },
+    "state_integration": {
+      "status": "pending",
+      "evidence": []
     }
   },
-  "current_revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522"
+  "current_revision": "content:73d27734dc9ed56741a4769d00289e288b5e720dd2a9828cd2c502cdaa06fa51"
 }

@@ -11,6 +11,7 @@ import SimplifyCore
     public private(set) var confirmation: NSAlert?
     public private(set) var results: [PluginRemovalResult] = []
     public private(set) var isWorking = false
+    public private(set) var installerLabels: [NSTextField] = []
     private let model: CatalogModel
     private let message = label("", size: 12, secondary: true)
     private let summary = label("", size: 12, secondary: true)
@@ -38,9 +39,11 @@ import SimplifyCore
             toggle.setAccessibilityLabel("Remove " + PluginProduct.formatName(installation.format) + " at " + installation.path)
             choices.append(toggle)
             let path = label(installation.path, size: 11, secondary: true); path.maximumNumberOfLines = 2; path.lineBreakMode = .byTruncatingMiddle; path.toolTip = installation.path; path.isSelectable = true
-            let row = column([toggle, path], spacing: 4); rows.addArrangedSubview(row)
+            let receipt = label(model.installerRecordDetail(installation), size: 11, secondary: true)
+            receipt.isSelectable = true; installerLabels.append(receipt)
+            let row = column([toggle, receipt, path], spacing: 4); rows.addArrangedSubview(row)
             row.widthAnchor.constraint(equalTo: rows.widthAnchor).isActive = true
-            for view in [toggle, path] { view.widthAnchor.constraint(equalTo: row.widthAnchor).isActive = true; view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal) }
+            for view in [toggle, receipt, path] { view.widthAnchor.constraint(equalTo: row.widthAnchor).isActive = true; view.setContentCompressionResistancePriority(.defaultLow, for: .horizontal) }
         }
         selectedButton.target = self; selectedButton.action = #selector(reviewSelected); selectedButton.bezelStyle = .rounded
         allButton.target = self; allButton.action = #selector(reviewAll); allButton.bezelStyle = .rounded
@@ -51,7 +54,14 @@ import SimplifyCore
         for view in stack.arrangedSubviews { view.widthAnchor.constraint(equalTo: stack.widthAnchor).isActive = true }
         scroll.heightAnchor.constraint(greaterThanOrEqualToConstant: 180).isActive = true
         scroll.setContentHuggingPriority(.defaultLow, for: .vertical)
-        updateChoices()
+        updateChoices(); refreshInstallerRecords()
+    }
+    /// Keep an open review sheet consistent with async evidence refresh/invalidation.
+    public func refreshInstallerRecords() {
+        for (index, installation) in product.installations.enumerated() {
+            installerLabels[index].stringValue = model.additionDate(installation, grouped: false).detail + "\n" + model.installerRecordDetail(installation)
+            installerLabels[index].setAccessibilityLabel(PluginProduct.formatName(installation.format) + ". " + installerLabels[index].stringValue)
+        }
     }
     required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
     @objc private func updateChoices() {

@@ -1,0 +1,77 @@
+{
+  "task_id": "cleanup-essentials",
+  "question": "How should historical installer evidence appear without implying original acquisition or use?",
+  "official_sources": [
+    {
+      "title": "Apple Lists and Tables",
+      "url": "https://developer.apple.com/design/human-interface-guidelines/lists-and-tables",
+      "finding": "Use meaningful column headings and native sortable tables."
+    },
+    {
+      "title": "Finder sorting",
+      "url": "https://support.apple.com/en-my/guide/mac-help/-mchlp1745/mac",
+      "finding": "Column headers support reversible sorting."
+    },
+    {
+      "title": "System Information",
+      "url": "https://support.apple.com/en-ca/101591",
+      "finding": "Installation history includes software updates."
+    },
+    {
+      "title": "App Store purchase history",
+      "url": "https://support.apple.com/en-ie/118212",
+      "finding": "Purchase history is a separate acquisition record."
+    }
+  ],
+  "comparable_cases": [
+    {
+      "name": "Finder",
+      "user_context": "Browsing file inventory",
+      "task": "Find dates with an explicit meaning",
+      "pattern": "Reversible column sorting",
+      "success": "Clear source-specific date meaning",
+      "failure": "Cannot establish actual instrument use",
+      "transferability": "Adopt semantic separation; do not infer acquisition from receipt time"
+    },
+    {
+      "name": "System Information",
+      "user_context": "Reviewing installations and updates",
+      "task": "Find dates with an explicit meaning",
+      "pattern": "Installation history",
+      "success": "Clear source-specific date meaning",
+      "failure": "Cannot establish actual instrument use",
+      "transferability": "Adopt semantic separation; do not infer acquisition from receipt time"
+    },
+    {
+      "name": "App Store",
+      "user_context": "Finding acquisitions",
+      "task": "Find dates with an explicit meaning",
+      "pattern": "Separate purchase history",
+      "success": "Clear source-specific date meaning",
+      "failure": "Cannot establish actual instrument use",
+      "transferability": "Adopt semantic separation; do not infer acquisition from receipt time"
+    }
+  ],
+  "synthesis": {
+    "requirements": [
+      "Sortable plugin evidence dates",
+      "Visible partial coverage and saved-record status"
+    ],
+    "recurring_patterns": [
+      "Explicit date meaning",
+      "Native column sorting"
+    ],
+    "project_inferences": [
+      "Installer record must stay distinct from original Date added and Last used"
+    ],
+    "hypotheses": [
+      "Numeric dates fit compact table better; full dates remain accessible"
+    ]
+  },
+  "decision": "Plugin Installer record column; shared inspector/format status; other categories retain unknown Date added.",
+  "validation": [
+    "Native header clicks and AX labels",
+    "Light/dark 1040/1220 captures",
+    "Exact-node atomic projection and race tests"
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "probe": "completion_errors against otherwise valid completed task with code-review backing report absent and hash invalid",
+  "errors": [],
+  "unexpected_pass": true,
+  "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+  "scope": "in-memory copied task and temporary evidence only; did not alter active task or earlier gate evidence"
+}

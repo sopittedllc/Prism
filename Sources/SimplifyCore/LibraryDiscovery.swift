@@ -97,7 +97,9 @@ enum LibraryDiscovery {
                     if values.isDirectory == true {
                         // Do not walk millions of sample payloads or unrelated app/project packages.
                         let name = child.lastPathComponent.lowercased()
-                        if ["samples", "sample data", "imported samples", "audio", "documentation", "resources", "snapshots", "soundsources", "images"].contains(name) || ["app", "logicx", "band", "component", "vst3", "aaxplugin"].contains(child.pathExtension.lowercased()) { continue }
+                        // Samples can be a collection container before a product owns it.
+                        // Once owned, it is payload and remains outside patch discovery.
+                        if (name == "samples" && owner != nil) || ["sample data", "imported samples", "audio", "documentation", "resources", "snapshots", "soundsources", "images"].contains(name) || ["app", "logicx", "band", "component", "vst3", "aaxplugin"].contains(child.pathExtension.lowercased()) { continue }
                         walk(child, depth: depth + 1, inherited: owner)
                     } else if ["nki", "dspreset"].contains(child.pathExtension.lowercased()) {
                         let player = child.pathExtension.lowercased() == "nki" ? "Kontakt" : "Decent Sampler"

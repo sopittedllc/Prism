@@ -1,0 +1,20 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "cleanup-essentials",
+  "gate": "product_tag_sources",
+  "status": "passed",
+  "revision": "content:78c4ac75dc131500024b8c0fe4acb26b10b8916e2685ae5603d02812919fb367",
+  "timestamp": "2026-09-26T17:04:56.641501+00:00",
+  "producer": "scripts/run_check.py",
+  "client": "automation",
+  "checks": [
+    {
+      "name": "product-tag-sources",
+      "status": "passed",
+      "command": "[\".build/debug/simplify-probe\", \"--check-product-tags\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/cleanup-essentials/logs/product-tag-sources.log"
+    }
+  ]
+}

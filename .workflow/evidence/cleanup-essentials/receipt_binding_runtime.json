@@ -1,0 +1,20 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "cleanup-essentials",
+  "gate": "receipt_binding_runtime",
+  "status": "passed",
+  "revision": "content:490fe7498298d09882fa3aa80b8af6c42a97888a4ec546139b304c542b3b1d26",
+  "timestamp": "2026-09-26T23:51:52.145318+00:00",
+  "producer": "scripts/run_check.py",
+  "client": "automation",
+  "checks": [
+    {
+      "name": "receipt-binding-runtime",
+      "status": "passed",
+      "command": "[\"env\", \"PRISM_RECEIPT_BINDING_RUNTIME=1\", \"swift\", \"test\", \"--filter\", \"nativeReceiptBindingRuntime\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/cleanup-essentials/logs/receipt-binding-runtime.log"
+    }
+  ]
+}

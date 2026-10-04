@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "task_id": "cleanup-essentials",
+  "gate": "date_policy_research_checkpoint",
+  "status": "passed",
+  "revision": "content:bf11d1a6c84c8e9207c7db2c13a271d1f3570b2e4a0ccfd06ebb269d92afe5c7",
+  "timestamp": "2026-09-26T22:50:06.193503+00:00",
+  "producer": "codex /root",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "Controlled baseline reopen yielded new host events; exact action time not claimed",
+      "status": "passed"
+    },
+    {
+      "name": "All 14 original user test inputs retain their SHA-256 hashes",
+      "status": "passed"
+    },
+    {
+      "name": "Mapped binary persistence and missing success confirmation recorded as admission limits",
+      "status": "passed"
+    }
+  ]
+}

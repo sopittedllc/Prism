@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "task_id": "cleanup-essentials",
+  "gate": "cubase_archive_plan_review",
+  "status": "passed",
+  "revision": "content:b656d9d4f03eb20a171905f45e41aecb5a1001cd4b2ce2fe79032b8e719dd31c",
+  "timestamp": "2026-09-26T20:52:55.167225+00:00",
+  "producer": "codex /root/archive_spec_critic",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "Scoped B1 owner-path contract passed; selected-track coverage only; no catalog or timestamps",
+      "status": "passed"
+    }
+  ]
+}

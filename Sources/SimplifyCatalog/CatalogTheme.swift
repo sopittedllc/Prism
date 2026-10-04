@@ -49,7 +49,7 @@ import AppKit
         let tile = NSView(); tile.wantsLayer = true
         tile.layer?.backgroundColor = NSColor.white.cgColor; tile.layer?.cornerRadius = size * 0.22
         let image = NSImageView(); image.image = icon(); image.imageScaling = .scaleProportionallyUpOrDown
-        image.setAccessibilityLabel("Simplify app icon")
+        image.setAccessibilityLabel("Prism app icon")
         image.translatesAutoresizingMaskIntoConstraints = false; tile.addSubview(image)
         NSLayoutConstraint.activate([tile.widthAnchor.constraint(equalToConstant: size), tile.heightAnchor.constraint(equalToConstant: size),
             image.leadingAnchor.constraint(equalTo: tile.leadingAnchor, constant: size * 0.13), image.trailingAnchor.constraint(equalTo: tile.trailingAnchor, constant: -size * 0.13),
@@ -76,12 +76,14 @@ import AppKit
 
 /// Shared table geometry: comfortable horizontal inset and baseline-independent centering.
 @MainActor final class CatalogCell: NSTableCellView {
-    init(value: String, primary: Bool, subtitle: String? = nil, query: String = "", context: String? = nil) {
+    init(value: String, primary: Bool, subtitle: String? = nil, query: String = "", context: String? = nil, wrap: Bool = false) {
         super.init(frame: .zero)
         let text = NSTextField(labelWithString: value)
         text.font = .systemFont(ofSize: 12, weight: primary ? .medium : .regular)
         text.textColor = primary ? .labelColor : .secondaryLabelColor
-        text.lineBreakMode = .byTruncatingMiddle; text.toolTip = [value, subtitle, context].compactMap { $0 }.joined(separator: "\n")
+        text.lineBreakMode = wrap ? .byWordWrapping : .byTruncatingMiddle
+        text.maximumNumberOfLines = wrap ? 2 : 1
+        text.toolTip = [value, subtitle, context].compactMap { $0 }.joined(separator: "\n")
         text.setAccessibilityLabel([value, context].compactMap { $0 }.joined(separator: " · ")); textField = text
         if !query.isEmpty {
             let attributed = NSMutableAttributedString(string: value, attributes: [.font: text.font!, .foregroundColor: text.textColor!])
@@ -131,5 +133,16 @@ import AppKit
         var fill = bounds; fill.size.width *= CGFloat(min(100, max(0, doubleValue)) / 100)
         CatalogTheme.accent.setFill()
         NSBezierPath(roundedRect: fill, xRadius: 3, yRadius: 3).fill()
+    }
+}
+
+/// App-wide override; nil leaves AppKit following changes to the system preference.
+@MainActor extension CatalogAppearance {
+    func apply() {
+        switch self {
+        case .light: NSApp.appearance = NSAppearance(named: .aqua)
+        case .dark: NSApp.appearance = NSAppearance(named: .darkAqua)
+        case .system: NSApp.appearance = nil
+        }
     }
 }

@@ -1,0 +1,27 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "cleanup-essentials",
+  "gate": "installer_date_runtime",
+  "status": "passed",
+  "revision": "content:e363e416fbd6ef21b3cc3ac5a99fe0e4a046afeeb2486a4be0e7ca870c4667b9",
+  "timestamp": "2026-09-27T00:56:05.773754+00:00",
+  "producer": "scripts/run_check.py",
+  "client": "automation",
+  "checks": [
+    {
+      "name": "catalog-runtime",
+      "status": "passed",
+      "command": "[\"build/Prism.app/Contents/MacOS/Prism\", \"--ui-smoke\", \"captures/catalog\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/cleanup-essentials/logs/catalog-runtime.log"
+    },
+    {
+      "name": "automatic-receipt-runtime",
+      "status": "passed",
+      "command": "[\"env\", \"PRISM_AUTOMATIC_RECEIPT_RUNTIME=1\", \"swift\", \"test\", \"--filter\", \"nativeAutomaticReceiptRuntime\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/cleanup-essentials/logs/automatic-receipt-runtime.log"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "task_id": "cleanup-essentials",
+  "gate": "cubase_archive_runtime",
+  "status": "passed",
+  "revision": "content:b656d9d4f03eb20a171905f45e41aecb5a1001cd4b2ce2fe79032b8e719dd31c",
+  "timestamp": "2026-09-26T20:52:55.167960+00:00",
+  "producer": "codex root",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "Native debug and release exports yield 3/2/4 structurally owned references",
+      "status": "passed"
+    },
+    {
+      "name": "Renamed duplicate keeps Original Plugin Name and UID; duplicate owners remain separate",
+      "status": "passed"
+    },
+    {
+      "name": "Removed Diva-named track has no plugin ref; normal project reader rejects XML input",
+      "status": "passed"
+    },
+    {
+      "name": "Original sessions and exported files retain hashes; exports retain mtimes",
+      "status": "passed"
+    }
+  ],
+  "target": "macOS Apple Silicon; Cubase 15.0.30 XML exports, Cubase13/Nuendo13-or-newer compatibility",
+  "artifact_sha256": "a2dbf45248afb2e4c48fcab140452d19091b60e41921a02c26650d7be2569df5"
+}

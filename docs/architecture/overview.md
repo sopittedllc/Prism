@@ -25,7 +25,11 @@ installations of the same product remain distinct. Baseline observations are new
 not installation timestamps. Startup restores asynchronously; newer scans, scope edits,
 and reset prevent late restoration from replacing user intent. Unsupported or corrupt
 databases are preserved, and live results remain available if saving fails. Backup is local
-and explicit. No schema migration beyond the initial version is claimed.
+and explicit. Schema 3 migrates v1/v2 transactionally after a verified local backup.
+An immutable date-evidence ledger belongs to exact existing catalog node IDs. Atomic
+append and validated read APIs preserve history through reopen, offline scans and
+verified moves; replacement identities do not inherit evidence. Source qualification,
+instrument/product lineage and date presentation are separate, unfinished integrations.
 
 User tags, folder bookmarks, and background reconciliation remain future work subject to
 the state-completeness contract. Reviewed plugin removal moves only validated bundles to

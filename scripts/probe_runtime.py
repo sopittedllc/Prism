@@ -2,13 +2,18 @@
 """Read standard plugin roots and factory Ableton projects; print aggregates only."""
 import collections
 import json
+import os
 import subprocess
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 BIN = ROOT / '.build/debug/simplify-probe'
 command = [str(BIN), '--standard-plugins']
-factory = Path('/Applications/Ableton Live 12 Standard.app/Contents/App-Resources/Core Library/Lessons/Demo Songs')
+factory_override = os.environ.get('PRISM_ABLETON_FACTORY_DEMOS')
+factory = Path(factory_override) if factory_override else Path(
+    '/Applications/Ableton Live 12 Standard.app/Contents/App-Resources/Core Library/Lessons/Demo Songs')
+if factory_override and not factory.is_dir():
+    raise SystemExit('PRISM_ABLETON_FACTORY_DEMOS must point to an existing directory')
 if factory.is_dir():
     command += ['--projects', str(factory)]
 result = subprocess.run(command, capture_output=True, text=True, timeout=120)

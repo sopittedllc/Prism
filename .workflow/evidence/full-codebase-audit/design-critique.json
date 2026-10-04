@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "client": "codex",
+  "role": "specification-critic",
+  "status": "passed",
+  "verdict": "PASS",
+  "decision_scope": "Research and proposed direction are ready for an implementation plan. This is not implementation approval, measured user demand, runtime verification, or accessibility certification.",
+  "timestamp": "2026-09-26T01:09:34.178652+00:00",
+  "reviewed_sha256": {
+    "COMPOSER-DISCOVERY.md": "ef5b29d76ff5ce987bf9ac959141be1f9218b643fc6525df5af3f1db5c5d43f7",
+    "metadata-research.md": "b9d949da02390e1389b8084001bae513221021885d6ded14bbc87416f1d69374",
+    "acquisitions-design.md": "fcc578df5fed48021e1bfa9f81c8f0d9bc6d07475ded1c7aa5470ec314d4c052"
+  },
+  "blocking_findings": [],
+  "smallest_product_decision_requiring_user": null,
+  "resolved_ambiguities": [
+    "Ordered Try next queue replaces prior single-slot proposal consistently, with durable order, duplicate policy, explicit remove/clear and Undo.",
+    "COMPOSER-DISCOVERY governs final proposed facet priorities; metadata-research is evidence/input, so its secondary Character suggestion is not a conflicting instruction.",
+    "Transition table defines mutual movement between Try next and Later, effects of Mark explored and Dismiss, independence from Favorite/reference evidence, and atomic Undo.",
+    "Effective-value suppression and source-specific rejection are distinct; logical product/edition versus installation identity and unresolved reconciliation are explicit."
+  ],
+  "supported_design_boundaries": [
+    "Named Spitfire/OT/Cinematic Strings audience drives corpus selection; KVR voting and Splice behavior are not inflated into target-audience market share or query frequency.",
+    "CS2/CSS and Ark product/edition identities remain distinct; scoped aliases do not merge installations.",
+    "Advertised product capability, verified installed patch capability and observed current configuration remain separate. Multi-articulation instruments do not become fictitious files.",
+    "User authority wins; raw vendor assertions remain inspectable; unknown is not absence or a negative fact.",
+    "Initial baseline, new root, newly found, reconnect, update, uncertain identity and user acquisition date are distinguished. Scope/baseline defects are explicitly prerequisites.",
+    "Registry, persistence/default/reset, migration, Undo, automation, clipboard, sync, accessibility, privacy and export policies are addressed at proposal level.",
+    "New-to-explore and manual explored state are not usage history, deletion safety, playback, or an automatic external action."
+  ],
+  "nonblocking_planning_requirements": [
+    {
+      "id": "P01",
+      "section": "Implementation and validation sequence; acquisitions-design Cross-cutting policy",
+      "requirement": "The implementation plan must bind exact registry IDs/schema migration and transaction boundaries, choose measured responsiveness budgets, and list exact verification commands. These are intentionally not certified by this proposal.",
+      "binary_counterexample": "After a failed transaction or migration, prior override/suppression/queue order survives reopen; no partial Mark explored transition persists."
+    },
+    {
+      "id": "P02",
+      "section": "Explicit proposed state transitions; newness rules",
+      "requirement": "Translate event-versus-product semantics into concrete fixtures, including a new instrument added to a previously explored library and repeated Mark explored/Undo.",
+      "binary_counterexample": "A newly discovered patch in an explored library is labeled Updated under the declared review policy, never a fake newly acquired product; dismissing one event does not erase later events."
+    },
+    {
+      "id": "P03",
+      "section": "Metadata assertions and suppression; capability distinction",
+      "requirement": "Verify scope across inherited, multi-source and version-specific assertions, not only simple one-tag fixtures.",
+      "binary_counterexample": "Removing an effective inherited tag survives rescan; source-only rejection leaves an independent supported assertion; a product webpage cannot make a non-installed articulation appear as an installed patch."
+    },
+    {
+      "id": "P04",
+      "section": "Identity/reconciliation; acquisition dates",
+      "requirement": "Before persistence implementation define date-only manual acquisition semantics and ambiguous physical-to-logical identity reconciliation, with restored-user-state acceptance cases.",
+      "binary_counterexample": "Manual acquisition day does not change after timezone change; duplicate editions and offline installations preserve distinct mappings; uncertain anchor replacement retains unresolved queue/edit state rather than silently transferring it."
+    }
+  ],
+  "limits": [
+    "Reviewed supplied official-source research and inference boundaries; did not independently refetch every linked vendor page.",
+    "No usability study, new UI, adapter capability or extraction permission was established.",
+    "No product files were edited; no blind criteria read."
+  ]
+}

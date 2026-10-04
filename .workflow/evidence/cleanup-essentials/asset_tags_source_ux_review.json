@@ -1,0 +1,24 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "cleanup-essentials",
+  "gate": "asset_tags_source_ux_review",
+  "status": "passed",
+  "revision": "content:008e7bfe8037b8306b6b75976d678531995249a25189426a3674f5bc21e2c903",
+  "timestamp": "2026-09-26T17:26:30.299096+00:00",
+  "producer": "Independent Codex agent asset_priority_review",
+  "client": "codex",
+  "target": "Asset presentation and six-source online product tags only; parent usage/storage/removal remains pending",
+  "checks": [
+    {
+      "name": "Source review after generation cancellation and obsolete-cache repairs",
+      "status": "passed",
+      "log": ".workflow/evidence/cleanup-essentials/ASSET-TAGS-DELIVERY.md"
+    },
+    {
+      "name": "Independent visual review: light, compact dark, plugin and technical-details captures",
+      "status": "passed",
+      "log": "captures/catalog/runtime.json"
+    }
+  ]
+}

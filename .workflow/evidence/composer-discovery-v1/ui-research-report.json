@@ -1,0 +1,63 @@
+{
+  "client": "codex",
+  "role": "ux-architect",
+  "status": "passed",
+  "official_sources": [
+    "https://developer.apple.com/design/human-interface-guidelines/searching",
+    "https://www.spitfireaudio.com/products/spitfire-symphony-orchestra",
+    "https://www.orchestraltools.com/berlin-series",
+    "https://cinematicstudioseries.com/strings/"
+  ],
+  "comparable_cases": [
+    {
+      "name": "Kontakt browser",
+      "user_context": "Composer finding instruments",
+      "task": "Combine musical tags with owned content",
+      "pattern": "Search plus musical facets",
+      "success": "Composable musical retrieval documented by vendor",
+      "failure": "Product recommendations concern unowned content",
+      "transferability": "Transfer musical filters, exclude commerce"
+    },
+    {
+      "name": "Sononym tags",
+      "user_context": "Local sample collection",
+      "task": "Correct automatic labels and rediscover sounds",
+      "pattern": "Manual/automatic labels and durable suppression",
+      "success": "Refresh need not undo a user classification",
+      "failure": "Ambiguous filenames cannot prove musical intent",
+      "transferability": "Separate suggestions, overrides and empty suppression"
+    },
+    {
+      "name": "Splice search",
+      "user_context": "Producer narrowing sample results",
+      "task": "Filter samples by instrument, type, tempo and key",
+      "pattern": "Contextual sample fields",
+      "success": "Asset-specific narrowing",
+      "failure": "Download time is not acquisition time",
+      "transferability": "Sample-only BPM/key/type; observed dates separately"
+    }
+  ],
+  "synthesis": {
+    "requirements": [
+      "Editable musical metadata",
+      "Honest observed dates",
+      "No Library identity/Advanced details groups",
+      "No v2 exploration queue"
+    ],
+    "recurring_patterns": [
+      "Composable search",
+      "User-correctable tags",
+      "Separate availability and acquisition"
+    ],
+    "project_inferences": [
+      "Six core musical fields and three contextual sample fields",
+      "30-day recent observation filter"
+    ],
+    "hypotheses": [
+      "Target composers benefit from musical descriptors; no representative query-frequency dataset found"
+    ]
+  },
+  "decision": "Implement revised V1-SCOPE.md using existing native collection/editor shell",
+  "validation": "77 fixture tests plus native controls, failure recovery, screenshots and independent source/UX review",
+  "source_provenance": "Prior official research in full-codebase-audit/COMPOSER-DISCOVERY.md, metadata-research.md and acquisitions-design.md; scope narrowed by user afterward. No new market-share claims."
+}

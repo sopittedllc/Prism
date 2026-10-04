@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "task_id": "cleanup-essentials",
+  "gate": "receipt_runtime",
+  "status": "passed",
+  "revision": "content:77344710cc095f2ed6d9908de868718a72d078bfa33ec0013e3032d200994c70",
+  "timestamp": "2026-09-26T23:34:38.077344+00:00",
+  "producer": "codex native debug/release receipt replay",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "Three real AU receipts matched expected association/version-mismatch outcomes in both builds",
+      "status": "passed"
+    },
+    {
+      "name": "Report versions and dates equal fresh pkgutil output; debug/release fields equal except observation time",
+      "status": "passed"
+    },
+    {
+      "name": "All six input metadata/executable SHA-256 values and mtimes unchanged",
+      "status": "passed"
+    }
+  ]
+}

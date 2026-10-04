@@ -1,0 +1,34 @@
+{
+  "client": "codex",
+  "role": "research coordinator",
+  "status": "passed",
+  "scope": "Official-source competitive comparison and proposed composer metadata/acquisition design; no demand-frequency or market-share ranking established",
+  "audience": "Film/TV/game composers using Spitfire, Orchestral Tools and Cinematic Strings",
+  "sources": [
+    "https://www.pluginstation.app/",
+    "https://github.com/julianworden/PluginStation",
+    "https://www.sononym.net/docs/manual/tags/",
+    "https://docs.native-instruments.com/ni-tech-manuals/kontakt-manual/en/browser-and-presets",
+    "https://support.splice.com/en/articles/8652594-finding-sounds",
+    "https://www.xlnaudio.com/products/xo",
+    "https://algonaut.audio/manuals/atlas/2_0_2/map.html",
+    "https://www.kvraudio.com/readers-choice-awards/2025/",
+    "https://www.midiaresearch.com/sounds-of-2026",
+    "https://www.spitfireaudio.com/products/spitfire-symphony-orchestra",
+    "https://www.orchestraltools.com/berlin-series",
+    "https://cinematicstudioseries.com/strings/",
+    "https://cinematicstudioseries.com/cs2/"
+  ],
+  "artifacts": [
+    "REPORT.md",
+    "COMPOSER-DISCOVERY.md",
+    "metadata-research.md",
+    "acquisitions-design.md"
+  ],
+  "limits": [
+    "ADSR official page returned403; no verified claims included.",
+    "No representative target-composer query log dataset found.",
+    "Vendor capability does not establish local extraction feasibility or installed patch content.",
+    "Proposed design not implemented or usability validated."
+  ]
+}

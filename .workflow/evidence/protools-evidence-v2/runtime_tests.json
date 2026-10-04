@@ -1,0 +1,20 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "protools-evidence-v2",
+  "gate": "runtime_tests",
+  "status": "passed",
+  "revision": "content:b2de8bc1b2f7d48ce9f53a50dce09ff32512dadc02b1b523e66fb98076cf40bb",
+  "timestamp": "2026-10-03T23:30:03.388192+00:00",
+  "producer": "scripts/run_check.py",
+  "client": "automation",
+  "checks": [
+    {
+      "name": "protools-restore-v2-runtime",
+      "status": "passed",
+      "command": "[\"env\", \"PRISM_PROTOOLS_RESTORE_V2_RUNTIME=1\", \"swift\", \"test\", \"--filter\", \"nativeProToolsRestoreV2Runtime\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/protools-evidence-v2/logs/protools-restore-v2-runtime.log"
+    }
+  ]
+}

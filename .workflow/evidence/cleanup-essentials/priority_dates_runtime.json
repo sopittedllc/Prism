@@ -1,0 +1,27 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "cleanup-essentials",
+  "gate": "priority_dates_runtime",
+  "status": "passed",
+  "revision": "content:73eb6e8d40a7dce4e7e97e3a9c1aad1d91afa7a28fcc1a7bb5e8b20d1c3e6d6d",
+  "timestamp": "2026-09-27T02:01:45.012108+00:00",
+  "producer": "scripts/run_check.py",
+  "client": "automation",
+  "checks": [
+    {
+      "name": "catalog-runtime",
+      "status": "passed",
+      "command": "[\"build/Prism.app/Contents/MacOS/Prism\", \"--ui-smoke\", \"captures/catalog\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/cleanup-essentials/logs/catalog-runtime.log"
+    },
+    {
+      "name": "live-usage-runtime",
+      "status": "passed",
+      "command": "[\"env\", \"PRISM_LIVE_USAGE_RUNTIME=1\", \"swift\", \"test\", \"--filter\", \"nativeLiveCompletedRestoreRuntime\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/cleanup-essentials/logs/live-usage-runtime.log"
+    }
+  ]
+}

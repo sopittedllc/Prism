@@ -46,6 +46,14 @@ public struct LibraryMetadata: Codable, Sendable {
     public var searchText: String { ([player, maker, summary] + tags + instruments.flatMap { [$0.name] + $0.tags }).joined(separator: " ") }
 }
 
+/// Bounded fields extracted from one Kontakt ProductHints product.
+/// SNPID is preserved exactly as stored; it is not case-folded or normalized.
+public struct KontaktManifestDetails: Sendable, Equatable {
+    public let name: String
+    public let maker: String
+    public let snpid: String?
+}
+
 /// Local, derived metadata only. Never reads sample payloads or account/license data.
 public enum LibraryMetadataReader {
     public static let maximumMetadataBytes = 8 * 1024 * 1024
@@ -68,14 +76,44 @@ public enum LibraryMetadataReader {
         return parseKontaktManifest(data)
     }
     public static func parseKontaktManifest(_ data: Data) -> (name: String, maker: String)? {
+        guard let details = parseKontaktManifestDetails(data) else { return nil }
+        return (details.name, details.maker)
+    }
+    public static func kontaktManifestDetails(_ url: URL) -> KontaktManifestDetails? {
+        guard safe(url),
+              (try? url.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true,
+              let data = try? BoundedFile.read(url, limit: 65_536, prefixOnly: true) else { return nil }
+        return parseKontaktManifestDetails(data)
+    }
+    public static func parseKontaktManifestDetails(_ data: Data) -> KontaktManifestDetails? {
         guard data.count <= 65_536 else { return nil }
-        let text = String(decoding: data, as: UTF8.self)
-        guard !text.localizedCaseInsensitiveContains("<!DOCTYPE"), !text.localizedCaseInsensitiveContains("<!ENTITY"),
-              let start = text.range(of: "<ProductHints"), let end = text.range(of: "</ProductHints>"), start.lowerBound < end.upperBound else { return nil }
-        let reader = ProductManifestDelegate(); let parser = XMLParser(data: Data(text[start.lowerBound..<end.upperBound].utf8))
+        let prefixText = String(decoding: data, as: UTF8.self)
+        guard !prefixText.localizedCaseInsensitiveContains("<!DOCTYPE"),
+              !prefixText.localizedCaseInsensitiveContains("<!ENTITY") else { return nil }
+        let opening = Data("<ProductHints".utf8)
+        let closing = Data("</ProductHints>".utf8)
+        guard let start = data.range(of: opening),
+              let end = data.range(of: closing, in: start.lowerBound..<data.endIndex),
+              start.lowerBound < end.upperBound else { return nil }
+        let xmlData = data.subdata(in: start.lowerBound..<end.upperBound)
+        guard let text = String(data: xmlData, encoding: .utf8),
+              text.hasPrefix("<ProductHints") else { return nil }
+        let reader = ProductManifestDelegate(); let parser = XMLParser(data: xmlData)
         parser.shouldResolveExternalEntities = false; parser.delegate = reader
-        guard parser.parse(), !reader.rejected, let name = reader.fields["Name"], !name.isEmpty else { return nil }
-        return (name, reader.fields["Company"] ?? "Unknown maker")
+        guard parser.parse(), !reader.rejected, reader.productCount == 1,
+              reader.fieldCounts["Name"] == 1,
+              let name = reader.fields["Name"], !name.isEmpty else { return nil }
+        if reader.fieldCounts["SNPID", default: 0] > 1 { return nil }
+        let snpid = reader.fields["SNPID"]
+        if let snpid, !validKontaktSNPID(snpid) { return nil }
+        return KontaktManifestDetails(name: name,
+                                      maker: reader.fieldCounts["Company"] == 1 ? (reader.fields["Company"] ?? "Unknown maker") : "Unknown maker",
+                                      snpid: snpid)
+    }
+    static func validKontaktSNPID(_ value: String) -> Bool {
+        (1...64).contains(value.utf8.count) && value.utf8.allSatisfy {
+            (48...57).contains($0) || (65...90).contains($0) || (97...122).contains($0)
+        }
     }
     public static func soundpaintPart(_ url: URL) -> LibraryInstrument? {
         guard safe(url), let data = try? BoundedFile.read(url, limit: maximumMetadataBytes),
@@ -173,12 +211,26 @@ public enum LibraryMetadataReader {
     }
 }
 private final class ProductManifestDelegate: NSObject, XMLParserDelegate {
-    var stack: [String] = []; var fields: [String: String] = [:]; var rejected = false
+    var stack: [String] = []; var fields: [String: String] = [:]
+    var fieldCounts: [String: Int] = [:]; var productCount = 0; var rejected = false
     func parser(_ parser: XMLParser, didStartElement name: String, namespaceURI: String?, qualifiedName: String?, attributes: [String: String]) {
-        stack.append(name); if stack.count > 64 { rejected = true; parser.abortParsing() }
+        stack.append(name)
+        if stack.count > 64 { rejected = true; parser.abortParsing(); return }
+        if stack == ["ProductHints", "Product"] {
+            productCount += 1
+            if productCount > 1 { rejected = true; parser.abortParsing(); return }
+        }
+        if stack.count == 3, stack[0] == "ProductHints", stack[1] == "Product",
+           ["Name", "Company", "SNPID"].contains(name) {
+            fieldCounts[name, default: 0] += 1
+            if fieldCounts[name, default: 0] > 1 { rejected = true; parser.abortParsing() }
+        }
     }
     func parser(_ parser: XMLParser, foundCharacters text: String) {
-        if stack.count == 3, stack[0] == "ProductHints", stack[1] == "Product", let key = stack.last, ["Name", "Company"].contains(key) { fields[key, default: ""] += text }
+        if stack.count == 3, stack[0] == "ProductHints", stack[1] == "Product",
+           let key = stack.last, ["Name", "Company", "SNPID"].contains(key) {
+            fields[key, default: ""] += text
+        }
     }
     func parser(_ parser: XMLParser, didEndElement: String, namespaceURI: String?, qualifiedName: String?) { if !stack.isEmpty { stack.removeLast() } }
 }

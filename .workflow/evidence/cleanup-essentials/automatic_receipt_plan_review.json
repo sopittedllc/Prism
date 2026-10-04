@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "task_id": "cleanup-essentials",
+  "gate": "automatic_receipt_plan_review",
+  "status": "passed",
+  "revision": "content:bb761288456a3d64cbc086476db06dd3910bbc3eaa43ffa1cc97e32f28be3f7e",
+  "timestamp": "2026-09-27T00:12:55.824335+00:00",
+  "producer": "codex /root/group_source_review",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "Specification passed after actor-entry/precommit cancellation, inclusive budgets, deterministic ordering and diagnostic handling clarifications",
+      "status": "passed"
+    },
+    {
+      "name": "Independent read-only Codex fallback after prior alternate Claude OAuth failure",
+      "status": "passed"
+    }
+  ]
+}

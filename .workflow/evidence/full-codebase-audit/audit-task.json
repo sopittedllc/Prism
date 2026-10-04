@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "task_id": "full-codebase-audit",
+  "title": "Full product, codebase, metadata and competitive audit",
+  "risk_tier": 1,
+  "domains": [],
+  "state": "complete",
+  "base_revision": "893196c",
+  "product_decisions_needed": [],
+  "acceptance_criteria": [
+    {
+      "id": "A1",
+      "statement": "Scope coverage and limitations",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/full-codebase-audit/REPORT.md",
+        ".workflow/evidence/full-codebase-audit/audit-review.json",
+        ".workflow/evidence/full-codebase-audit/delivery-report.json"
+      ]
+    },
+    {
+      "id": "A2",
+      "statement": "Reproducible prioritized findings",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/full-codebase-audit/REPORT.md",
+        ".workflow/evidence/full-codebase-audit/audit-review.json",
+        ".workflow/evidence/full-codebase-audit/delivery-report.json"
+      ]
+    },
+    {
+      "id": "A3",
+      "statement": "Official competitor comparison",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/full-codebase-audit/REPORT.md",
+        ".workflow/evidence/full-codebase-audit/audit-review.json",
+        ".workflow/evidence/full-codebase-audit/delivery-report.json"
+      ]
+    },
+    {
+      "id": "A4",
+      "statement": "Metadata and workflow analysis",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/full-codebase-audit/REPORT.md",
+        ".workflow/evidence/full-codebase-audit/audit-review.json",
+        ".workflow/evidence/full-codebase-audit/delivery-report.json"
+      ]
+    },
+    {
+      "id": "A5",
+      "statement": "Reviewed remediation sequence",
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/full-codebase-audit/REPORT.md",
+        ".workflow/evidence/full-codebase-audit/audit-review.json",
+        ".workflow/evidence/full-codebase-audit/delivery-report.json"
+      ]
+    }
+  ],
+  "gates": {
+    "research": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/full-codebase-audit/research.json"
+      ],
+      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+      "agent": "codex-research-coordinator"
+    },
+    "plan_review": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/full-codebase-audit/plan_review.json"
+      ],
+      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+      "agent": "independent-codex-specification-critic"
+    },
+    "implementation": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/full-codebase-audit/implementation.json"
+      ],
+      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+      "agent": "codex-audit-coordinator"
+    },
+    "automated_tests": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/full-codebase-audit/automated_tests.json"
+      ],
+      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+      "agent": "scripts/run_check.py"
+    },
+    "code_review": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/full-codebase-audit/code_review.json"
+      ],
+      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+      "agent": "independent-codex-reviewer"
+    },
+    "runtime_tests": {
+      "status": "passed",
+      "evidence": [
+        ".workflow/evidence/full-codebase-audit/runtime_tests.json"
+      ],
+      "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+      "agent": "scripts/run_check.py"
+    }
+  },
+  "current_revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522"
+}

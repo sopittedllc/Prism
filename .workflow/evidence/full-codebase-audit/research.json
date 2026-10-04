@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "full-codebase-audit",
+  "gate": "research",
+  "status": "passed",
+  "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+  "timestamp": "2026-09-26T01:10:23.815928+00:00",
+  "producer": "codex-research-coordinator",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "research-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/full-codebase-audit/research-summary.json",
+        "sha256": "1879773435ff213e0a7d6fae60227aa6cf6eb32f4f8b67c19ffef291448868d6"
+      }
+    }
+  ]
+}

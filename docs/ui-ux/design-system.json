@@ -49,7 +49,9 @@
     "numeric_unit_formatting": {
       "counts": "localized formatted integers",
       "size": "ByteCountFormatter; unknown shown as dash / not measured",
-      "recency": "project modification date proxy; samples only"
+      "recency": "project modification date proxy; samples only",
+      "installer_record": "Plugin installer history appears in inspector/per-format details, independent of Date added and Last used.",
+      "addition_bounds": "Date added preserves precision: exact numeric date, During date or two-line arrival range, By date for present-by bounds. Sort upper bound, lower bound, precision then stable name/identity; disclose actual acquisition order may differ. Instruments never inherit library/player dates."
     }
   },
   "components": [
@@ -105,9 +107,9 @@
       ],
       "examples": [
         "setup-welcome",
-        "setup-sounds",
-        "setup-projects",
-        "setup-ready"
+        "setup-mixed",
+        "setup-long-folders",
+        "setup-save-error"
       ],
       "tests": [
         "catalog-runtime",
@@ -199,19 +201,94 @@
         "catalog-runtime",
         "catalog-state"
       ]
+    },
+    {
+      "semantic_role": "names and tags search with header sorting",
+      "authority": "CatalogWindow.swift / CatalogModel.swift / MusicalMetadata.swift",
+      "states": [
+        "plain search",
+        "zero matches",
+        "ascending and descending headers",
+        "unknown dates",
+        "offline retained record"
+      ],
+      "examples": [
+        "composer-facet-light",
+        "simple-browsing-inspector",
+        "simple-browsing-dark"
+      ],
+      "tests": [
+        "catalog-runtime",
+        "unit-tests",
+        "catalog-state"
+      ]
+    },
+    {
+      "semantic_role": "musical metadata editor",
+      "authority": "MetadataEditor.swift / MusicalMetadata.swift",
+      "states": [
+        "suggested",
+        "user edited",
+        "empty suppression",
+        "invalid input",
+        "save failed draft retained",
+        "saved",
+        "cancelled",
+        "undo"
+      ],
+      "examples": [
+        "composer-metadata-editor",
+        "composer-metadata-save-error",
+        "composer-sample-validation"
+      ],
+      "tests": [
+        "catalog-runtime",
+        "unit-tests",
+        "catalog-state"
+      ]
+    },
+    {
+      "semantic_role": "direct tag pills and compact setup",
+      "authority": "TagPills.swift / SetupWindow.swift",
+      "states": [
+        "light and dark",
+        "hover and keyboard delete",
+        "empty plus",
+        "wrapped scrolling tags",
+        "add draft validation and retry",
+        "atomic grouped edit and Undo",
+        "single native locations sheet",
+        "setup save recovery"
+      ],
+      "examples": [
+        "tag-pill-add",
+        "tag-pills-keyboard",
+        "setup-welcome",
+        "setup-mixed",
+        "setup-long-folders",
+        "setup-save-error"
+      ],
+      "tests": [
+        "catalog-runtime",
+        "unit-tests",
+        "catalog-state"
+      ]
     }
   ],
   "patterns": [
     "Persistent category navigation; collection-specific evidence columns",
     "Local interactive setup with draft/cancel semantics and explicit first scan",
-    "Long selectable location text stays inside scrollable inspector",
+    "Full selectable paths and per-format Finder actions live in Location; tags and lifecycle facts lead the inspector",
     "No numeric cleanup/savings claims from incomplete evidence",
     "Table text is centered vertically inside 38pt rows with 8pt horizontal inset.",
-    "Folder lists use a flipped document with top-anchored rows; edits focus the same category folder chooser.",
+    "Setup uses one native Type/Folder table; selected removal retains list focus.",
     "Stream inventory before project analysis; pending references remain explicit. Determinate progress has no animation lag.",
     "Native outline uses 16pt indentation with the shared 38pt row and 8pt text inset.",
     "Search keeps matching patch ancestors; flat sample results show a root-relative breadcrumb and distinguish equal root names.",
-    "Unmeasured library footprint remains Not measured; instrument storage is Shared with library."
+    "Unmeasured library footprint remains Not measured; instrument storage is Shared with library.",
+    "Tag dropdowns and Last used occupy separate rows. Unknown usage is not inactivity; unavailable age ranges remain disabled.",
+    "Settings appearance uses native popup Light/Dark/Match system preference; Light default, live preview, Cancel rollback, atomic Save without scan; app-wide semantic colors.",
+    "Scan targets the captured active section; plugin formats form the name subtitle with no duplicate format column; standard plugin roots automatic; one Settings entry for preferences."
   ],
   "exceptions": [
     {

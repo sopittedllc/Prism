@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "task_id": "composer-discovery-design",
+  "title": "Composer discovery proposal: implementation planning pending",
+  "risk_tier": 2,
+  "domains": [
+    "ui-ux",
+    "stateful-feature"
+  ],
+  "state": "planning",
+  "base_revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+  "product_decisions_needed": [],
+  "acceptance_criteria": [
+    {
+      "id": "C1",
+      "statement": "Plan durable musical metadata, overrides and search for instrument, technique, ensemble/register, character and role; exclude Library identity and Advanced details UI groups",
+      "status": "pending",
+      "evidence": [
+        ".workflow/evidence/full-codebase-audit/V1-SCOPE.md"
+      ]
+    },
+    {
+      "id": "C2",
+      "statement": "Plan simple recent-content highlighting after baseline/scope repairs; defer Try next, Mark explored and related exploration workflow to v2",
+      "status": "pending",
+      "evidence": [
+        ".workflow/evidence/full-codebase-audit/V1-SCOPE.md"
+      ]
+    },
+    {
+      "id": "C3",
+      "statement": "Require runtime, accessibility, migration and state evidence before any product completion claim",
+      "status": "pending",
+      "evidence": [
+        ".workflow/evidence/full-codebase-audit/V1-SCOPE.md"
+      ]
+    }
+  ],
+  "gates": {
+    "research": {
+      "status": "pending",
+      "evidence": []
+    },
+    "plan_review": {
+      "status": "pending",
+      "evidence": []
+    },
+    "implementation": {
+      "status": "pending",
+      "evidence": []
+    },
+    "automated_tests": {
+      "status": "pending",
+      "evidence": []
+    },
+    "code_review": {
+      "status": "pending",
+      "evidence": []
+    },
+    "runtime_tests": {
+      "status": "pending",
+      "evidence": []
+    },
+    "ui_research": {
+      "status": "pending",
+      "evidence": []
+    },
+    "design_system_audit": {
+      "status": "pending",
+      "evidence": []
+    },
+    "accessibility": {
+      "status": "pending",
+      "evidence": []
+    },
+    "visual_regression": {
+      "status": "pending",
+      "evidence": []
+    },
+    "ux_review": {
+      "status": "pending",
+      "evidence": []
+    },
+    "state_coverage": {
+      "status": "pending",
+      "evidence": []
+    },
+    "preset_roundtrip": {
+      "status": "pending",
+      "evidence": []
+    },
+    "state_migration": {
+      "status": "pending",
+      "evidence": []
+    },
+    "state_integration": {
+      "status": "pending",
+      "evidence": []
+    }
+  }
+}

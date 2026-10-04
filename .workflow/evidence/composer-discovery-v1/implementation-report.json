@@ -1,0 +1,25 @@
+{
+  "client": "codex",
+  "role": "implementer",
+  "status": "passed",
+  "revision": "content:7e67a2a7258455ef635b1e5f6b46adbf5a2f223b87a183800a10c0b4792abcbd",
+  "features": [
+    "Musical metadata suggestions, editable replacements and suppression",
+    "Tokenized musical search and contextual facet menus",
+    "Native single-item editor with per-installation plugin targets and Undo",
+    "Recent 30-day non-baseline findings and First found ordering",
+    "Per-root coverage, cross-scope offline retention, per-member timestamps and v1 backup/migration"
+  ],
+  "validation": [
+    "automated_tests.json",
+    "runtime_tests.json",
+    "runtime-report.json"
+  ],
+  "scope_limits": [
+    "No Library identity/Advanced details filters",
+    "Try next/Mark explored remain v2",
+    "No full prior-audit remediation or DAW usage coverage claim",
+    "Single musical facet menu combines with multiword search; no batch editor"
+  ],
+  "native_enforcement": "Native hooks unavailable; deterministic run_check, record_gate and check-complete used directly."
+}

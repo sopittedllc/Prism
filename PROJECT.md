@@ -1,4 +1,4 @@
-# Simplify
+# Prism
 
 **Status:** Discovery
 **Owner:** TODO
@@ -6,7 +6,7 @@
 
 ## Product statement
 
-Simplify is a free, lean audio collection manager supporting Altadena Girls.
+Prism is a free, lean audio collection manager supporting Altadena Girls.
 Musicians and composers can inventory installed plugins, individual samples, and
 instrument libraries, classify them, understand saved-project references, and remove
 unwanted content. Charity presentation and donation destination remain to be defined.
@@ -42,6 +42,15 @@ This workflow is the north star for feature and architecture decisions.
 
 ## Non-negotiable constraints
 
+- Reliable Last used and Date added are the two highest-priority capabilities and
+  release gates. Validate usage across all four primary hosts before treating cleanup
+  as delivered; UI polish and metadata breadth cannot substitute for this evidence.
+  Investigate qualified host activity and prospective observation alongside saved
+  projects; project parsing is not the only permitted source of usage evidence.
+- Date added must distinguish original addition, recorded installation/update, and
+  first discovery by Prism. Initial inventory, rescans, updates, moves, and reconnects
+  must not make an existing product appear newly acquired. Unknown original dates
+  remain unknown; discovery of a plugin by a DAW does not establish use.
 - macOS only; compatibility target covers ten DAW families, with related products
   included, as recorded in [ecosystem research](docs/research/audio-ecosystems.md).
 - Logic Pro, Ableton Live, Cubase, and Pro Tools are mandatory primary targets.

@@ -1,0 +1,23 @@
+{
+  "client": "codex",
+  "role": "qa",
+  "status": "passed",
+  "scope": "Automated native accessibility labels, existing native arrow disclosure and Find focus, visible keyboard focus and source review of new AppKit controls",
+  "revision": "content:7e67a2a7258455ef635b1e5f6b46adbf5a2f223b87a183800a10c0b4792abcbd",
+  "evidence": [
+    "runtime-report.json",
+    "ux-review-report.json"
+  ],
+  "checks": [
+    "Metadata input and suggested-checkbox labels",
+    "Recent filter accessible label includes 30-day period",
+    "Save/Cancel native key equivalents",
+    "Sheet completion restores table focus",
+    "State/provenance/newness/error conveyed in text",
+    "Native outline semantics and arrow keys retained"
+  ],
+  "limits": [
+    "No full accessibility certification",
+    "Manual VoiceOver, full keyboard-only traversal, zoom, high-contrast and numerical contrast unverified"
+  ]
+}

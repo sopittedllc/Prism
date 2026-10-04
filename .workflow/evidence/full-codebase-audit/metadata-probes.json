@@ -1,0 +1,182 @@
+{
+  "producer": "independent metadata/discovery reviewer",
+  "client": "codex",
+  "evidence_grade": "E2",
+  "generated_at": "2026-09-26T00:58:21.546972+00:00",
+  "revision": "893196ca68ab4bc353124cd479efb963db115b6d",
+  "executable_sha256": "0fd080f331c99483296d96b0f360d78b5a7fff3ed2a00c4354ebfe09ded004df",
+  "source_sha256": {
+    "Sources/SimplifyCore/LibraryDiscovery.swift": "b770ed8bc361910ab65e09d137777a853322189f00aaa7a1d4f30d6bb510630d",
+    "Sources/SimplifyCore/LibraryMetadata.swift": "4440ae2278a78e96c4c538b6b7d3ae1f792f512a00664dd281144c9d6d65e31d"
+  },
+  "limitations": [
+    "Synthetic fixtures only; no vendor installation compatibility certification.",
+    "These assertions reproduce current defects, not desired regression expectations."
+  ],
+  "cases": [
+    {
+      "case": "mixed_player_folder_fragmentation",
+      "argv": [
+        ".build/debug/simplify-probe",
+        "--libraries",
+        "<synthetic-fixture>/Mixed"
+      ],
+      "exit_code": 0,
+      "stdout": {
+        "assets": [
+          {
+            "classification": "needsIdentification",
+            "format": "Kontakt",
+            "kind": "library",
+            "libraryMetadata": {
+              "identity": {
+                "evidence": "unresolved"
+              },
+              "instruments": [
+                {
+                  "name": "Accordion",
+                  "path": "<synthetic-fixture>/Mixed/Accordion.nki",
+                  "tags": [
+                    "Accordion"
+                  ]
+                }
+              ],
+              "maker": "Unknown maker",
+              "player": "Kontakt",
+              "source": "Unresolved instrument folder; product and maker need identification. Tags inferred from instrument names.",
+              "summary": "",
+              "tags": [
+                "Accordion"
+              ]
+            },
+            "name": "Mixed",
+            "path": "<synthetic-fixture>/Mixed"
+          },
+          {
+            "classification": "needsIdentification",
+            "format": "Decent Sampler",
+            "kind": "library",
+            "libraryMetadata": {
+              "identity": {
+                "evidence": "unresolved"
+              },
+              "instruments": [
+                {
+                  "name": "Banjo",
+                  "path": "<synthetic-fixture>/Mixed/Banjo.dspreset",
+                  "tags": [
+                    "Banjo"
+                  ]
+                }
+              ],
+              "maker": "Unknown maker",
+              "player": "Decent Sampler",
+              "source": "Unresolved instrument folder; product and maker need identification. Tags inferred from instrument names.",
+              "summary": "",
+              "tags": [
+                "Banjo"
+              ]
+            },
+            "name": "Mixed",
+            "path": "<synthetic-fixture>/Mixed/Banjo.dspreset"
+          },
+          {
+            "classification": "needsIdentification",
+            "format": "Decent Sampler",
+            "kind": "library",
+            "libraryMetadata": {
+              "identity": {
+                "evidence": "unresolved"
+              },
+              "instruments": [
+                {
+                  "name": "Cello",
+                  "path": "<synthetic-fixture>/Mixed/Cello.dspreset",
+                  "tags": [
+                    "Cello"
+                  ]
+                }
+              ],
+              "maker": "Unknown maker",
+              "player": "Decent Sampler",
+              "source": "Unresolved instrument folder; product and maker need identification. Tags inferred from instrument names.",
+              "summary": "",
+              "tags": [
+                "Cello"
+              ]
+            },
+            "name": "Mixed",
+            "path": "<synthetic-fixture>/Mixed/Cello.dspreset"
+          }
+        ],
+        "durationSeconds": 0.03199803829193115,
+        "issues": [],
+        "projects": [],
+        "sampleInclusions": [],
+        "schemaVersion": 1
+      },
+      "stderr": "",
+      "observed_groups": [
+        [
+          "Mixed",
+          "Kontakt",
+          1
+        ],
+        [
+          "Mixed",
+          "Decent Sampler",
+          1
+        ],
+        [
+          "Mixed",
+          "Decent Sampler",
+          1
+        ]
+      ],
+      "defect_reproduced": true,
+      "expected_behavior": "Two unresolved groups, one per player, with same-player siblings consolidated."
+    },
+    {
+      "case": "malformed_soundpaint_metadata_silently_omitted",
+      "argv": [
+        ".build/debug/simplify-probe",
+        "--libraries",
+        "<synthetic-fixture>/Soundpaint"
+      ],
+      "exit_code": 0,
+      "stdout": {
+        "assets": [
+          {
+            "classification": "needsIdentification",
+            "format": "Soundpaint",
+            "kind": "library",
+            "libraryMetadata": {
+              "identity": {
+                "evidence": "proposed",
+                "installationRoot": "<synthetic-fixture>/Soundpaint"
+              },
+              "instruments": [],
+              "maker": "Soundpaint",
+              "player": "Soundpaint",
+              "source": "Soundpaint libraryInfo + Parts metadata; library name from installation folder. Usage not established.",
+              "summary": "",
+              "tags": []
+            },
+            "name": "Soundpaint",
+            "path": "<synthetic-fixture>/Soundpaint"
+          }
+        ],
+        "durationSeconds": 0.03193199634552002,
+        "issues": [],
+        "projects": [],
+        "sampleInclusions": [],
+        "schemaVersion": 1
+      },
+      "stderr": "",
+      "defect_reproduced": true,
+      "expected_behavior": "Recognized invalid part metadata produces a scoped coverage issue."
+    }
+  ],
+  "synthetic_fixture_removed": true,
+  "all_defects_reproduced": true
+}

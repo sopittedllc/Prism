@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "full-codebase-audit",
+  "gate": "implementation",
+  "status": "passed",
+  "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+  "timestamp": "2026-09-26T01:10:23.986235+00:00",
+  "producer": "codex-audit-coordinator",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "implementation-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/full-codebase-audit/delivery-report.json",
+        "sha256": "0b525e885c5edffd40b55f978fd42b06f9156f3fa8e4ed87cd31fe630cd37733"
+      }
+    }
+  ]
+}

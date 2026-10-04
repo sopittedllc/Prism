@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "task_id": "cleanup-essentials",
+  "gate": "cubase_group_plan_review",
+  "status": "passed",
+  "revision": "content:8a9147d3f2727fab40cc9a5783e82ba3565df6de09fd81fd0b6097bf222daae6",
+  "timestamp": "2026-09-26T21:10:13.398115+00:00",
+  "producer": "codex /root/group_spec_critic",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "Exact group signature and deferred admission approved; no output or whole-project coverage claim",
+      "status": "passed"
+    }
+  ]
+}

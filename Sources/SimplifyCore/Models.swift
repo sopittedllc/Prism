@@ -1,6 +1,6 @@
 import Foundation
 
-public enum AssetKind: String, Codable, Sendable { case plugin, sample, library }
+public enum AssetKind: String, Codable, CaseIterable, Sendable { case plugin, sample, library }
 
 /// A discovered location, not a claim of ownership or safe removability.
 public struct Asset: Codable, Sendable {
@@ -25,6 +25,11 @@ public struct Asset: Codable, Sendable {
 public struct ScanIssue: Codable, Sendable {
     public let path: String
     public let reason: String
+    /// Nil for older reports whose diagnostic ownership is unknown.
+    public let kind: AssetKind?
+    public init(path: String, reason: String, kind: AssetKind? = nil) {
+        self.path = path; self.reason = reason; self.kind = kind
+    }
 }
 
 /// A saved reference. Project modification time is only a recency proxy.
@@ -63,6 +68,20 @@ public struct ScanReport: Codable, Sendable {
     }
     public func replacingAssets(_ assets: [Asset]) -> ScanReport {
         ScanReport(schemaVersion: schemaVersion, assets: assets, projects: projects, sampleInclusions: sampleInclusions, issues: issues, durationSeconds: durationSeconds)
+    }
+    /// Replace only executed sections; legacy unowned issues remain until a full scan.
+    public func merging(previous: ScanReport?, scannedKinds: Set<AssetKind>) -> ScanReport {
+        guard let previous, scannedKinds != Set(AssetKind.allCases) else { return self }
+        var seenIssues = Set<String>()
+        let mergedIssues = (previous.issues.filter { $0.kind.map { !scannedKinds.contains($0) } ?? true } + issues).filter {
+            seenIssues.insert(($0.kind?.rawValue ?? "legacy") + "\0" + $0.path + "\0" + $0.reason).inserted
+        }
+        return ScanReport(schemaVersion: schemaVersion,
+            assets: previous.assets.filter { !scannedKinds.contains($0.kind) } + assets,
+            projects: scannedKinds.contains(.sample) ? projects : previous.projects,
+            sampleInclusions: scannedKinds.contains(.sample) ? sampleInclusions : previous.sampleInclusions,
+            issues: mergedIssues,
+            durationSeconds: durationSeconds)
     }
     public func removingPluginPaths(_ paths: Set<String>) -> ScanReport {
         ScanReport(schemaVersion: schemaVersion, assets: assets.filter { $0.kind != .plugin || !paths.contains($0.path) }, projects: projects, sampleInclusions: sampleInclusions, issues: issues, durationSeconds: durationSeconds)

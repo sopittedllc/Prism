@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "source": "Sanitized aggregate of a 2026-09-26 offline Samples-volume metadata snapshot",
+  "scope": "Structure and counts only; path names, file names, device IDs, timestamps and payloads omitted",
+  "entries": {
+    "files": 2150069,
+    "directories": 162992,
+    "symlinks": 83
+  },
+  "depthCounts": {
+    "directory": {
+      "0": 20,
+      "1": 234,
+      "2": 896,
+      "3": 3782,
+      "4": 8447,
+      "5": 12146,
+      "6": 20237,
+      "7": 29219,
+      "8": 29676,
+      "9": 25098,
+      "10": 18203,
+      "11": 11678,
+      "12": 2878,
+      "13": 398,
+      "14": 69,
+      "15": 11
+    },
+    "file": {
+      "0": 5,
+      "1": 103,
+      "2": 8122,
+      "3": 13494,
+      "4": 115128,
+      "5": 404483,
+      "6": 491954,
+      "7": 342729,
+      "8": 230600,
+      "9": 199790,
+      "10": 152463,
+      "11": 121450,
+      "12": 56017,
+      "13": 11103,
+      "14": 1895,
+      "15": 641,
+      "16": 92
+    },
+    "symlink": {
+      "0": 1,
+      "4": 1,
+      "5": 12,
+      "6": 1,
+      "7": 31,
+      "8": 17,
+      "9": 19,
+      "10": 1
+    }
+  },
+  "topLevelDirectoryFileCountsDescending": [
+    2150069,
+    1115947,
+    637493,
+    268373,
+    70714,
+    25180,
+    12627,
+    11164,
+    3819,
+    3288,
+    1089,
+    123,
+    74,
+    74,
+    56,
+    43,
+    0,
+    0,
+    0,
+    0,
+    0
+  ],
+  "selectedExtensionCounts": {
+    "nki": 31414,
+    "nkm": 1276,
+    "nicnt": 190,
+    "otmeta": 1248,
+    "otarc": 1248,
+    "spitfire": 36397,
+    "dspreset": 10,
+    "wav": 597879,
+    "aif": 132955,
+    "aiff": 58,
+    "flac": 0
+  },
+  "scan": {
+    "readErrors": 0,
+    "excludedSystemDirectories": 5,
+    "elapsedSeconds": 107
+  },
+  "limitations": [
+    "Metadata only; no audio, Kontakt state or instrument content",
+    "Filesystem dates do not establish Last used or Date added",
+    "A live scan is not atomic",
+    "Original full snapshot remains private and is not needed for generic builds/tests"
+  ]
+}

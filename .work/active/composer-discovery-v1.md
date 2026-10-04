@@ -1,0 +1,41 @@
+# Plan: composer discovery v1
+
+Status: APPROVED for implementation; independent specification critique PASS (Codex fallback, Claude unavailable). Driver: Codex implementer; 2026-09-25.
+Risk 2; domains ui-ux and stateful-feature. User authorized implementation after narrowing scope in full-codebase-audit/V1-SCOPE.md.
+
+## Outcome and non-goals
+Search and edit instrument, technique, ensemble, register, character and role; optional sample type/BPM/key. Highlight content newly found within 30 days in established roots, with first-observed dates and newest-first sorting. No Library identity/Advanced details filter groups; no Try next, Mark explored or related v2 queue. No external enrichment, audio modification, host execution, telemetry or release.
+
+## Current evidence and semantic inventory
+Audit REPORT F03/F04: exact-scope history loses offline content after root changes; global issue list prevents baselines completing. CatalogStore schema 1 stores graph/observations but no edits. CatalogOutline uses literal substring matching. CatalogWindow contains shared toolbar, outline, inspector; CatalogModel owns filters and scan lifecycle. Existing vendor/comparable research remains input, with narrowed user scope governing. Affected: Core catalog, new musical-metadata types, Catalog model/outline/window and editor, App native smoke, Core/Catalog tests, state registry, design authority and validation scripts.
+
+## Design and implementation
+1. Schema 2: backup existing v1 SQLite using SQLite backup before transactional migration. Add root-baseline and metadata-override tables. Preserve old graph and timestamps. Seed root baselines conservatively from complete v1 scopes. Retain prior memberships/children when a selected root overlaps earlier scopes; removed roots are excluded; newest scope payload wins; transferred records remain stale until observed. No user-state transfer by fuzzy name.
+2. Baseline per asset category/root: complete only when its inventory has no relevant issues (global entry limit blocks all; library-adapter failures block library roots). Project failures and missing unrelated roots cannot block healthy inventory roots. New root/expanded root establishes a baseline. Existing observation never becomes new after reconnect; incomplete initial baseline keeps additions baseline until successful coverage. First seen is observation, never purchase/use time.
+3. Musical metadata: stable enum field IDs. User replacements (including empty suppression) override suggested values at that subject/facet; reset restores suggestions. Subject is catalog observation ID plus instrument vendor ID or exact path; never a shortened name. Library-level musical tags do not automatically assert capabilities on every child. Local observed tags/names generate labeled suggestions using a small explicit vocabulary; no website-derived installed patches. Editable comma-separated values; sample fields contextual. Save is transactional, Cancel leaves unchanged; explicit Undo metadata button restores preceding edit. Failed saves retain editor text and show error. Session Undo history; durable values. Editing requires a saved catalog and idle scan, avoiding scan/edit races. Unresolved instrument moves keep old edits stored without assigning them to another instrument.
+   Grouped plugins: edits belong to an explicitly selected installation, with a format/path picker in the editor. The initial target is the representative but is visibly identified; other formats keep independent values. Group search matches any installation and inspector identifies each edited installation. Adding/removing a format or changing representative must preserve remaining installation edits; no automatic propagation to future formats. Test representative changes and conflicting installation facets. Single-item editing only. Suppression removes suggested facet matches, while literal title text remains searchable as title evidence.
+4. Tokenized AND free-text search with narrow cello/celli and muted/con-sordino aliases; selected facet/value narrows matching nodes. Search uses effective metadata, not suppressed suggestions. Product text cannot promote sibling articulations into installed matches. Inspector distinguishes suggested vs edited fields. One shared editor and filter route for all categories; no second catalog UI.
+5. Recently found checkbox and First found sort. Recent means non-baseline first observation in last 30 days relative to current wall clock; future dates excluded. Plugin group is new only if all known installations are non-baseline and earliest first observation is recent. Existing library child changes do not make library new. Dates appear in inspector. Initial/new-root content not badged; offline records remain visible. Filter with no results explains timeframe and baseline distinction, Clear filters restores collection. Native named controls, keyboard traversal, accessible text rather than color. Keep filtering session-only.
+
+## Risks and acceptance
+- Root add/remove/reconnect/overlap fixtures preserve retained identities and exclude removed roots; unsupported project and absent plugin root do not prevent new library detection.
+- Frozen v1 migrates with backup; corrupt/future DB unchanged; injected write failure rolls back; edits survive restart/rescan/backup and empty suppression survives changed suggestions.
+- Musical queries match across words/facets; sibling technique false positives rejected; product-only result labeled. Editor Save/Cancel/Undo and failed save do not lose data.
+- Grouped plugin formats yield one discovery; adding format/patch does not create new product; baseline, 30-day boundary, future date, stale/offline tested.
+- Native smoke covers edit/save/reopen/undo, query/filter clear, recent empty/new item and screenshots at minimum/typical sizes and light/dark. Accessibility semantics inspected; do not claim a manual VoiceOver pass unless performed.
+
+## State completeness
+New session fields musical_filter (empty object) and recent_only (false): same exclusions as query; included default/reset, accessibility/privacy; excluded presets, persistence, migration, undo (direct reversible navigation), automation, structured clipboard, sync, analytics, export. Metadata catalog field: local SQLite persistence/default/migration/undo/accessibility/privacy/backup included; audio presets, DAW projects, automation, structured clipboard, sync/analytics and merge-import excluded with reasons. New root-baseline field is derived local catalog state, follows catalog.observations policies; resets retain history. Each field mirrored in runtime and documented registry; exact-ID gate required. No setup schema change.
+
+## Verification and gates
+Use argv from .workflow/toolchain.json via scripts/run_check.py: build-debug, unit-tests, integration-tests, catalog-state, template-integrity, adapter-integrity, build-release, app-package, catalog-runtime. Capture reports under .workflow/evidence/composer-discovery-v1; deterministic workflow gate replaces unavailable native hook enforcement. Specification critique before product edits, fresh source/UI/state review after; rerun tests/build/runtime on affected changes. No claim of completed implementation until applicable gates pass. Runtime Apple Silicon current macOS; older macOS/Intel/real DAW matrix outside this feature.
+
+## Recovery and resume
+SQLite backup and transaction rollback; failed migration leaves source v1 intact. UI write failure preserves draft; no filesystem audio mutations. Prior audit artifacts remain unchanged. Last step: source inspection and plan drafted; next: independent critique then implementation. Remaining audit defects outside prerequisites are out of scope.
+
+## Implementation review amendments
+Independent source review repaired repeated-scope reconciliation and stale-snapshot precedence
+using per-member observation timestamps. Nested cross-category exclusions are stored in root
+baselines. UX review requires category-appropriate facet menus, preserving active zero-match
+values, musical metadata above provenance, and native failure/validation/facet/light captures.
+Product implementation is present; final verification and review are in progress.

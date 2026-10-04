@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "composer-discovery-v1",
+  "gate": "design_system_audit",
+  "status": "passed",
+  "revision": "content:7e67a2a7258455ef635b1e5f6b46adbf5a2f223b87a183800a10c0b4792abcbd",
+  "timestamp": "2026-09-26T02:06:26.904614+00:00",
+  "producer": "codex-verification",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "design_system_audit-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/composer-discovery-v1/systemic-impact-report.json",
+        "sha256": "061910dfe5eb46a998dcc6ca25d0ee8773342bef4923ad9f4f370552bf5b18eb"
+      }
+    }
+  ]
+}

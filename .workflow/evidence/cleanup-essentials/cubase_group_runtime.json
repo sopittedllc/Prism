@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "task_id": "cleanup-essentials",
+  "gate": "cubase_group_runtime",
+  "status": "passed",
+  "revision": "content:8a9147d3f2727fab40cc9a5783e82ba3565df6de09fd81fd0b6097bf222daae6",
+  "timestamp": "2026-09-26T21:10:13.398840+00:00",
+  "producer": "codex /root",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "Cubase 15.0.30 isolated controls: bypass, disabled track, group addition/removal, output insert",
+      "status": "passed"
+    },
+    {
+      "name": "Debug and release exact XML-tree replay passed: B1 3/2/4, B2 4/4/5/5/4 references",
+      "status": "passed"
+    },
+    {
+      "name": "Output-channel export omission demonstrated and reported; ordinary reader remains unsupported",
+      "status": "passed"
+    },
+    {
+      "name": "Input hashes/mtimes and original session hashes unchanged",
+      "status": "passed"
+    }
+  ]
+}

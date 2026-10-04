@@ -1,0 +1,21 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "composer-discovery-v1",
+  "gate": "plan_review",
+  "status": "passed",
+  "revision": "content:7e67a2a7258455ef635b1e5f6b46adbf5a2f223b87a183800a10c0b4792abcbd",
+  "timestamp": "2026-09-26T02:06:26.561581+00:00",
+  "producer": "codex-independent-review",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "plan_review-report",
+      "status": "passed",
+      "measurement": {
+        "report": ".workflow/evidence/composer-discovery-v1/plan-review.json",
+        "sha256": "f68bc3c4b4fd579721e4622d96607bb14b992505674b48486723412fffd757e3"
+      }
+    }
+  ]
+}

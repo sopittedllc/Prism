@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "task_id": "cleanup-essentials",
+  "gate": "protools_text_runtime",
+  "status": "passed",
+  "revision": "content:e912586b986af350afdfe529fea6d0be124ca8031d7e787d13365839ad721f42",
+  "timestamp": "2026-09-26T21:41:19.964252+00:00",
+  "producer": "codex /root",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "Debug and release real export replay: baseline 3 plugins, removed 2; same 1 file/2 clips",
+      "status": "passed"
+    },
+    {
+      "name": "Every row field and included section matches independent table reader",
+      "status": "passed"
+    },
+    {
+      "name": "Source text and isolated session hashes/mtimes unchanged; all 14 original fixture hashes unchanged",
+      "status": "passed"
+    },
+    {
+      "name": "Ordinary project reader remains unsupported; no catalog/Last used admission",
+      "status": "passed"
+    }
+  ]
+}

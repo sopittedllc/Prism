@@ -24,6 +24,12 @@ public struct PluginProduct: Sendable {
         for vendor in ["arturia", "fabfilter", "plugin-alliance", "pluginalliance", "native-instruments", "spectrasonics", "softube", "plogue", "overloud", "tailorednoise"] {
             if id.hasPrefix("com." + vendor + ".") { return "vendor:" + vendor }
         }
+        if id.hasPrefix("com.soundtoys.") {
+            let parts = id.split(separator: ".").map(String.init)
+            if parts.count == 4, ["vst", "vst3", "audiounit", "aax"].contains(parts[2]) {
+                return "com.soundtoys." + parts[3]
+            }
+        }
         let product = normalizedName(asset.name)
         if ["kontakt", "kontakt 7", "kontakt 8", "battery 4", "reaktor 6"].contains(product),
            [".synth.vst", ".musicdevice.component", ".aaxplugin", ".vst3"].contains(where: { id == product + $0 }) {

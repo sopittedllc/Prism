@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "task_id": "cleanup-essentials",
+  "gate": "collection_locations_review",
+  "status": "passed",
+  "revision": "content:706da95baa4207b7d5e2dcc45d67fe21627dc194933fb4b962d01708fa831955",
+  "timestamp": "2026-09-26T18:59:45.425330+00:00",
+  "producer": "/root/simple_review",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "Independent source and native visual review: single locations sheet, actual selectable paths, per-format Finder actions, draft and error recovery",
+      "status": "passed"
+    },
+    {
+      "name": "Final native screenshots: Collection locations and AU label",
+      "status": "passed"
+    }
+  ]
+}

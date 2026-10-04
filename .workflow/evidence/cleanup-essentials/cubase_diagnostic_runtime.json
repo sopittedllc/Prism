@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "task_id": "cleanup-essentials",
+  "gate": "cubase_diagnostic_runtime",
+  "status": "passed",
+  "revision": "content:c7be08452ea0b8ffab3f38cf35ac3f89118cba038d94085c812b2c3de5dc93c2",
+  "timestamp": "2026-09-26T20:36:09.962541+00:00",
+  "producer": "codex root + independent /root/cubase_diagnostic_review",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "Debug/release native replay: 233 UID/name/offset tuples per configuration match reviewed controls",
+      "status": "passed"
+    },
+    {
+      "name": "All 3 original hashes and mtimes unchanged; normal CPR inspection stays unsupported and reference-free",
+      "status": "passed"
+    },
+    {
+      "name": "Older template exceeds 32 MiB and rejects without partial JSON; budgets unchanged",
+      "status": "passed"
+    }
+  ],
+  "artifact_sha256": "1bcaa229e2def580e86811777f2c457b665014e789a266bcbe2393fcecc313c2",
+  "target": "macOS Apple Silicon; native CLI; private Cubase 15.0.30 host-saved controls"
+}

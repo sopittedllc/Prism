@@ -1,0 +1,34 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "full-codebase-audit",
+  "gate": "runtime_tests",
+  "status": "passed",
+  "revision": "content:aa522a91eae75aef541556649d75c9b2afed433c6c571eae5025711156160522",
+  "timestamp": "2026-09-26T00:54:27.201908+00:00",
+  "producer": "scripts/run_check.py",
+  "client": "automation",
+  "checks": [
+    {
+      "name": "build-release",
+      "status": "passed",
+      "command": "[\"swift\", \"build\", \"-c\", \"release\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/full-codebase-audit/logs/build-release.log"
+    },
+    {
+      "name": "app-package",
+      "status": "passed",
+      "command": "[\"python3\", \"scripts/build_app.py\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/full-codebase-audit/logs/app-package.log"
+    },
+    {
+      "name": "catalog-runtime",
+      "status": "passed",
+      "command": "[\"build/Simplify.app/Contents/MacOS/Simplify\", \"--ui-smoke\", \"captures/catalog\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/full-codebase-audit/logs/catalog-runtime.log"
+    }
+  ]
+}

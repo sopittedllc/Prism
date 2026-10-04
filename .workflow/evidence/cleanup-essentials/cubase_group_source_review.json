@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "task_id": "cleanup-essentials",
+  "gate": "cubase_group_source_review",
+  "status": "passed",
+  "revision": "content:8a9147d3f2727fab40cc9a5783e82ba3565df6de09fd81fd0b6097bf222daae6",
+  "timestamp": "2026-09-26T21:10:13.398682+00:00",
+  "producer": "codex /root/group_source_review",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "Fresh read-only review passed without blockers",
+      "status": "passed"
+    },
+    {
+      "name": "Independent eight-export owner/name/UID/role comparison passed; hashes unchanged",
+      "status": "passed"
+    },
+    {
+      "name": "Direct signature, provisional budgets, owner isolation and inactive-reference retention verified",
+      "status": "passed"
+    }
+  ]
+}

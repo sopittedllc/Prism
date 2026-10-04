@@ -1,0 +1,50 @@
+{
+  "client": "codex",
+  "role": "implementer",
+  "status": "passed",
+  "symptom": "Read-only tags and no recent discovery route",
+  "semantic_role": "Shared collection filtering and metadata editing",
+  "authority": [
+    "docs/ui-ux/COLLECTION_AND_SETUP.md",
+    "docs/ui-ux/design-system.json"
+  ],
+  "searches": [
+    "CatalogWindow toolbar/inspector/action consumers",
+    "CatalogOutline query projection",
+    "CatalogModel filtering/restore/scan state",
+    "CatalogStore scope, graph and observation persistence"
+  ],
+  "included_consumers": [
+    "Plugins with explicit installation editor target",
+    "Libraries and instruments",
+    "Individual samples",
+    "Shared inspector and native editor sheet",
+    "Restore, scan, Undo and error states"
+  ],
+  "excluded_consumers": [
+    "Vendor installers",
+    "DAW state",
+    "V2 exploration queue",
+    "Library identity/Advanced details filter groups"
+  ],
+  "system_changes": [
+    "Shared facet enum and effective metadata model",
+    "Two-row toolbar with contextual sample fields",
+    "Native metadata editor with durable overrides",
+    "Per-root baseline and per-member observation timestamps",
+    "Active zero-match facet retained; musical metadata prioritized in inspector"
+  ],
+  "representative_tests": [
+    "77 unit fixtures",
+    "Native composer-facet-light",
+    "Native composer-metadata-save-error",
+    "Native composer-sample-validation",
+    "Native composer-recent-empty and recent-dark"
+  ],
+  "regression_prevention": [
+    "Runtime registry exact-ID/default gate",
+    "Populated v1 migration and backup fixture",
+    "Cross-scope/offline precedence fixtures",
+    "Native action smoke assertions"
+  ]
+}

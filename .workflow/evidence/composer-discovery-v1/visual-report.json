@@ -1,0 +1,20 @@
+{
+  "client": "codex",
+  "role": "qa",
+  "status": "passed",
+  "revision": "content:7e67a2a7258455ef635b1e5f6b46adbf5a2f223b87a183800a10c0b4792abcbd",
+  "evidence": [
+    "runtime-report.json",
+    "ux-review-report.json"
+  ],
+  "checks": [
+    "38 native screenshots including seven composer states",
+    "Existing regression smoke plus new light/dark compact views",
+    "Editor, invalid sample input, failed-save draft, musical facet and recent empty/new state visual review"
+  ],
+  "limits": [
+    "Intentional new visual baseline; no pixel-diff claim",
+    "Existing table clipping is audited prior debt",
+    "Current display and Mac only"
+  ]
+}

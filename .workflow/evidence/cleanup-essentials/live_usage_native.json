@@ -1,0 +1,20 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "cleanup-essentials",
+  "gate": "live_usage_native",
+  "status": "passed",
+  "revision": "content:d6ac381e9ff4c1554eb9e46afa57c7472bde356da34551ed32d0b62ff8b38518",
+  "timestamp": "2026-09-27T01:44:55.922780+00:00",
+  "producer": "scripts/run_check.py",
+  "client": "automation",
+  "checks": [
+    {
+      "name": "live-usage-runtime",
+      "status": "passed",
+      "command": "[\"env\", \"PRISM_LIVE_USAGE_RUNTIME=1\", \"swift\", \"test\", \"--filter\", \"nativeLiveCompletedRestoreRuntime\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/cleanup-essentials/logs/live-usage-runtime.log"
+    }
+  ]
+}

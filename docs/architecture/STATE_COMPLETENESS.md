@@ -159,3 +159,169 @@ analytics and export/import are explicitly excluded as navigation-only state. Lo
 privacy and native accessibility are included. Existing setup and catalog schemas do
 not change. Derived outline nodes/indexes are recomputable caches, invalidated by report
 or ordering changes; search projects a filtered tree without filesystem reads.
+
+## Composer discovery (catalog schema 2)
+
+Schema 2 supersedes the exact-scope baseline policy above. Per-category/root baselines
+isolate inventory completeness from unrelated project failures and unavailable locations.
+Scope membership, instruments and physical members store their own observation timestamp;
+reconciliation uses those timestamps instead of an offline scope's later save date. Newly
+selected scopes retain matching observations, while removed roots are excluded. Transferred
+records stay stale until observed. A SQLite backup precedes transactional v1 migration;
+unsupported/corrupt catalogs remain unchanged. Initial/incomplete baseline entries stay
+baseline; scan timestamps never become installation/purchase/use dates.
+
+Registry groups catalog.root_baselines and catalog.musical_metadata are local catalog
+state. Empty defaults; reset retains durable history. Metadata uses observation ID plus
+instrument vendor ID or exact path, never fuzzy names; plugin edits are per installation.
+Missing facet override uses suggestions, empty override suppresses them; explicit reset
+restores suggestions. Raw scan payloads remain separate. Local persistence, migration,
+accessibility, privacy and consistent backup are included. Session Undo applies to user
+metadata only; scan-derived baselines are not undoable. Audio presets, DAW project state,
+automation, structured clipboard, sync, telemetry and merge-import are excluded. Native
+text fields support ordinary text copy/paste. Unresolved instrument moves leave old edits
+stored without assigning them to another instrument.
+
+Session recent_only and musical_filter share query's policies and reset to false/empty.
+The filter is not saved with setup or a DAW project. Metadata input is bounded to 24 values
+per field and 80 characters per value; BPM is one finite positive number at most 999.
+
+Root baseline coverage records nested opposite-category exclusions, so changing a folder
+from samples to libraries (or back) establishes indexing rather than inventing acquisitions.
+
+Usage filter (`usage_filter`, default `all`) is session-only browser navigation.
+It shares query policies: resettable, accessible, local; excluded from persistence,
+presets, undo, automation, sync, analytics and export. Category changes and Clear
+filters reset it. Only all/unknown are supported until verified host evidence exists;
+no new durable usage or installation-date schema is introduced by this UI slice.
+
+Online product metadata uses persisted `online_tags` (default false) in local setup
+version1; missing keys on older setup default false. It is excluded from presets/DAW
+automation/undo/sync/analytics/export and included in local persistence, reset,
+accessibility and privacy. Reset disables in session; explicit checkbox changes persist
+through the existing setup writer. Requests use only reviewed official product endpoints;
+no local inventory, filenames, samples, credentials or cookies are sent.
+
+`catalog.product_tags` is a derived sidecar cache with its own version1 envelope,
+introduced alongside catalog schema2 without changing SQLite. It stores source ID,
+reviewed-description digest and fetch date; taxonomy/source URLs come from reviewed
+adapters. Missing means local-only suggestions. Structurally invalid/future cache is preserved and
+reported; valid records for retired or updated descriptors expire individually. Seven-day freshness, offline retention with dates, atomic writes; disabling
+online tags retains cache but excludes its suggestions. Source descriptions changing
+fail closed, with prior cached suggestions still dated. User overrides and empty
+suppression take precedence. Product descriptions never propagate to individual patches.
+
+`sort_reversed` is session navigation with default false; each column has a useful initial
+direction. Reset clears it, header indicators expose it accessibly, and no persisted
+schema changes. Its full policy mirrors sort in the feature registry. Tag settings
+popover visibility is transient presentation; online_tags remains the persisted opt-in.
+
+Tag-pill add drafts and popover visibility are disposable presentation state, reset on
+close; they do not participate in persistence, migration, presets, automation, sync,
+clipboard, export or telemetry. Category is named accessibly, local values use existing
+metadata privacy/persistence policies. Product tag actions save existing per-subject
+overrides in one transaction; batch Undo remains session-only and publishes only after
+durable success. No schema or registry ID changes. Setup recovery visibility is derived
+from a failed save, and stored standard-folder preferences keep their existing policy.
+
+## Appearance preference
+`appearance` is a local application preference: light (default/reset), dark, system.
+Registry-selected setup-v1 persistence includes it; the policy's historical
+project_persistence name denotes that local settings store, not a DAW project.
+Missing older fields default Light; invalid enum/type rejects and preserves the file.
+Settings previews globally, Cancel restores accepted mode, Save persists atomically
+with folders without scanning. Failure retains draft and offers session-only use.
+Appearance-only changes do not invalidate inventory. No presets, DAW automation,
+structured clipboard, sync, analytics or export/import. Native popup exposes its name
+and selected value; privacy is local-only. No document Undo; Cancel supplies rollback.
+AppKit nil appearance follows system changes; explicit aqua/darkAqua override.
+
+## Section scans
+Execution masks and outstanding changed categories are transient, not additional user
+settings: excluded from presets/persistence/undo/automation/clipboard/sync/analytics/
+export. Scan captures section at click; projects belong to Samples execution. Full root
+scope remains the catalog key and ownership authority. Unscanned fresh generations and
+stale states carry forward without advancing observations, including compatible section
+transfer across unrelated root changes. Optional ScanIssue.kind is backward compatible;
+legacy unowned issues remain until full scan. No SQLite schema change. Current-session
+plugin file identities survive unrelated scans; disk restore still strips them.
+Production automatically enables standard plugin roots even if old settings stored false;
+explicit synthetic profiles retain isolation. Existing standard_plugins ID remains for
+compatibility/test profiles but has no user control. Online-tag preference remains opt-in
+in Settings, applied atomically on Save; Cancel preserves it. Per-item editor stays in
+context menu; pills remain the normal editing route.
+
+## Qualified date evidence (catalog schema 3)
+
+`catalog.date_evidence` is local immutable source history keyed by source/event IDs
+and exact existing catalog node IDs. It is empty by default and on v1/v2 migration;
+first discovery is never promoted into installation or use. Session reset and offline
+scans retain the ledger. Native SQLite tests cover migration with pre-change backup,
+reopen, verified moves, replacement isolation, local backup, corruption and atomic
+rollback. Future/foreign schemas are preserved.
+
+The authoritative registry and feature-registry declare every concern. Presets, DAW
+project state, undo, external automation, clipboard, sync and telemetry are excluded.
+Privacy and local backup are included; import/merge and UI presentation are absent.
+Instrument identity, cross-format product lineage and host qualification remain
+separate work. The storage API cannot itself establish successful usage.
+
+Receipt binding adds optional typed provenance to the same `catalog.date_evidence`
+group without SQL schema changes. Legacy payloads decode with nil provenance. The
+reserved `macos.pkgutil.receipt.v1` source requires a dated installation record with
+package ID/version, bundle path/identifier and ordered declared versions. These local
+paths and identifiers remain private and participate in existing SQLite backups.
+Evidence equality is byte exact; repeat source observations preserve first ingestion.
+Only opaque live reader observations can enter the source-specific binder. It checks
+current strong physical identity, latest agreeing catalog headers, removal intent,
+and bundle stamps before and after the transaction write. It does not renew inventory
+freshness, populate original Date added/Last used, or propagate an AU record to other
+formats. Generic evidence append remains an internal trust boundary for qualified
+adapters; typed provenance alone is not proof of acquisition. UI projection is pending.
+
+Automatic receipt collection runs after successful fresh plugin inventory persistence,
+on cancellable utility work separate from inventory. It populates the same evidence
+ledger; `receiptCollection` is a transient operational summary in that feature group,
+not a persisted setting. Reset, new scans, accepted location changes and reviewed
+removal cancel work; generation checks prevent late summary publication. Actor-entry
+and pre-commit cancellation checks protect queued attachment writes. Reset clears the
+summary but retains committed history. Neither restore nor sample/library-only scans
+initiate receipt queries. The summary records bounded-pass coverage, never original
+installation history; no new date label/control is exposed. Backups include evidence
+only, not operational summaries. Existing preset/project/undo/automation/clipboard/
+sync/analytics exclusions and local privacy policy apply unchanged.
+
+Installer date presentation derives an exact-node byte-keyed cache from typed receipt
+history. Loading/error state, read generation and grouped coverage are transient parts
+of catalog.date_evidence; no new persisted fields/preferences/schema. The single read
+transaction fails closed on corrupt/missing/over-budget history. Collection failure
+retains valid historical records; projection read failure clears untrusted display state.
+Reset clears cache and cancels late publication while retaining history. Samples,
+libraries and individual instruments do not inherit plugin receipt dates. Accessibility
+now includes visible source/date/coverage/status and sortable native headers. Other
+preset/project/undo/automation/clipboard/sync/analytics exclusions and private backup
+participation remain unchanged. There is no editable date or original-addition inference.
+
+### Addition bounds (schema4)
+Existing catalog.date_evidence owns node_addition_bounds and scan_coverage. Coverage
+retains kind/root/exclusions, policy, physicalrootidentity and start/finish. Only final
+compatible complete scans establish an arrival/return interval. Prior absence remains
+valid through no-scan settings roundtrips; loaded/scanned omitted scopes conservatively
+clear it. Legacy first_seen yields presentBy, not exact acquisition. Session reset
+retains history, backup/migration include it, no presets/undo/sync/automation/network.
+Derived grouped bounds weaken for unknown siblings; instrument dates stay independent.
+
+### Live class-use projection
+Optional hostUsage provenance belongs to catalog.date_evidence, not a new preference.
+Records contain strict source-local Gregorian components, source/run/record identity,
+VST3 classID and plugin/host versions. eventDate remains nil: no offset is invented.
+The node association is verified current class membership; historical physical-byte
+continuity is explicitly not claimed. Source event equality excludes mutable cache
+snapshots and growing-file hashes. Replay preserves first ingestion; moves preserve
+node history; newly verified replacements may associate the same class history.
+Read corruption returns unavailable with no partial projection. Collector source
+failures retain prior valid history and show incomplete coverage. Reset/scope/removal
+cancel collection; read/scan generations reject stale publication and stale task starts.
+Polling is 60 seconds only while the app runs, bounded and changed-source gated. No host
+is launched or automated by production collection. No presets, undo, DAW automation,
+clipboard, telemetry, sync or external export changes; consistent backups include it.

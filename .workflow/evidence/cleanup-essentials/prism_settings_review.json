@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "task_id": "cleanup-essentials",
+  "gate": "prism_settings_review",
+  "status": "passed",
+  "revision": "content:c7932c610075b2ee084b3163bbcc2df4dc2723e262aa254301122ea9c67ce39d",
+  "timestamp": "2026-09-26T19:12:29.870292+00:00",
+  "producer": "/root/simple_review",
+  "client": "codex",
+  "checks": [
+    {
+      "name": "Independent source/state and native visual review: appearance modes, draft/save/recovery, Prism branding and original logo in sidebar/Dock",
+      "status": "passed"
+    }
+  ]
+}

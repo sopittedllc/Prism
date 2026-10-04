@@ -77,11 +77,62 @@
     },
     "catalog-runtime": {
       "argv": [
-        "build/Simplify.app/Contents/MacOS/Simplify",
+        "build/Prism.app/Contents/MacOS/Prism",
         "--ui-smoke",
         "captures/catalog"
       ],
       "timeout_seconds": 180
+    },
+    "product-tag-sources": {
+      "argv": [
+        ".build/debug/simplify-probe",
+        "--check-product-tags"
+      ],
+      "timeout_seconds": 300
+    },
+    "receipt-binding-runtime": {
+      "argv": [
+        "env",
+        "PRISM_RECEIPT_BINDING_RUNTIME=1",
+        "swift",
+        "test",
+        "--filter",
+        "nativeReceiptBindingRuntime"
+      ],
+      "timeout_seconds": 120
+    },
+    "automatic-receipt-runtime": {
+      "argv": [
+        "env",
+        "PRISM_AUTOMATIC_RECEIPT_RUNTIME=1",
+        "swift",
+        "test",
+        "--filter",
+        "nativeAutomaticReceiptRuntime"
+      ],
+      "timeout_seconds": 300
+    },
+    "live-usage-runtime": {
+      "argv": [
+        "env",
+        "PRISM_LIVE_USAGE_RUNTIME=1",
+        "swift",
+        "test",
+        "--filter",
+        "nativeLiveCompletedRestoreRuntime"
+      ],
+      "timeout_seconds": 120
+    },
+    "protools-restore-v2-runtime": {
+      "argv": [
+        "env",
+        "PRISM_PROTOOLS_RESTORE_V2_RUNTIME=1",
+        "swift",
+        "test",
+        "--filter",
+        "nativeProToolsRestoreV2Runtime"
+      ],
+      "timeout_seconds": 300
     }
   }
 }

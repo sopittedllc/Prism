@@ -1,0 +1,20 @@
+{
+  "$schema": "../../schemas/evidence.schema.json",
+  "schema_version": 1,
+  "task_id": "cleanup-essentials",
+  "gate": "automated_tests",
+  "status": "passed",
+  "revision": "content:73d27734dc9ed56741a4769d00289e288b5e720dd2a9828cd2c502cdaa06fa51",
+  "timestamp": "2026-10-03T22:28:42.705371+00:00",
+  "producer": "scripts/run_check.py",
+  "client": "automation",
+  "checks": [
+    {
+      "name": "unit-tests",
+      "status": "passed",
+      "command": "[\"swift\", \"test\"]",
+      "exit_code": 0,
+      "log": ".workflow/evidence/cleanup-essentials/logs/unit-tests.log"
+    }
+  ]
+}

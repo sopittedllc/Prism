@@ -1,0 +1,21 @@
+{
+  "client": "codex",
+  "role": "independent-reviewer",
+  "reviewer": "discovery_source_review",
+  "status": "passed",
+  "verdict": "PASS",
+  "revision": "content:7e67a2a7258455ef635b1e5f6b46adbf5a2f223b87a183800a10c0b4792abcbd",
+  "resolved": [
+    "Existing scopes reconcile rather than skipping known scope IDs",
+    "Observation timestamps determine parent/child/member precedence",
+    "Recent-filter caching and native expiry refresh",
+    "Populated v1 graph/date/baseline/readable-backup fixture",
+    "Nested opposite-category exclusions",
+    "Numeric exact terms and local instrument match evidence"
+  ],
+  "findings": [],
+  "limits": [
+    "Read-only source review; execution evidence separately recorded",
+    "Claude review unavailable: client not logged in"
+  ]
+}

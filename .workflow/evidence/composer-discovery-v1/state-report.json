@@ -1,0 +1,22 @@
+{
+  "client": "codex",
+  "role": "qa",
+  "status": "passed",
+  "revision": "content:7e67a2a7258455ef635b1e5f6b46adbf5a2f223b87a183800a10c0b4792abcbd",
+  "evidence": [
+    "automated_tests.json",
+    "runtime_tests.json",
+    "runtime-report.json"
+  ],
+  "checks": {
+    "state_coverage": "Exact native/documented IDs/defaults and all concern policies checked by catalog-state; new musical_filter/recent_only, catalog.musical_metadata/catalog.root_baselines",
+    "preset_roundtrip": "Explicit preset exclusions checked; setup persistence IDs unchanged and roundtrip/reset tests pass",
+    "state_migration": "Populated frozen-v1-schema fixture preserves graph, dates and baseline, verifies readable schema-1 backup; foreign/corrupt/future catalogs unchanged; write rollback tests pass",
+    "state_integration": "Edits/suppression survive rescan/reopen/backup; grouped plugin targets independent; Cancel/Save/Undo/failure retry/invalid BPM and facet/zero-match states exercised natively"
+  },
+  "limits": [
+    "Undo is session-only",
+    "No sync/import-merge or DAW/preset serialization",
+    "No power-loss injection or older-target runtime verification"
+  ]
+}

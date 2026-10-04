@@ -24,6 +24,8 @@ public struct SetupStore: Sendable {
             if key == "roots" {
                 guard let roots = value as? [String: [String]], roots.keys.allSatisfy({ RootKind(rawValue: $0) != nil }),
                       roots.values.flatMap({ $0 }).allSatisfy({ $0.hasPrefix("/") && !$0.contains("\0") }) else { throw SetupError.invalid }
+            } else if key == "appearance" {
+                guard let raw = value as? String, CatalogAppearance(rawValue: raw) != nil else { throw SetupError.invalid }
             } else {
                 guard let number = value as? NSNumber, CFGetTypeID(number) == CFBooleanGetTypeID() else { throw SetupError.invalid }
             }

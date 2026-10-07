@@ -42,6 +42,27 @@ private func summary(_ records: [AssetDateEvidence], subject: String = "product"
     #expect(added.dateAdded == date(100) && added.lastUsed == nil)
 }
 
+@Test func itemAccessRequiresKnownMusicApplicationAndQualifiesOnlyTypedAttempts() throws {
+    let date = date(800)
+    func item(_ bundle: String, family: ItemAccessProvenance.AppFamily = .abletonLive) -> AssetDateEvidence {
+        let access = ItemAccessProvenance(appFamily: family, appVersion: "12.0", processBundleIdentifier: bundle,
+            outcome: .attempted, eventToken: "event-1")
+        return AssetDateEvidence(sourceID: ItemAccessProvenance.sourceID,
+            evidenceID: try! access.eventID(subjectID: "sample"), subjectID: "sample", kind: .loadAttempt,
+            eventDate: date, ingestedAt: date, itemAccess: access)
+    }
+    let qualified = item("com.ableton.live")
+    #expect(try summary([qualified], subject: "sample").lastUsed == date)
+    for bundle in ["com.apple.finder", "com.apple.quicklook"] {
+        let untrusted = ItemAccessProvenance(appFamily: .abletonLive, appVersion: "1",
+            processBundleIdentifier: bundle, outcome: .attempted, eventToken: "event")
+        #expect(throws: AssetDateEvidenceError.invalidProvenance) { try untrusted.validate() }
+    }
+    // Historical untyped attempt rows remain decodable/valid, but cannot satisfy Last Used.
+    let legacy = evidence(.loadAttempt, 800, id: "old-attempt", subject: "sample")
+    #expect(try summary([legacy], subject: "sample").lastUsed == nil)
+}
+
 @Test func legacyProToolsPayloadRemainsReadableButCannotSetLastUsed() throws {
     let legacyJSON = #"{"name":"Test","eventID":"legacy-event","reportedDate":100,"sourceSeconds":42.5}"#
     let use = try JSONDecoder().decode(ProToolsPluginUse.self, from: Data(legacyJSON.utf8))

@@ -4,12 +4,15 @@ import SimplifyCore
 @MainActor public final class CatalogWindow: NSWindowController, NSOutlineViewDataSource, NSOutlineViewDelegate, NSSearchFieldDelegate, NSWindowDelegate, NSPopoverDelegate {
     public let model: CatalogModel
     public let categoryButtons = [NSButton(title: "Plugins", target: nil, action: nil), NSButton(title: "Individual Samples", target: nil, action: nil), NSButton(title: "Libraries", target: nil, action: nil)]
-    public let scanButton = NSButton(title: "Scan", target: nil, action: nil)
+    public let scanButton = NSButton(title: "Check For Updates", target: nil, action: nil)
     public let search = NSSearchField()
+    public let librarySort = NSPopUpButton()
     public let undoMetadataButton = NSButton(title: "Undo tag edit", target: nil, action: nil)
     public private(set) var metadataEditor: MetadataEditor?
     public let table = NSOutlineView()
     public let tagPills = TagPillList(frame: .zero)
+    private let libraryTagsPopover = NSPopover()
+    private weak var libraryTagsAnchor: NSButton?
     public private(set) var tagEntry: TagEntryController?
     public let tagPopover = NSPopover()
     private let tagScroll = NSScrollView()
@@ -52,6 +55,7 @@ import SimplifyCore
     public var inspectorSummaryText: String {
         "Last used   \(lastUsedSummary.stringValue)\nDate added   \(addedSummary.stringValue)\nSize   \(sizeSummary.stringValue)"
     }
+    public var inspectorSizeDetailText: String? { sizeSummary.toolTip }
 
     public init(model: CatalogModel = CatalogModel()) {
         self.model = model
@@ -104,8 +108,13 @@ import SimplifyCore
         search.placeholderString = "Search plugins"; search.delegate = self; search.sendsSearchStringImmediately = true; search.setAccessibilityLabel("Search collection")
         search.placeholderString = "Search names and tags"
         search.searchMenuTemplate = nil
-        let filters = column([search], spacing: 0)
-        search.widthAnchor.constraint(equalTo: filters.widthAnchor).isActive = true
+        librarySort.addItems(withTitles: ["Name", "Tags", "Size", "Date added", "Last used", "Player / format"])
+        librarySort.target = self; librarySort.action = #selector(changeLibrarySort(_:))
+        librarySort.setAccessibilityLabel("Sort collection")
+        librarySort.toolTip = "Choose a sort. Choose the current sort again to reverse it."
+        librarySort.widthAnchor.constraint(equalToConstant: 128).isActive = true
+        let filters = NSStackView(views: [search, librarySort]); filters.orientation = .horizontal; filters.spacing = 8
+        search.setContentHuggingPriority(.defaultLow, for: .horizontal)
         for (id, title, width) in [("name", "Name", 165.0), ("tags", "Tags", 105.0), ("size", "Size", 65.0), ("installed", "Date added", 90.0), ("reference", "Last used", 85.0)] {
             let col = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(id)); col.title = title; col.width = width; col.minWidth = id == "name" ? 155 : 60; col.sortDescriptorPrototype = NSSortDescriptor(key: id, ascending: id == "name" || id == "format" || id == "tags"); table.addTableColumn(col)
         }
@@ -174,7 +183,6 @@ import SimplifyCore
     }
 
     public func refresh() {
-        setup?.refreshTagStatus()
         if appliedAppearance != model.appearance {
             model.appearance.apply(); appliedAppearance = model.appearance
         }
@@ -204,6 +212,15 @@ import SimplifyCore
         let title = ["Plugins", "Individual Samples", "Libraries"][index]; titleLabel.stringValue = title
         search.placeholderString = "Search names and tags"
         search.stringValue = model.query
+        librarySort.isHidden = false
+        let sortIndex: Int
+        switch model.sort { case .tags: sortIndex = 1; case .size: sortIndex = 2; case .installed: sortIndex = 3; case .recency, .firstFound: sortIndex = 4; case .format: sortIndex = 5; default: sortIndex = 0 }
+        let formatTitle = model.category == .library ? "Player / format" : model.category == .sample ? "File type" : "Format"
+        let sortTitles = ["Name", "Tags", "Size", model.dateColumnTitle, "Last used", formatTitle]
+        for (index, title) in sortTitles.enumerated() { librarySort.item(at: index)?.title = title }
+        let sortAscending = ([CatalogSort.name, .tags, .format].contains(model.sort)) != model.sortReversed
+        librarySort.item(at: sortIndex)?.title = sortTitles[sortIndex] + (sortAscending ? " ↑" : " ↓")
+        librarySort.selectItem(at: sortIndex)
         let count = outline.nodes.filter { $0.kind == .plugin || $0.kind == .library || $0.kind == .sample }.count
         let instruments = outline.nodes.filter { $0.kind == .instrument }.count
         let flatLibrary = model.category == .library && (model.sort == .tags || model.sort == .installed)
@@ -213,8 +230,9 @@ import SimplifyCore
         if !model.isScanning, model.report?.issues.contains(where: { $0.reason.contains("Entry limit") }) == true { countLabel.stringValue += " · partial scan" }
         table.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("reference"))?.isHidden = false
         table.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("installed"))?.title = model.dateColumnTitle
-        table.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("reference"))?.title = model.category == .sample ? "Project recency" : "Last used"
+        table.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("reference"))?.title = "Last used"
         table.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("size"))?.title = "Size"
+        table.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("tags"))?.isHidden = true
         table.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("size"))?.width = model.category == .library ? 135 : 90
         table.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("format"))?.title = model.category == .library ? "Player / format" : "Format"
         table.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("format"))?.width = model.category == .library ? 105 : 75
@@ -225,16 +243,18 @@ import SimplifyCore
         let ascending = (model.sort == .name || model.sort == .format || model.sort == .tags) != model.sortReversed
         let descriptor = NSSortDescriptor(key: sortKey, ascending: ascending)
         if table.sortDescriptors != [descriptor] { table.sortDescriptors = [descriptor] }
-        table.setAccessibilityHelp("Sorted by \(model.sort == .installed ? model.dateColumnTitle : model.sort == .recency && model.category != .sample ? "Last used" : model.sort.rawValue), \(ascending ? "ascending" : "descending"). Click a column heading to reverse its order. Unknown dates do not mean unused. Plugin Date added uses the earliest available Finder file-location date, or confirmed original addition when Finder metadata is unavailable; scan and installer dates remain separate. Unknown sizes and dates sort last. Last used for plugins sorts calendar days: Live and Pro Tools use reported DAW local days; Cubase and Logic use this Mac's local display day. Comparable times within one host family break same-day ties.")
+        table.setAccessibilityHelp("Sorted by \(model.sort == .installed ? model.dateColumnTitle : model.sort == .recency && model.category != .sample ? "Last used" : model.sort.rawValue), \(ascending ? "ascending" : "descending"). Click a column heading to reverse its order. Unknown dates do not mean unused. Qualified original addition takes precedence over Finder file-location Date Added; scan and installer dates remain separate. Unknown sizes and dates sort last. Last used is based on qualified saved-project membership and the saved file's modification date.")
         undoMetadataButton.isEnabled = model.canUndoMetadata
         undoMetadataButton.isHidden = !model.canUndoMetadata
-        scanButton.toolTip = "Scan " + categoryButtons[index].title.lowercased()
+        scanButton.title = model.isStoppingScan ? "Stopping…" : model.isScanning ? "Stop" : "Check For Updates"
+        scanButton.toolTip = model.isStoppingScan ? "Stopping collection refresh" : model.isScanning ? "Stop collection refresh" : "Check all collection locations for updates"
         scanButton.setAccessibilityLabel(scanButton.toolTip)
-        scanButton.isEnabled = !model.isBusy; folderButton.isEnabled = !model.isBusy
+        scanButton.image = NSImage(systemSymbolName: model.isScanning ? "stop.fill" : "arrow.clockwise", accessibilityDescription: nil)
+        scanButton.isEnabled = !model.isStoppingScan && (model.isScanning || !model.isBusy); folderButton.isEnabled = !model.isBusy
         issuesButton.isEnabled = model.report != nil
         if model.isScanning { progress.startAnimation(nil) } else { progress.stopAnimation(nil) }
         refreshProgress()
-        statusLabel.stringValue = model.isRemoving ? "Moving selected installations to Trash…" : model.catalogNotice ?? model.setupNotice ?? (model.usingSavedCatalog && !model.isScanning ? "Saved collection · Scan to refresh" : model.isScanning ? (model.isBackgroundScanning ? "Updating in background · browse as results arrive" : "Finding your collection…") : model.configurationChanged ? "Locations changed. Scan to update." : model.report == nil ? "Ready when you are." : "\(model.report!.projects.count) projects · \(model.report!.issues.count) scan issue\(model.report!.issues.count == 1 ? "" : "s")")
+        statusLabel.stringValue = model.isStoppingScan ? "Stopping refresh…" : model.isPreparingOutline ? "Updating collection view…" : model.isRemoving ? "Moving selected installations to Trash…" : model.catalogNotice ?? model.setupNotice ?? (model.usingSavedCatalog && !model.isScanning ? "Saved collection · Choose Check For Updates to verify changes" : model.isScanning ? (model.isBackgroundScanning ? "Updating in background · browse as results arrive" : "Checking your collection…") : model.configurationChanged ? "Locations changed. Choose Check For Updates." : model.report == nil ? "Ready when you are." : "\(model.report!.projects.count) projects · \(model.report!.issues.count == 1 ? "1 scan issue" : "\(model.report!.issues.count) scan issues")")
         statusLabel.toolTip = model.status
         emptyContainer.isHidden = !outline.roots.isEmpty; collectionScroll.isHidden = outline.roots.isEmpty
         emptyTitle.stringValue = model.isScanning ? (model.isBackgroundScanning ? "Your collection is open." : "Finding your sounds…") : model.report == nil ? "Meet your collection." : model.query.isEmpty ? "No items found." : "No matches."
@@ -272,7 +292,19 @@ import SimplifyCore
         // Inset table style adds spacing outside NSTableColumn.width. Fit the rendered extent.
         if let last = table.tableColumns.lastIndex(where: { !$0.isHidden }) {
             let overflow = table.rect(ofColumn: last).maxX - available
-            if overflow > 0 { name.width = max(name.minWidth, name.width - overflow - 1) }
+            if overflow > 0 {
+                name.width = max(name.minWidth, name.width - overflow - 1)
+                // When Name reaches its readable minimum, reclaim the remaining
+                // inset-style overflow from flexible columns before a date clips.
+                var remaining = max(0, table.rect(ofColumn: last).maxX - available + 1)
+                for id in ["tags", "size", "installed", "reference"] where remaining > 0 {
+                    guard let column = table.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier(id)),
+                          !column.isHidden else { continue }
+                    let reduction = min(remaining, max(0, column.width - column.minWidth))
+                    column.width -= reduction
+                    remaining -= reduction
+                }
+            }
         }
     }
     @objc private func progressTick() { refreshProgress() }
@@ -284,12 +316,12 @@ import SimplifyCore
         let phase = update?.phase ?? .discovering
         let title: String
         switch phase {
-        case .discovering: title = "1 of 3 · Finding files"
-        case .inspecting: title = "2 of 3 · Reading files"
-        case .matching: title = "3 of 3 · Matching references"
-        case .complete: title = "Finishing scan"
+        case .discovering: title = "Checking for changes"
+        case .inspecting: title = "Updating collection"
+        case .matching: title = "Matching references"
+        case .complete: title = "Finishing refresh"
         }
-        let scope = model.scanningKinds.count == 1 ? (model.scanningKinds.first == .plugin ? "Plugins" : model.scanningKinds.first == .sample ? "Samples" : "Libraries") : "Collection"
+        let scope = "Collection"
         if let fraction = update?.fraction {
             discoveryProgressBar.stopAnimation(nil); discoveryProgressBar.isHidden = true
             scanProgressBar.isHidden = false; scanProgressBar.doubleValue = fraction * 100
@@ -305,6 +337,35 @@ import SimplifyCore
         let current = update?.currentPath.map { URL(fileURLWithPath: $0).lastPathComponent } ?? "Preparing…"
         scanProgressDetail.stringValue = "\(counts) · \(elapsed) · \(current)"
         scanProgressDetail.toolTip = update?.currentPath
+    }
+    func sizePresentationDetail(_ node: CatalogOutlineNode, value: String) -> String {
+        if node.kind == .articulation {
+            return "Included in patch and library size; this technique is not measured separately."
+        }
+        if node.kind == .instrument {
+            return "Included in library size; this instrument is not measured separately."
+        }
+        switch node.asset?.libraryMetadata?.sizeBasis {
+        case .unassociatedContent:
+            return value + ". Measured unassociated metadata and archive content; product and whole-library footprint are unknown."
+        case .installedContent:
+            let shared = node.asset?.libraryMetadata?.sharedLogicalBytes ?? 0
+            let sharing = shared > 0
+                ? " Includes " + ByteCountFormatter.string(fromByteCount: Int64(shared), countStyle: .file) + " shared with other SINE collections."
+                : ""
+            return value + ". Measured installed SINE metadata and archives." + sharing + " Other product files are not established."
+        case .candidateFolder:
+            return value + ". Measured folder footprint; product ownership is unverified. It may include shared or nested content and is not a reclaimable total."
+        case .fullInstallation:
+            return value + ". Measured installation-folder logical bytes; hard-linked files are counted once."
+        case nil:
+            if node.kind == .sample && node.asset?.logicalBytes == nil {
+                return "Size unavailable; file size metadata could not be read. See Scan details for the source issue."
+            }
+            return node.kind == .library && node.asset?.logicalBytes == nil
+                ? "Size unavailable; no safe physical folder measurement was established. See Scan details for the source-specific issue."
+                : "Size, " + value + "."
+        }
     }
     private func updateInspector() {
         let node = selectedNode
@@ -328,27 +389,49 @@ import SimplifyCore
         guard let node else {
             inspectorTitle.stringValue = "A closer look"; inspectorMeta.stringValue = "Select a sound"
             lastUsedSummary.stringValue = "—"; addedSummary.stringValue = "—"; sizeSummary.stringValue = "—"
+            sizeSummary.toolTip = nil
             return
         }
         inspectorTitle.stringValue = node.displayName
         if node.isGroup {
             inspectorMeta.stringValue = "\(node.children.count.formatted()) items"
             lastUsedSummary.stringValue = "—"; addedSummary.stringValue = "—"; sizeSummary.stringValue = "—"
+            sizeSummary.toolTip = nil
             return
         }
         guard let asset = node.asset else { return }
-        inspectorMeta.stringValue = model.product(for: asset)?.formats
+        inspectorMeta.stringValue = node.articulation.map { _ in
+            (node.instrument?.name ?? "Patch") + " · Technique"
+        } ?? model.product(for: asset)?.formats
             ?? node.instrument.map { URL(fileURLWithPath: $0.path).pathExtension.uppercased() }
             ?? asset.libraryMetadata?.player ?? asset.format.uppercased()
-        let size = node.kind == .instrument ? "Shared with library" : asset.kind == .plugin ? model.pluginSize(asset).value : node.sizeText
+        if node.kind == .instrument, let instrument = node.instrument {
+            switch instrument.articulationCoverage.status {
+            case .unknown: inspectorMeta.stringValue += " · Technique details unavailable"
+            case .indexed where instrument.articulations.count == 1:
+                inspectorMeta.stringValue += " · " + instrument.articulations[0].name
+            default: break
+            }
+        }
+        if asset.classification == "unassociatedPhysicalContent" {
+            inspectorMeta.stringValue = "Unassociated physical content · Product unknown"
+        }
+        inspectorMeta.toolTip = node.articulation?.source
+            ?? node.instrument?.articulationCoverage.adapter.map { "Technique evidence: " + $0 }
+            ?? asset.libraryMetadata?.source
+        let size = node.instrument != nil ? "—" : asset.kind == .plugin ? model.pluginSize(asset).value : node.sizeText
         let addition = node.instrument.map(model.instrumentAdditionDate) ?? model.additionDate(asset)
-        let usage = model.lastUsed(asset)
-        lastUsedSummary.stringValue = usage.value.replacingOccurrences(of: "\n", with: " ")
-        addedSummary.stringValue = addition.value.replacingOccurrences(of: "\n", with: " ")
+        let usage = node.instrument.map { model.instrumentLastUsed(asset, instrument: $0) } ?? model.lastUsed(asset)
+        lastUsedSummary.stringValue = node.kind == .articulation ? "—" : usage.value.replacingOccurrences(of: "\n", with: " ")
+        addedSummary.stringValue = node.kind == .articulation ? "—" : addition.value.replacingOccurrences(of: "\n", with: " ")
         sizeSummary.stringValue = size
-        lastUsedSummary.setAccessibilityLabel(usage.accessibility)
-        addedSummary.setAccessibilityLabel(addition.accessibility)
-        sizeSummary.setAccessibilityLabel(asset.kind == .plugin ? model.pluginSize(asset).accessibility : "Size, " + size)
+        lastUsedSummary.setAccessibilityLabel(node.kind == .articulation ? "No independent technique use measurement" : usage.accessibility)
+        addedSummary.setAccessibilityLabel(node.kind == .articulation ? "No independent technique addition date" : addition.accessibility)
+        let sizeDetail = sizePresentationDetail(node, value: size)
+        sizeSummary.toolTip = sizeDetail
+        sizeSummary.setAccessibilityLabel(asset.kind == .plugin && node.instrument == nil
+            ? model.pluginSize(asset).accessibility : sizeDetail)
+        sizeSummary.setAccessibilityHelp(sizeDetail)
     }
     public func outlineView(_ outlineView: NSOutlineView, numberOfChildrenOfItem item: Any?) -> Int {
         (item as? CatalogOutlineNode)?.children.count ?? outline.roots.count
@@ -359,8 +442,22 @@ import SimplifyCore
     public func outlineView(_ outlineView: NSOutlineView, isItemExpandable item: Any) -> Bool {
         !(item as! CatalogOutlineNode).children.isEmpty
     }
+    private func nameSubtitle(for node: CatalogOutlineNode) -> String? {
+        if node.kind == .plugin { return node.asset.flatMap(model.product)?.formats }
+        if node.metadataOnlyMatch { return "Library metadata match" }
+        if node.kind == .sample, model.hasFilters { return node.breadcrumb.dropLast().joined(separator: " › ") }
+        return nil
+    }
     public func outlineView(_ outlineView: NSOutlineView, viewFor column: NSTableColumn?, item: Any) -> NSView? {
         guard let node = item as? CatalogOutlineNode else { return nil }
+        if column?.identifier.rawValue == "name", !node.isGroup {
+            let tags = model.tags(for: node)
+            let cell = CollectionTagCell(title: node.displayName, subtitle: nameSubtitle(for: node), tags: tags,
+                context: node.breadcrumb.joined(separator: " › "), query: model.query) { [weak self] button, allTags in
+                self?.showLibraryTags(allTags, from: button)
+            }
+            return cell
+        }
         let value: String
         switch column?.identifier.rawValue {
         case "tags": value = node.isGroup ? "" : model.tagSummary(node)
@@ -368,30 +465,28 @@ import SimplifyCore
             value = node.asset.flatMap(model.product)?.formats ?? node.instrument.map { URL(fileURLWithPath: $0.path).pathExtension.uppercased() }
                 .flatMap { $0.isEmpty ? nil : $0 } ?? node.asset.map { $0.libraryMetadata?.player ?? $0.format.uppercased() } ?? ""
         case "size": value = node.isGroup ? "" : node.sizeText
-        case "installed": value = node.isGroup ? "" : node.instrument.map { model.instrumentAdditionDate($0).value } ?? node.asset.map { model.additionDate($0).value } ?? "Unknown"
+        case "installed": value = node.isGroup ? "" : node.kind == .articulation ? "—" : node.instrument.map { model.instrumentAdditionDate($0).value } ?? node.asset.map { model.additionDate($0).value } ?? "Unknown"
         case "reference":
-            value = node.isGroup ? "" : node.kind == .instrument ? "Unknown" : node.asset.map { $0.kind == .plugin ? model.lastUsed($0).value : model.referenceText($0) } ?? ""
+            value = node.isGroup ? "" : node.kind == .articulation ? "—" : node.instrument.flatMap { instrument in node.asset.map { model.instrumentLastUsed($0, instrument: instrument).value } } ?? node.asset.map { model.lastUsed($0).value } ?? ""
         default:
             let product = node.asset.flatMap(model.product)
             let stale = product.map { $0.installations.allSatisfy { $0.catalogStale == true } } ?? node.stale
             value = (product?.name ?? node.title) + (stale ? " · Not observed" : "")
         }
-        let subtitle: String?
-        if column?.identifier.rawValue == "name", node.kind == .plugin {
-            subtitle = node.asset.flatMap(model.product)?.formats
-        } else if column?.identifier.rawValue == "name", node.metadataOnlyMatch {
-            subtitle = "Library metadata match"
-        } else if column?.identifier.rawValue == "name", model.hasFilters, node.kind == .sample {
-            subtitle = node.breadcrumb.dropLast().joined(separator: " › ")
-        } else if column?.identifier.rawValue == "name", !node.isGroup, node.kind != .sample {
-            subtitle = model.tagSummary(node)
-        } else { subtitle = nil }
+        let subtitle = column?.identifier.rawValue == "name" ? nameSubtitle(for: node) : nil
         let cell = CatalogCell(value: value, primary: column?.identifier.rawValue == "name", subtitle: subtitle,
                            query: model.query, context: node.breadcrumb.joined(separator: " › "), wrap: ["installed", "reference"].contains(column?.identifier.rawValue ?? ""))
-        if column?.identifier.rawValue == "reference", node.kind == .plugin, let asset = node.asset {
-            cell.textField?.setAccessibilityLabel(model.lastUsed(asset).accessibility); cell.textField?.setAccessibilityHelp(model.lastUsed(asset).detail)
+        if column?.identifier.rawValue == "size" {
+            let detail = sizePresentationDetail(node, value: value)
+            cell.textField?.toolTip = detail
+            cell.textField?.setAccessibilityLabel(detail)
+            cell.textField?.setAccessibilityHelp(detail)
         }
-        if column?.identifier.rawValue == "installed", !node.isGroup {
+        if column?.identifier.rawValue == "reference", let asset = node.asset {
+            let usage = node.instrument.map { model.instrumentLastUsed(asset, instrument: $0) } ?? model.lastUsed(asset)
+            cell.textField?.setAccessibilityLabel(usage.accessibility); cell.textField?.setAccessibilityHelp(usage.detail)
+        }
+        if column?.identifier.rawValue == "installed", !node.isGroup, node.kind != .articulation {
             let help = node.instrument.map { model.instrumentAdditionDate($0).accessibility } ?? node.asset.map { model.additionDate($0).accessibility } ?? "Date added unknown"
             cell.textField?.setAccessibilityLabel(help); cell.textField?.setAccessibilityHelp(help)
             cell.textField?.toolTip = help
@@ -405,17 +500,65 @@ import SimplifyCore
     }
     public func outlineViewItemDidExpand(_ notification: Notification) { recordExpansion(notification, expanded: true) }
     public func outlineViewItemDidCollapse(_ notification: Notification) { recordExpansion(notification, expanded: false) }
+    public func outlineView(_ outlineView: NSOutlineView, heightOfRowByItem item: Any) -> CGFloat {
+        guard let node = item as? CatalogOutlineNode, !node.isGroup else { return 38 }
+        return nameSubtitle(for: node) == nil ? 64 : 82
+    }
     private func recordExpansion(_ notification: Notification, expanded: Bool) {
         guard !refreshing, let node = notification.userInfo?["NSObject"] as? CatalogOutlineNode else { return }
         model.outlineState.setExpanded(expanded, node: node, category: model.category, query: model.navigationQuery)
     }
     public func controlTextDidChange(_ notification: Notification) { model.query = search.stringValue; refresh() }
-    @objc public func scan() { model.scan(scannedKinds: [model.category]) }
+    @objc public func scan() {
+        if model.isScanning { model.cancelScan() }
+        else { model.scan() }
+    }
     @objc public func focusSearch(_ sender: Any?) { window?.makeFirstResponder(search) }
     @objc public func changeCategory(_ sender: NSButton) {
         model.category = [AssetKind.plugin, .sample, .library][sender.tag]; model.selectedPath = nil; model.selectedProductID = nil
         if model.sort == .firstFound { model.sort = .name; model.sortReversed = false }
         model.musicalFilter = [:]; model.usageFilter = .all; refresh()
+    }
+    @objc public func changeLibrarySort(_ sender: NSPopUpButton) {
+        let values: [CatalogSort] = [.name, .tags, .size, .installed, .recency, .format]
+        let chosen = values[max(0, min(sender.indexOfSelectedItem, values.count - 1))]
+        if model.sort == chosen { model.sortReversed.toggle() }
+        else { model.sort = chosen; model.sortReversed = false }
+        refresh()
+    }
+    private func showLibraryTags(_ tags: [(MusicalFacet, String)], from button: NSButton) {
+        libraryTagsPopover.close()
+        libraryTagsAnchor = button
+        let content = TopAlignedDocument(frame: NSRect(x: 0, y: 0, width: 320, height: 1))
+        var y: CGFloat = 12
+        let title = label("All tags", size: 14, weight: .semibold)
+        title.frame = NSRect(x: 14, y: y, width: 292, height: 20); content.addSubview(title); y += 28
+        for (facet, value) in tags {
+            let text = NSTextField(wrappingLabelWithString: facet.title + ": " + MusicalTagDisplay.title(value))
+            text.font = .systemFont(ofSize: 12)
+            text.setAccessibilityLabel(facet.title + ": " + MusicalTagDisplay.title(value))
+            let height = max(20, ceil((text.stringValue as NSString).boundingRect(with: NSSize(width: 286, height: 1000), options: [.usesLineFragmentOrigin], attributes: [.font: text.font!]).height) + 2)
+            text.frame = NSRect(x: 14, y: y, width: 292, height: height)
+            content.addSubview(text); y += height + 5
+        }
+        let less = NSButton(title: "Show less", target: self, action: #selector(closeLibraryTags))
+        less.bezelStyle = .rounded; less.frame = NSRect(x: 14, y: y + 3, width: 86, height: 27)
+        content.addSubview(less); y += 43
+        content.frame.size.height = y
+        let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 320, height: min(y, 330)))
+        scroll.documentView = content; scroll.hasVerticalScroller = y > 330
+        let controller = NSViewController(); controller.view = scroll
+        libraryTagsPopover.contentViewController = controller
+        libraryTagsPopover.contentSize = scroll.frame.size
+        libraryTagsPopover.behavior = .transient; libraryTagsPopover.delegate = self
+        libraryTagsPopover.show(relativeTo: button.bounds, of: button, preferredEdge: .maxY)
+        window?.makeFirstResponder(less)
+    }
+    @objc private func closeLibraryTags() { libraryTagsPopover.close() }
+    public func popoverDidClose(_ notification: Notification) {
+        guard notification.object as? NSPopover === libraryTagsPopover else { return }
+        window?.makeFirstResponder(libraryTagsAnchor ?? table)
+        libraryTagsAnchor = nil
     }
     public func outlineView(_ outlineView: NSOutlineView, sortDescriptorsDidChange oldDescriptors: [NSSortDescriptor]) {
         guard !refreshing, let descriptor = outlineView.sortDescriptors.first else { return }

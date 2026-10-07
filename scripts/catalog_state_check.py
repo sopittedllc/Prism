@@ -21,7 +21,7 @@ assert native['preset_ids'] == [] and native['preset_serialization'] == 'absent'
 assert native['persistence'] == 'local-setup-v1' and native['migration'] == 'version 1; reject unsupported versions'
 assert set(native['persistence_ids']) == {s['id'] for s in registry['settings'] if s['policies']['project_persistence'] == 'included'}
 assert all(s['policies']['preset']['decision'] == 'excluded' for s in registry['settings'])
-assert set(native['persistence_ids']) == {'roots', 'standard_plugins', 'onboarding_completed', 'online_tags', 'appearance'}
+assert set(native['persistence_ids']) == {'roots', 'standard_plugins', 'onboarding_completed', 'appearance'}
 print('Catalog state: PASS (exact IDs/defaults; setup persistence IDs; explicit preset exclusions)')
 
 # Persistent inventory has its own runtime authority, separate from setup settings.
@@ -34,5 +34,5 @@ assert set(expected_catalog) == set(actual_catalog)
 for key in expected_catalog:
     for field in ('value_type', 'default', 'introduced_in'):
         assert expected_catalog[key][field] == actual_catalog[key][field]
-assert native['catalog_schema_version'] == 5
+assert native['catalog_schema_version'] == 6
 print('Catalog persistence: PASS (exact IDs/defaults and all cross-cutting decisions)')

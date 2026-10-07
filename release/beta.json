@@ -1,0 +1,7 @@
+{
+  "marketing_version": "2026.10.07",
+  "channel": "beta.1",
+  "bundle_identifier": "llc.sopitted.Prism",
+  "architecture": "arm64",
+  "minimum_macos": "13.0"
+}

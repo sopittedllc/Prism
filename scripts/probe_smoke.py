@@ -53,8 +53,13 @@ with tempfile.TemporaryDirectory(prefix='simplify-fixture-', dir=scratch) as dir
     assert [r['name'] for r in diagnostic['descriptors']] == ['Example']
     assert diagnostic['inputSHA256'] == hashlib.sha256(cpr.read_bytes()).hexdigest()
     assert 'references' not in diagnostic
-    ordinary = json.loads(run('--inspect-project', cpr).stdout)
-    assert ordinary['coverage'] == 'unsupported' and ordinary['references'] == []
+    # These diagnostic marker bytes are not a valid typed CPR container. The
+    # saved-project reader must fail closed, never promote the descriptor to use.
+    ordinary_result = run('--inspect-project', cpr)
+    ordinary = json.loads(ordinary_result.stdout)
+    assert ordinary_result.returncode == 2
+    assert ordinary['coverage'] == 'failed' and ordinary['references'] == []
+    assert not ordinary.get('pluginClasses') and not ordinary.get('sourceSHA256')
     assert snapshot(root) == diagnostic_before
     assert run('--inspect-cubase-descriptors').returncode == 64
     assert run('--inspect-cubase-descriptors', '--help').returncode == 64

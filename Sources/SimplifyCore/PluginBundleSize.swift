@@ -48,18 +48,21 @@ enum PluginBundleSize {
         var isSymlink: Bool { mode & S_IFMT == S_IFLNK }
     }
 
-    static func measure(_ bundle: URL, pass: inout Pass) -> Result {
+    /// Complete traversal is used for library installations; plugin startup keeps
+    /// its existing budgets. Both modes retain cancellation and consistency checks.
+    static func measure(_ bundle: URL, pass: inout Pass, complete: Bool = false,
+                        progress: ((Int) -> Void)? = nil) -> Result {
         let clock = ProcessInfo.processInfo.systemUptime
         if pass.startedAt == nil { pass.startedAt = clock }
-        guard !pass.exhausted else { return Result(bytes: nil, issue: "Plugin size pass limit reached") }
+        guard complete || !pass.exhausted else { return Result(bytes: nil, issue: "Plugin size pass limit reached") }
         let bundleStart = clock
         var visited: [(URL, Signature)] = []
-        var internalLinks: [URL] = []
         var distinctFiles = Set<String>()
         var sum = 0
         var bundleEntries = 0
         func budget() -> String? {
             if Task<Never, Never>.isCancelled { return "Plugin size measurement cancelled" }
+            if complete { return nil }
             if bundleEntries >= maximumBundleEntries { return "Plugin size entry limit reached" }
             if pass.entries >= maximumPassEntries { pass.exhausted = true; return "Plugin size pass entry limit reached" }
             let now = ProcessInfo.processInfo.systemUptime
@@ -70,24 +73,18 @@ enum PluginBundleSize {
         func account(_ url: URL) -> String? {
             if let reason = budget() { return reason }
             bundleEntries += 1; pass.entries += 1
+            if bundleEntries % 512 == 0 { progress?(bundleEntries) }
             guard let signature = Signature(url) else { return "Plugin size metadata unavailable" }
-            if signature.isSymlink {
-                guard let destination = try? FileManager.default.destinationOfSymbolicLink(atPath: url.path),
-                      !destination.hasPrefix("/"),
-                      !destination.isEmpty else { return "Plugin size contains external or invalid link" }
-                let target = url.deletingLastPathComponent().appendingPathComponent(destination).standardizedFileURL
-                guard target.path.hasPrefix(bundle.standardizedFileURL.path + "/") else {
-                    return "Plugin size contains external or invalid link"
-                }
-                internalLinks.append(target)
-            } else if !signature.isDirectory && !signature.isRegular {
+            if !signature.isDirectory && !signature.isRegular && !signature.isSymlink {
                 return "Plugin size contains unsupported entry"
             }
             visited.append((url, signature))
-            if signature.isRegular {
+            if signature.isRegular || signature.isSymlink {
                 guard signature.size >= 0, signature.size <= Int.max else { return "Plugin size invalid file length" }
                 let key = "\(signature.device):\(signature.inode)"
                 if distinctFiles.insert(key).inserted {
+                    // A link is a real directory entry with its own length. Its target
+                    // may be absent or separately owned, and is never traversed here.
                     guard let next = checkedSum(sum, Int(signature.size)) else { return "Plugin size overflow" }
                     sum = next
                 }
@@ -120,16 +117,12 @@ enum PluginBundleSize {
                 }
                 if name == "." || name == ".." { continue }
                 let child = directory.appendingPathComponent(name)
-                if depth + 1 > maximumBundleDepth { failed = "Plugin size depth limit reached"; break }
+                if !complete && depth + 1 > maximumBundleDepth { failed = "Plugin size depth limit reached"; break }
                 if let reason = account(child) { failed = reason; break }
                 if visited.last?.1.isDirectory == true { directories.append((child, depth + 1)) }
             }
             closedir(stream)
             if let failed { return Result(bytes: nil, issue: failed) }
-        }
-        let includedTargets = Set(visited.filter { $0.1.isDirectory || $0.1.isRegular }.map { $0.0.standardizedFileURL.path })
-        guard internalLinks.allSatisfy({ includedTargets.contains($0.path) }) else {
-            return Result(bytes: nil, issue: "Plugin size contains unresolved link")
         }
         for (url, before) in visited {
             if let reason = budget() { return Result(bytes: nil, issue: reason) }

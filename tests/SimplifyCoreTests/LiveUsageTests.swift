@@ -309,8 +309,50 @@ private let liveInit = liveLine(0, "Init: Version: 'Live 12.4.6 Build: test' 1")
     let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath).appendingPathComponent("build/date-evidence")
     guard let baseline = try? Data(contentsOf: root.appendingPathComponent("cubase-usage-baseline.jsonl")),
           let missing = try? Data(contentsOf: root.appendingPathComponent("cubase-usage-missing-control.jsonl")) else { return }
-    #expect(try CubaseUsageLog.parse(baseline).count >= 3)
-    #expect(try CubaseUsageLog.parse(missing).allSatisfy { $0.name != "Diva" })
+    enum Grammar { case legacy, native1505, native1530 }
+    enum CaptureError: Error { case unexpectedInstanceGrammar }
+    func grammar(_ data: Data) throws -> Grammar {
+        guard let text = String(data: data, encoding: .utf8) else { throw CaptureError.unexpectedInstanceGrammar }
+        let begins = try text.split(separator: "\n").compactMap { line -> [String: Any]? in
+            let object = try #require(JSONSerialization.jsonObject(with: Data(line.utf8)) as? [String: Any])
+            return object["smtg_type"] as? String == "instance_begin" ? object : nil
+        }
+        guard !begins.isEmpty else { throw CaptureError.unexpectedInstanceGrammar }
+        if begins.allSatisfy({ $0["smtg_product_name"] == nil && $0["smtg_product_version"] == nil }) { return .legacy }
+        if begins.allSatisfy({ $0["smtg_product_name"] as? String == "Cubase Pro" && $0["smtg_product_version"] as? String == "15.0.5.121" }) { return .native1505 }
+        if begins.allSatisfy({ $0["smtg_product_name"] as? String == "Cubase Pro" && $0["smtg_product_version"] as? String == "15.0.30.287" }) { return .native1530 }
+        throw CaptureError.unexpectedInstanceGrammar
+    }
+    switch try grammar(baseline) {
+    case .legacy, .native1505: #expect(try CubaseUsageLog.parse(baseline).count >= 3)
+    case .native1530: #expect(try CubaseUsageLog.parse(baseline).count == 4)
+    }
+    switch try grammar(missing) {
+    case .legacy, .native1505: #expect(try CubaseUsageLog.parse(missing).allSatisfy { $0.name != "Diva" })
+    case .native1530:
+        let candidates = try CubaseUsageLog.parse(missing)
+        #expect(candidates.count == 2 && candidates.allSatisfy { $0.evidenceKind == .loadAttempt })
+    }
+    if try grammar(baseline) == .native1530 {
+        let before = try CubaseUsageLog.parse(baseline)
+        let lines = try #require(String(data: baseline, encoding: .utf8))
+            .split(separator: "\n", omittingEmptySubsequences: true)
+        let firstAddIndex = try #require(lines.firstIndex { $0.contains("\"smtg_report_name\":\"Plugin Instance Info: VST - Add\"") })
+        let partial = Data((lines.prefix(firstAddIndex + 1).joined(separator: "\n") + "\n").utf8)
+        let firstAttempt = try CubaseUsageLog.parse(partial)
+        #expect(firstAttempt.count == 1 && firstAttempt[0].eventID == before[0].eventID)
+        let removed = try CubaseUsageLog.parse(Data(contentsOf: root.appendingPathComponent("cubase-usage-removed.jsonl")))
+        let empty = try CubaseUsageLog.parse(Data(contentsOf: root.appendingPathComponent("cubase-usage-empty.jsonl")))
+        let rescan = try CubaseUsageLog.parse(Data(contentsOf: root.appendingPathComponent("cubase-usage-rescan.jsonl")))
+        #expect(before.count == 4 && removed.count == 7 && empty.count == 7)
+        #expect(Set(before.map(\.eventID)).isSubset(of: Set(removed.map(\.eventID))))
+        #expect(Set(empty.map(\.eventID)) == Set(rescan.map(\.eventID)))
+        #expect(rescan.allSatisfy { $0.evidenceKind == .loadAttempt })
+        #expect(try CubaseUsageLog.parse(Data(lines.joined(separator: "\n")
+            .replacingOccurrences(of: "15.0.30.287", with: "15.0.30.288").utf8)).isEmpty)
+        #expect(try CubaseUsageLog.parse(Data(lines.joined(separator: "\n")
+            .replacingOccurrences(of: "\"Type\":\"Audio Module Class\"", with: "\"Type\":\"Instrument Class\"").utf8)).isEmpty)
+    }
 }
 
 @Test func cubaseCacheRequiresExactDescriptorTuple() throws {

@@ -3,6 +3,22 @@ import CryptoKit
 import Testing
 @testable import SimplifyCore
 
+@Test func cubaseCollectorChoosesNewestSixteenLogsWithoutUsingMtimeAsEventTime() throws {
+    let root = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".cache/SimplifyTests/" + UUID().uuidString)
+    try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let entries = try (0..<18).map { index -> URL in
+        let url = root.appendingPathComponent(String(format: "log-%02d.json", index))
+        try Data("fixture".utf8).write(to: url)
+        try FileManager.default.setAttributes([.modificationDate: Date(timeIntervalSince1970: Double(index + 100))], ofItemAtPath: url.path)
+        return url
+    }
+    let selected = CubaseUsageCollector.recentLogs(entries.reversed())
+    #expect(selected.count == 16)
+    #expect(selected.first == entries[17] && selected.last == entries[2])
+    #expect(!selected.contains(entries[0]) && !selected.contains(entries[1]))
+}
+
 private func nativeLine(_ fields: [String: Any]) -> String {
     let data = try! JSONSerialization.data(withJSONObject: fields, options: [.sortedKeys])
     return String(decoding: data, as: UTF8.self) + "\n"

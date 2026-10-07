@@ -17,18 +17,151 @@ private final class CatalogFixture {
     }
 }
 
-@Test @MainActor func startupRefreshScansEveryConfiguredCategoryOnce() async throws {
+@Test @MainActor func settingsSaveBeforeFirstReviewDoesNotCompleteOnboarding() throws {
     let f = try CatalogFixture()
-    try f.file("Plugins/Test.vst3/Contents/Info.plist", "<plist><dict><key>CFBundleIdentifier</key><string>example.test</string></dict></plist>")
-    try f.file("Samples/First.wav")
-    let model = CatalogModel(); model.setStandardPlugins(false)
-    model.addRoots([f.root.appendingPathComponent("Plugins")], kind: .plugins)
-    model.addRoots([f.root.appendingPathComponent("Samples")], kind: .samples)
-    model.scan(scannedKinds: [.plugin]); try await finish(model)
-    #expect(model.report?.assets.filter { $0.kind == .sample }.isEmpty == true)
-    model.refreshConfiguredCollectionAfterRestore(); try await finish(model)
-    #expect(model.report?.assets.filter { $0.kind == .sample }.count == 1)
-    #expect(model.report?.assets.filter { $0.kind == .plugin }.count == 1)
+    let setup = SetupStore(url: f.root.appendingPathComponent("setup.json"))
+    let model = CatalogModel(store: setup)
+    #expect(!model.onboardingCompleted)
+    let draft = model.setupDraft(); draft.appearance = .dark
+    try model.acceptSetup(draft, remember: true, completeOnboarding: false)
+    #expect(!model.onboardingCompleted && !model.isScanning)
+    let reopened = CatalogModel(store: setup)
+    #expect(!reopened.onboardingCompleted && reopened.appearance == .dark)
+}
+
+@Test @MainActor func unavailableSampleReferenceAndSizeCopyStayQualified() async throws {
+    let f = try CatalogFixture()
+    let first = try f.file("Samples/First.wav")
+    let second = try f.file("Samples/Second.wav")
+    let catalog = CatalogStore(url: f.root.appendingPathComponent("Private/catalog.sqlite"))
+    let model = CatalogModel(catalogStore: catalog); model.setStandardPlugins(false)
+    model.addRoots([first.deletingLastPathComponent()], kind: .samples)
+    model.addRoots([f.root.appendingPathComponent("UnavailableProjects")], kind: .projects)
+    model.scan(); try await finish(model)
+    model.category = .sample; model.selectedPath = first.path
+    #expect(model.detail.contains("Project reference coverage unavailable"))
+    try FileManager.default.removeItem(at: second)
+    model.scan(); try await finish(model)
+    model.selectedPath = second.path
+    #expect(model.selectedAsset?.catalogStale == true)
+    #expect(model.detail.contains("Reference coverage unavailable for this not-observed"))
+    #expect(!model.detail.contains("No references found"))
+
+    let window = CatalogWindow(model: model)
+    let sample = Asset(kind: .sample, path: "/fixture/Unreadable.wav", name: "Unreadable", format: "wav",
+        bundleIdentifier: nil, logicalBytes: nil, classification: "fixture")
+    let sampleNode = CatalogOutlineNode(id: "sample", kind: .sample, title: "Unreadable", breadcrumb: [], asset: sample)
+    #expect(window.sizePresentationDetail(sampleNode, value: "Size unavailable").contains("file size metadata could not be read"))
+    var orphan = Asset(kind: .library, path: "/fixture/Orphan", name: "Orphan", format: "SINE",
+        bundleIdentifier: nil, logicalBytes: 18, classification: "unassociatedPhysicalContent")
+    var metadata = LibraryMetadata(player: "SINE", maker: "Unknown maker", summary: "", instruments: [], tags: [], source: "fixture")
+    metadata.sizeBasis = .unassociatedContent; orphan.libraryMetadata = metadata
+    let orphanNode = CatalogOutlineNode(id: "orphan", kind: .library, title: "Orphan", breadcrumb: [], asset: orphan)
+    let help = window.sizePresentationDetail(orphanNode, value: "18 bytes")
+    #expect(help.contains("unassociated metadata and archive content") && help.contains("whole-library footprint are unknown"))
+}
+
+@Test @MainActor func cancellingCatalogScanDoesNotPublishOrCommitPartialResults() async throws {
+    let f = try CatalogFixture()
+    for index in 0..<180 { _ = try f.file(String(format: "Libraries/Folder%03d/Patch.nki", index)) }
+    let catalog = CatalogStore(url: f.root.appendingPathComponent("Private/catalog.sqlite"))
+    let model = CatalogModel(catalogStore: catalog); model.setStandardPlugins(false)
+    let libraryRoot = f.root.appendingPathComponent("Libraries")
+    model.addRoots([libraryRoot], kind: .libraries)
+    model.scan(scannedKinds: [.library])
+    model.cancelScan()
+    try await finish(model)
+    #expect(model.report == nil)
+    #expect(model.catalogNotice?.contains("Refresh stopped") == true)
+    #expect(try await catalog.load(scope: { var request = ScanRequest(); request.libraries = [libraryRoot]; return CatalogScope(request) }()) == nil)
+    model.scan(scannedKinds: [.library]); try await finish(model)
+    #expect(model.report?.assets.count == 180)
+}
+
+@Test @MainActor func restoringSavedCatalogLeavesRefreshUnderSectionControl() async throws {
+    let f = try CatalogFixture()
+    let setup = SetupStore(url: f.root.appendingPathComponent("setup.json"))
+    let catalog = CatalogStore(url: f.root.appendingPathComponent("catalog.sqlite"))
+    let libraryRoot = f.root.appendingPathComponent("Libraries")
+    let configured = CatalogModel(store: setup, catalogStore: catalog)
+    configured.setStandardPlugins(false)
+    configured.addRoots([libraryRoot], kind: .libraries)
+    try setup.save(configured.stateSnapshot)
+    var request = ScanRequest(); request.libraries = [libraryRoot]
+    let path = libraryRoot.appendingPathComponent("Folk")
+    let asset = Asset(kind: .library, path: path.path, name: "Folk", format: "Kontakt",
+        bundleIdentifier: nil, logicalBytes: nil, classification: "fixture")
+    _ = try await catalog.ingest(ScanReport(schemaVersion: 1, assets: [asset], projects: [],
+        sampleInclusions: [], issues: [], durationSeconds: 0), scope: CatalogScope(request))
+
+    let restored = CatalogModel(store: setup, catalogStore: catalog)
+    await restored.restoreSavedCatalog()
+    #expect(restored.report?.assets.map(\.path) == [path.path])
+    #expect(!restored.isScanning)
+    #expect(!restored.isRestoringCatalog)
+}
+
+@Test @MainActor func savedSINEInstrumentDateProjectsOnlyRefreshReachesNormalCatalog() async throws {
+    guard ProcessInfo.processInfo.environment["PRISM_SAVED_PROJECT_RUNTIME"] == "1" else { return }
+    let f = try CatalogFixture()
+    let meta = try f.file("Libraries/SINE/Tides.otmeta")
+    let archive = try f.file("Libraries/SINE/Tides.otarc")
+    let setup = SetupStore(url: f.root.appendingPathComponent("setup.json"))
+    let store = CatalogStore(url: f.root.appendingPathComponent("catalog.sqlite"))
+    let model = CatalogModel(store: setup, catalogStore: store)
+    model.setStandardPlugins(false)
+    model.addRoots([f.root.appendingPathComponent("Libraries")], kind: .libraries)
+    let controlRoot = try #require(ProcessInfo.processInfo.environment["PRISM_SINE_CONTROL_PROJECTS"])
+    let projectPath = URL(fileURLWithPath: controlRoot).appendingPathComponent("sinetest.cpr")
+    model.addRoots([projectPath.deletingLastPathComponent()], kind: .projects)
+    try setup.save(model.stateSnapshot)
+    var request = ScanRequest()
+    request.libraries = [f.root.appendingPathComponent("Libraries")]
+    request.projects = [projectPath.deletingLastPathComponent()]
+    var asset = Asset(kind: .library, path: meta.path, name: "Tides by Rachel Portman", format: "SINE",
+        bundleIdentifier: nil, logicalBytes: nil, classification: "identifiedLibrary")
+    asset.libraryMetadata = LibraryMetadata(player: "SINE", maker: "Orchestral Tools", summary: "",
+        instruments: [LibraryInstrument(name: "Violins a6", path: meta.path, tags: [],
+            vendorID: "sine:collection:5107:instrument:5108", contentPaths: [meta.path, archive.path])],
+        tags: [], source: "fixture", identity: LibraryIdentity(evidence: .vendorCatalog,
+            productID: "sine:collection:5107", installationRoot: nil))
+    let scope = CatalogScope(request)
+    let first = ScanReport(schemaVersion: 1, assets: [asset], projects: [], sampleInclusions: [], issues: [], durationSeconds: 0)
+    _ = try await store.ingest(first, scope: scope)
+    let project = ProjectReader.read(projectPath)
+    #expect(project.sineInstrumentIDs == ["5108"])
+    let second = ScanReport(schemaVersion: 1, assets: [], projects: [project], sampleInclusions: [], issues: [], durationSeconds: 0)
+    let saved = try await store.ingest(second, scope: scope, scannedKinds: [.sample])
+    let library = try #require(saved.report.assets.first { $0.kind == .library })
+    let instrument = try #require(library.libraryMetadata?.instruments.first)
+    let subject = AssetUsageSubject.instrumentID(parentNodeID: try #require(library.catalogID), instrument: instrument)
+    #expect(try await store.dateSummary(for: subject, asOf: Date()).lastUsed == project.projectModifiedAt)
+    let restored = CatalogModel(store: setup, catalogStore: store)
+    await restored.restoreSavedCatalog()
+    await restored.reloadUsage()
+    let visible = try #require(restored.report?.assets.first { $0.kind == .library })
+    #expect(restored.usageRecord(visible)?.eventDate == project.projectModifiedAt)
+}
+
+@Test @MainActor func realLogicSavedKontaktLibraryReachesLibraryDateWhenEnabled() async throws {
+    guard let path = ProcessInfo.processInfo.environment["PRISM_REAL_LOGIC_PROJECT"] else { return }
+    let project = ProjectReader.read(URL(fileURLWithPath: path))
+    #expect(project.kontaktStates?.contains { $0.libraryIDs.contains("058") } == true)
+    let current = CatalogModel(store: .application, catalogStore: .application)
+    await current.restoreSavedCatalog()
+    let asset = try #require(current.report?.assets.first {
+        $0.libraryMetadata?.identity?.productID == "kontakt:snpid:058"
+    })
+    let f = try CatalogFixture()
+    let store = CatalogStore(url: f.root.appendingPathComponent("catalog.sqlite"))
+    var request = ScanRequest(); request.libraries = [URL(fileURLWithPath: asset.path).deletingLastPathComponent()]
+    request.projects = [URL(fileURLWithPath: path).deletingLastPathComponent()]
+    let scope = CatalogScope(request)
+    let report = ScanReport(schemaVersion: 1, assets: [asset], projects: [project],
+        sampleInclusions: [], issues: [], durationSeconds: 0)
+    let saved = try await store.ingest(report, scope: scope, at: Date())
+    let subject = try #require(saved.report.assets.first?.catalogID)
+    #expect(try await store.dateSummary(for: subject, asOf: Date()).lastUsed == project.projectModifiedAt)
 }
 
 @Test @MainActor func tagCapitalizationChangesPresentationOnly() {
@@ -41,6 +174,62 @@ private final class CatalogFixture {
     #expect(pill.toolTip?.contains("Sul Ponticello") == true)
     #expect(pill.removeButton.accessibilityLabel()?.contains("Sul Ponticello") == true)
     #expect(MusicalSearch.matches("sul ponticello", in: pill.value))
+}
+
+@Test @MainActor func collectionReadOnlyTagsKeepFullValuesAndEqualPaddingAtCompactWidth() throws {
+    let tags: [(MusicalFacet, String)] = [
+        (.instrument, "cello"), (.technique, "legato"), (.character, "warm"),
+        (.ensemble, "chamber ensemble"), (.role, String(repeating: "very long tag ", count: 25))
+    ]
+    var disclosed = false
+    let cell = CollectionTagCell(title: "Celli Core", tags: tags, context: "Spitfire › Chamber Strings", query: "Celli") { _, supplied in
+        disclosed = supplied.count == tags.count
+    }
+    cell.frame = NSRect(x: 0, y: 0, width: 190, height: 64)
+    cell.layout()
+    let more = try #require(cell.subviews.compactMap { $0 as? NSButton }.first)
+    let visiblePills = cell.subviews.compactMap { $0 as? ReadOnlyTagPill }.filter { !$0.isHidden }
+    let visible = visiblePills.count
+    #expect(more.title == "+\(tags.count - visible) more")
+    #expect(more.accessibilityLabel()?.contains("all 5 tags") == true)
+    #expect(cell.textField?.accessibilityLabel()?.contains("Very Long Tag") == true)
+    let style = cell.textField?.attributedStringValue.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
+    #expect(style?.lineBreakMode == .byTruncatingMiddle)
+    #expect(cell.textField?.maximumNumberOfLines == 1)
+    #expect(cell.subviews.compactMap { $0 as? TagRemoveButton }.isEmpty)
+    for pill in visiblePills {
+        pill.layout()
+        #expect(pill.title.frame.minY == pill.bounds.height - pill.title.frame.maxY)
+        #expect(pill.title.frame.minX == pill.bounds.width - pill.title.frame.maxX)
+        #expect(pill.title.frame.width >= pill.title.fittingSize.width)
+        #expect(pill.title.accessibilityLabel()?.contains(": ") == true)
+    }
+    more.performClick(nil)
+    #expect(disclosed)
+
+    let withSubtitle = CollectionTagCell(title: "A plugin", subtitle: "AU, VST3", tags: tags,
+                                         context: "A maker", query: "plugin") { _, _ in }
+    withSubtitle.frame = NSRect(x: 0, y: 0, width: 190, height: 82)
+    withSubtitle.layout()
+    #expect(withSubtitle.textField?.accessibilityLabel()?.contains("AU, VST3") == true)
+    #expect(withSubtitle.subviews.compactMap { $0 as? ReadOnlyTagPill }.filter { !$0.isHidden }.allSatisfy { $0.frame.minY >= 0 })
+}
+
+@Test @MainActor func collectionSortAndTagColumnApplyAcrossCategories() {
+    let model = CatalogModel()
+    let controller = CatalogWindow(model: model)
+    for kind in [AssetKind.plugin, .sample, .library] {
+        model.category = kind
+        controller.refresh()
+        #expect(controller.table.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("tags"))?.isHidden == true)
+        #expect(!controller.librarySort.isHidden)
+        let formatTitle = kind == .plugin ? "Format" : kind == .sample ? "File type" : "Player / format"
+        #expect(controller.librarySort.item(at: 5)?.title == formatTitle)
+        controller.librarySort.selectItem(at: 1)
+        controller.changeLibrarySort(controller.librarySort)
+        #expect(model.sort == .tags)
+        model.sort = .name; model.sortReversed = false
+    }
 }
 
 @Test @MainActor func compactInspectorKeepsFormatActionsReachableAtMinimumWindowSize() async throws {
@@ -116,9 +305,11 @@ private final class CatalogFixture {
 }
 
 @MainActor private func finish(_ model: CatalogModel) async throws {
-    let deadline = Date().addingTimeInterval(10)
-    while (model.isScanning || model.isLoadingInstallerRecords) && Date() < deadline { try await Task.sleep(for: .milliseconds(10)) }
-    #expect(!model.isScanning && !model.isLoadingInstallerRecords)
+    // Swift Testing runs this suite concurrently; large scanner fixtures can keep
+    // otherwise tiny catalog scans queued for more than ten seconds on a cold run.
+    let deadline = Date().addingTimeInterval(30)
+    while (model.isScanning || model.isLoadingInstallerRecords || model.isLoadingItemUsage) && Date() < deadline { try await Task.sleep(for: .milliseconds(10)) }
+    #expect(!model.isScanning && !model.isLoadingInstallerRecords && !model.isLoadingItemUsage)
 }
 
 @Test @MainActor func defaultsRegistryAndResetAgree() throws {
@@ -153,7 +344,7 @@ private final class CatalogFixture {
     try await finish(model)
     model.removeRoot(f.root, kind: .samples)
     #expect(model.configurationChanged)
-    #expect(model.status.contains("Scan to update"))
+    #expect(model.status.contains("Check For Updates to update"))
     #expect(model.report?.assets.count == 1) // Old results remain until next scan.
 }
 
@@ -185,14 +376,14 @@ private final class CatalogFixture {
     #expect(model.detail.contains("not available for plugins"))
 }
 
-@Test func logicMetadataStaysUnresolvedAndExcludesUnused() throws {
+@Test func logicMetadataWithoutProjectDataFailsClosed() throws {
     let f = try CatalogFixture()
     let project = f.root.appendingPathComponent("Fixture.logicx")
     let metadata = try f.file("Fixture.logicx/Alternatives/000/MetaData.plist")
     try PropertyListSerialization.data(fromPropertyList: ["AudioFiles": ["/Samples/included.wav"], "UnusedAudioFiles": ["/Samples/unused.wav"]], format: .binary, options: 0).write(to: metadata)
     let report = ProjectReader.read(project)
-    #expect(report.coverage == "partial")
-    #expect(report.references.map(\.value) == ["/Samples/included.wav"])
+    #expect(report.coverage == "failed")
+    #expect(report.references.isEmpty)
     #expect(report.references.allSatisfy { $0.resolvedPath == nil })
     try PropertyListSerialization.data(fromPropertyList: ["AudioFiles": [5]], format: .binary, options: 0).write(to: metadata)
     #expect(ProjectReader.read(project).coverage == "failed")
@@ -347,8 +538,11 @@ private final class CatalogFixture {
     CREATE TABLE t_collection(collection_key,collection_id,title,subtitle,developer,keywords);
     CREATE TABLE t_instrument(instrument_key,instrument_collection,instrument_id,title,keywords);
     CREATE TABLE t_micPosition(micposition_instrument,filePath);
+    CREATE TABLE t_articulation(articulation_key,articulation_instrument,articulation_id,title,kind,hidden);
     INSERT INTO t_collection VALUES(1,'ark2','Ark 2','','Orchestral Tools',''),(2,'ark3','Ark 3','','Orchestral Tools','');
     INSERT INTO t_instrument VALUES(1,1,'low','Low Strings','strings'),(2,2,'low','Low Strings','strings');
+    INSERT INTO t_articulation VALUES(1,1,'legato','Legato','single',0),
+      (2,1,'tremolo','Tremolo','single',0),(3,2,'spiccato','Spiccato','single',0);
     """
     #expect(sqlite3_exec(db, schema, nil, nil, nil) == SQLITE_OK)
     for id: Int32 in [1, 2] {
@@ -364,6 +558,15 @@ private final class CatalogFixture {
     model.addRoots([f.root.appendingPathComponent("Content")], kind: .libraries)
     model.category = .library; model.scan(); try await finish(model)
     #expect(model.visibleAssets.count == 2)
+    #expect(model.outline.nodes.filter { $0.kind == .articulation }.count == 2)
+    #expect(model.outline.nodes.filter { $0.kind == .instrument }.count == 2)
+    model.query = "strings legato"
+    #expect(model.outline.nodes.filter { $0.kind == .articulation }.map(\.title) == ["Legato"])
+    model.query = "legato tremolo"
+    #expect(model.outline.nodes.filter { $0.kind == .articulation }.isEmpty)
+    model.query = "ark3 legato"
+    #expect(model.outline.nodes.filter { $0.kind == .articulation }.isEmpty)
+    model.query = ""
     for asset in model.visibleAssets {
         model.selectedPath = asset.selectionKey
         #expect(model.selectedAsset?.name == asset.name)
@@ -371,6 +574,67 @@ private final class CatalogFixture {
     }
     model.scan(); try await finish(model)
     #expect(model.selectedAsset?.name == "Ark 3")
+}
+
+@Test @MainActor func exactChamberPatchesSearchAndRestoreWithoutSiblingArticulationLeakage() async throws {
+    let f = try CatalogFixture()
+    let base = "Libraries/Chamber/"
+    try f.file(base + "Spitfire Chamber Strings.nicnt", "<ProductHints><Product><Name>Spitfire Chamber Strings</Name><Company>Spitfire Audio</Company><SNPID>058</SNPID></Product></ProductHints>")
+    try f.file(base + "Instruments/d - Celli.nki")
+    try f.file(base + "Instruments/_Advanced_/Individual articulations/d - Celli/d - Celli - Legato (Fingered).nki")
+    try f.file(base + "Instruments/_Advanced_/Individual articulations/d - Celli/d - Celli - Long Harmonics.nki")
+    try f.file(base + "Instruments/_Advanced_/Extended techniques/d - Celli - Core techniques.nki")
+    let store = CatalogStore(url: f.root.appendingPathComponent("Private/catalog.sqlite"))
+    func configured() -> CatalogModel {
+        let model = CatalogModel(catalogStore: store); model.standardPlugins = false
+        model.addRoots([f.root.appendingPathComponent("Libraries")], kind: .libraries)
+        model.category = .library
+        return model
+    }
+    let model = configured(); model.scan(); try await finish(model)
+    let all = model.outline
+    #expect(all.nodes.filter { $0.kind == .instrument }.count == 4)
+    #expect(all.nodes.filter { $0.kind == .articulation }.isEmpty)
+    #expect(all.nodes.filter { $0.kind == .instrument && $0.instrument?.articulationCoverage.status == .unknown }.count == 4)
+    #expect(all.nodes.first { $0.title == "d - Celli" }?.children.isEmpty == true)
+    let legatoPatch = try #require(all.nodes.first { $0.title == "d - Celli - Legato (Fingered)" })
+    let legatoAsset = try #require(legatoPatch.asset)
+    let legatoInstrument = try #require(legatoPatch.instrument)
+    let legatoSubject = try #require(model.subject(asset: legatoAsset, instrument: legatoInstrument))
+    #expect(model.effectiveMetadata(asset: legatoAsset, instrument: legatoInstrument)[.technique] == ["legato"])
+    try await model.saveMetadata(MusicalMetadata(fields: ["technique": []]), subject: legatoSubject)
+    #expect(model.effectiveMetadata(asset: legatoAsset, instrument: legatoInstrument)[.technique] == [])
+    model.query = "cello legato"
+    #expect(model.outline.nodes.filter { $0.kind == .instrument }.map(\.title) == ["d - Celli - Legato (Fingered)"])
+    try await model.undoMetadata()
+    #expect(model.effectiveMetadata(asset: legatoAsset, instrument: legatoInstrument)[.technique] == ["legato"])
+    #expect(model.outline.nodes.filter { $0.kind == .instrument }.map(\.title) == ["d - Celli - Legato (Fingered)"])
+    model.query = "harmonic cello"
+    let harmonic = try #require(model.outline.nodes.first { $0.kind == .instrument })
+    #expect(harmonic.title == "d - Celli - Long Harmonics" && harmonic.breadcrumb.count == 3)
+    #expect(harmonic.location == harmonic.instrument?.path && harmonic.sizeText == "—")
+    model.query = "legato harmonic"
+    #expect(model.outline.nodes.filter { $0.kind == .articulation || $0.kind == .instrument }.isEmpty)
+    model.query = ""
+    let patch = try #require(model.outline.nodes.first { $0.title == "d - Celli - Long Harmonics" })
+    model.outlineState.select(patch.id, category: .library, query: "")
+    model.outlineState.setExpanded(true, node: patch, category: .library, query: "")
+    model.query = "cello harmonics"
+    let found = try #require(model.outline.nodes.first { $0.kind == .instrument })
+    model.outlineState.select(found.id, category: .library, query: model.navigationQuery)
+    model.query = ""
+    #expect(model.outlineState.selectedID(category: .library, query: "") == patch.id)
+    #expect(model.outlineState.isExpanded(patch, category: .library, query: ""))
+    let reopened = configured(); await reopened.restoreSavedCatalog()
+    #expect(reopened.usingSavedCatalog)
+    #expect(reopened.outline.nodes.filter { $0.kind == .articulation }.isEmpty)
+    #expect(reopened.outline.nodes.filter { $0.kind == .instrument && $0.instrument?.articulationCoverage.status == .unknown }.count == 4)
+    #expect(reopened.outline.nodes.filter { $0.kind == .instrument }.allSatisfy { $0.instrument?.articulations.isEmpty == true && $0.location == $0.instrument?.path })
+    try FileManager.default.moveItem(at: f.root.appendingPathComponent(base),
+        to: f.root.appendingPathComponent("Offline-Chamber"))
+    reopened.scan(); try await finish(reopened)
+    #expect(reopened.outline.nodes.filter { $0.kind == .instrument && $0.instrument?.articulationCoverage.status == .unknown }.count == 4)
+    #expect(reopened.outline.nodes.filter { $0.kind == .instrument }.allSatisfy { $0.stale })
 }
 
 @Test @MainActor func persistentCatalogReopensAndRejectsCachedRemoval() async throws {
@@ -452,9 +716,20 @@ private final class CatalogFixture {
         let pending = Task { await model.restoreSavedCatalog() }
         // The main-actor flag proves restore captured the original scope/token and
         // yielded to the store. Change intent before allowing the read to complete.
-        while !model.isRestoringCatalog { await Task.yield() }
+        let restoreDeadline = Date().addingTimeInterval(10)
+        while !model.isRestoringCatalog && Date() < restoreDeadline {
+            try await Task.sleep(for: .milliseconds(1))
+        }
+        guard model.isRestoringCatalog else {
+            Issue.record("Catalog restore did not enter its suspended read within ten seconds")
+            #expect(sqlite3_exec(db, "ROLLBACK", nil, nil, nil) == SQLITE_OK)
+            await pending.value
+            continue
+        }
         if changeScope {
-            model.addRoots([f.root.appendingPathComponent("Other")], kind: .samples)
+            let other = f.root.appendingPathComponent("Other")
+            try FileManager.default.createDirectory(at: other, withIntermediateDirectories: true)
+            model.addRoots([other], kind: .samples)
         } else {
             try f.file("Samples/New.wav")
             model.scan()
@@ -504,6 +779,12 @@ private final class CatalogFixture {
     #expect(m.outline.nodes.filter { $0.kind == .instrument }.map(\.title) == ["Violin Spiccato"])
     let reopened = model(); await reopened.restoreSavedCatalog()
     #expect(reopened.metadataOverrides[subject.key]?[.character] == ["dark"])
+    let restoredLibrary = reopened.outline
+    reopened.category = .plugin; _ = reopened.outline
+    reopened.category = .library
+    #expect(reopened.outline === restoredLibrary)
+    await reopened.reloadUsage()
+    #expect(reopened.outline === restoredLibrary)
     reopened.musicalFilter = ["technique": "legato"]; #expect(reopened.outline.nodes.filter { $0.kind == .instrument }.isEmpty)
     m.scan(); try await finish(m)
     #expect(m.metadataOverrides[subject.key]?[.technique] == [])
@@ -543,6 +824,36 @@ private final class CatalogFixture {
     await reopened.restoreSavedCatalog()
     reopened.query = "dark"; #expect(reopened.outline.nodes.count == 1)
     #expect(reopened.metadataOverrides[subject.key]?[.character] == ["dark"])
+}
+
+@Test @MainActor func persistedFabFilterSplitIdentityConvergesWithoutLosingEditsOrHistory() async throws {
+    let f = try CatalogFixture()
+    let plist = "Plugins/FabFilter Pro-C 2.vst3/Contents/Info.plist"
+    try f.file(plist, "<plist><dict><key>CFBundleIdentifier</key><string>com.fabfilter.Pro-C.Legacy.2</string></dict></plist>")
+    let root = f.root.appendingPathComponent("Plugins")
+    let catalog = CatalogStore(url: f.root.appendingPathComponent("catalog.sqlite"))
+    let model = CatalogModel(catalogStore: catalog); model.setStandardPlugins(false); model.addRoots([root], kind: .plugins)
+    model.scan(scannedKinds: [.plugin]); try await finish(model)
+    let original = try #require(model.pluginProducts.first)
+    let nodeID = try #require(original.representative.catalogID)
+    let subject = MetadataSubject(nodeID: original.id)
+    try await model.saveMetadata(MusicalMetadata(fields: ["character": ["warm"]]), subject: subject)
+    let used = Date(timeIntervalSince1970: 1_790_474_024)
+    try await catalog.appendDateEvidence([AssetDateEvidence(sourceID: "fixture.use", evidenceID: "legacy-product-node",
+        subjectID: nodeID, kind: .confirmedUse, eventDate: used, ingestedAt: used)], asOf: used)
+
+    try f.file(plist, "<plist><dict><key>CFBundleIdentifier</key><string>com.fabfilter.Pro-C.Vst3.2</string></dict></plist>")
+    try f.file("Plugins/FabFilter Pro-C 2.component/Contents/Info.plist",
+        "<plist><dict><key>CFBundleIdentifier</key><string>com.fabfilter.Pro-C.AU.2</string></dict></plist>")
+    try f.file("Plugins/FabFilter Pro-C 2 (Mono).vst/Contents/Info.plist",
+        "<plist><dict><key>CFBundleIdentifier</key><string>com.fabfilter.Pro-C.Mono.Vst.2</string></dict></plist>")
+    model.scan(scannedKinds: [.plugin]); try await finish(model)
+
+    let repaired = try #require(model.pluginProducts.first)
+    #expect(model.pluginProducts.count == 1)
+    #expect(repaired.installations.count == 3)
+    #expect(model.metadataOverrides[MetadataSubject(nodeID: repaired.id).key]?[.character] == ["warm"])
+    #expect(try await catalog.dateEvidence(for: nodeID, asOf: used.addingTimeInterval(1)).contains { $0.eventDate == used })
 }
 
 @Test @MainActor func productNameAndConfirmedDateSurviveRemovalOfSourceFormat() async throws {
@@ -620,50 +931,117 @@ private final class CatalogFixture {
     #expect(model.usageFilter == .all)
 }
 
-private actor TagFetchCounter {
-    var ids: [String] = []
-    func fetch(_ source: ProductTagSource) throws -> ProductTagRecord {
-        ids.append(source.id)
-        if source.id == "0" { throw ProductTagError.response }
-        return ProductTagRecord(sourceID: source.id, descriptionDigest: source.descriptionDigest, fetchedAt: Date())
+@Test @MainActor func nativeReviewedTagCoverageOnSavedCatalog() async throws {
+    guard ProcessInfo.processInfo.environment["PRISM_TAG_CATALOG_RUNTIME"] == "1" else { return }
+    let start = ProcessInfo.processInfo.systemUptime
+    let model = CatalogModel(store: .application, catalogStore: .application,
+        tagSources: ProductTagSources.all)
+    await model.restoreSavedCatalog()
+    let restoredAt = ProcessInfo.processInfo.systemUptime
+    let candidates = model.pluginProducts.map(\.representative)
+        + (model.report?.assets.filter { $0.kind == .library } ?? [])
+    let matched = candidates.filter { model.productTagSource($0) != nil }
+    let matchedAt = ProcessInfo.processInfo.systemUptime
+    let tagged = candidates.filter { asset in
+        model.effectiveMetadata(asset: asset).fields.values.contains { !$0.isEmpty }
     }
+    print("Reviewed tag runtime: sources=\(ProductTagSources.all.count), products=\(candidates.count), reviewedMatches=\(matched.count), effectiveTags=\(tagged.count), restore=\(restoredAt - start)s, match=\(matchedAt - restoredAt)s, metadata=\(ProcessInfo.processInfo.systemUptime - matchedAt)s")
+    #expect(ProductTagSources.all.count == 400)
+    #expect(ProductTagSources.all.filter { $0.kind == .plugin }.count == 200)
+    #expect(ProductTagSources.all.filter { $0.kind == .library }.count == 200)
+    #expect(!candidates.isEmpty)
 }
-@MainActor private func finishTags(_ model: CatalogModel) async throws {
-    let deadline = Date().addingTimeInterval(10)
-    while model.isFetchingTags && Date() < deadline { try await Task.sleep(for: .milliseconds(10)) }
-    #expect(!model.isFetchingTags)
-}
-@Test @MainActor func productTagQueueDoesNotStarveAfterFailuresAndCancelsOnDisable() async throws {
-    let f = try CatalogFixture(); let counter = TagFetchCounter()
-    var sources: [ProductTagSource] = []
-    for index in 0..<25 {
-        let name = "Product \(index)"
-        try f.file("Plugins/\(name).vst3/Contents/Info.plist", "<plist version=\"1.0\"><dict><key>CFBundleIdentifier</key><string>com.fixture.product\(index)</string></dict></plist>")
-        sources.append(ProductTagSource(id: String(index), kind: .plugin, names: [name], makers: [], bundlePrefix: "com.fixture",
-            endpoint: URL(string: "https://example.com/product")!, page: URL(string: "https://example.com/product")!,
-            format: .shopify, remoteName: name, descriptionDigest: "fixture", metadata: MusicalMetadata(fields: ["character": ["warm"]])))
-    }
-    let model = CatalogModel(tagSources: sources, tagFetcher: { try await counter.fetch($0) })
+
+@Test @MainActor func vst3VendorCategoriesFlowThroughOfflineCacheAndRespectReviewedAndUserPrecedence() async throws {
+    let f = try CatalogFixture()
+    try f.file("Plugins/SuperSynth.vst3/Contents/Info.plist", "<plist version=\"1.0\"><dict><key>CFBundleIdentifier</key><string>com.fixture.supersynth</string></dict></plist>")
+    try f.file("Plugins/SuperSynth.component/Contents/Info.plist", "<plist version=\"1.0\"><dict><key>CFBundleIdentifier</key><string>com.fixture.supersynth</string></dict></plist>")
+    try f.file("Plugins/SuperSynth.vst3/Contents/Resources/moduleinfo.json", """
+    // JSON5 accepted by the VST3 module descriptor reader.
+    { 'Factory Info': { Vendor: 'Example Audio' }, Classes: [{ Category: 'Audio Module Class', Name: 'SuperSynth', 'Sub Categories': ['Fx', 'Dynamics', 'Synth',], }], }
+    """)
+    let reviewed = ProductTagSource(id: "reviewed-supersynth", kind: .plugin, names: ["SuperSynth"], makers: ["Example Audio"], bundlePrefix: nil,
+        endpoint: URL(string: "https://example.com/supersynth")!, page: URL(string: "https://example.com/supersynth")!, format: .metaDescription,
+        remoteName: "SuperSynth", descriptionDigest: String(repeating: "a", count: 64), metadata: MusicalMetadata(fields: ["function": ["reviewed function"]]))
+    let store = CatalogStore(url: f.root.appendingPathComponent("catalog.sqlite"))
+    let model = CatalogModel(catalogStore: store, tagSources: [reviewed])
     model.standardPlugins = false; model.addRoots([f.root.appendingPathComponent("Plugins")], kind: .plugins)
-    model.scan(); try await finish(model)
-    model.setOnlineTags(true); try await finishTags(model)
-    #expect(await counter.ids.count == 25)
-    #expect(model.tagFetchStatus.contains("24 of 25"))
-    model.refreshProductTags(); try await finishTags(model)
-    #expect(await counter.ids.count == 26) // Only failure retries; fresh cache hits do not use requests.
-    let tagged = try #require(model.report?.assets.first(where: { $0.name == "Product 1" }))
-    #expect(model.effectiveMetadata(asset: tagged)[.character] == ["warm"])
-    model.setOnlineTags(false)
-    #expect(model.effectiveMetadata(asset: tagged)[.character] == nil)
-    let delayed = CatalogModel(tagSources: sources, tagFetcher: { source in
-        try? await Task.sleep(for: .milliseconds(150)) // Simulates an uncooperative source that finishes late.
-        return ProductTagRecord(sourceID: source.id, descriptionDigest: source.descriptionDigest, fetchedAt: Date())
-    })
-    delayed.standardPlugins = false; delayed.addRoots([f.root.appendingPathComponent("Plugins")], kind: .plugins)
-    delayed.scan(); try await finish(delayed); delayed.setOnlineTags(true); delayed.setOnlineTags(false)
-    try await Task.sleep(for: .milliseconds(200))
-    #expect(!delayed.isFetchingTags && !delayed.onlineTags)
-    #expect(delayed.tagFetchStatus == "Online product tags are off.")
+    model.scan(scannedKinds: [.plugin]); try await finish(model)
+    let asset = try #require(model.report?.assets.first(where: { $0.format == "vst3" }))
+    let au = try #require(model.report?.assets.first(where: { $0.format == "component" }))
+    #expect(model.productTagSource(au)?.id == reviewed.id)
+    #expect(model.suggestedMetadata(asset: au)[.function] == ["reviewed function"])
+    #expect(asset.vst3Categories?.metadata[.function] == ["dynamics", "fx"])
+    #expect(model.suggestedMetadata(asset: asset)[.function] == ["reviewed function"])
+    #expect(model.suggestedMetadata(asset: asset)[.instrument] == ["synth"])
+    #expect(model.productTagProvenance(asset).contains("Vendor VST3 moduleinfo.json categories"))
+    let subject = try #require(model.subject(asset: asset))
+    try await model.saveMetadata(MusicalMetadata(fields: ["function": []]), subject: subject)
+    #expect(model.effectiveMetadata(asset: asset)[.function] == [])
+
+    try FileManager.default.removeItem(at: f.root.appendingPathComponent("Plugins/SuperSynth.vst3/Contents/Resources/moduleinfo.json"))
+    let reopened = CatalogModel(catalogStore: store, tagSources: [reviewed])
+    reopened.standardPlugins = false; reopened.addRoots([f.root.appendingPathComponent("Plugins")], kind: .plugins)
+    await reopened.restoreSavedCatalog()
+    let cached = try #require(reopened.report?.assets.first(where: { $0.format == "vst3" }))
+    #expect(cached.vst3Categories?.metadata[.function] == ["dynamics", "fx"])
+    #expect(reopened.effectiveMetadata(asset: cached)[.function] == [])
+}
+
+@Test @MainActor func sharedAutomaticTagsSurviveOfflineReopenAndUserClear() async throws {
+    let f = try CatalogFixture()
+    try f.file("Plugins/Fixture Compressor.vst3/Contents/Resources/moduleinfo.json", """
+    {"Factory Info":{"Vendor":"FabFilter"},"Classes":[{"Category":"Audio Module Class","Name":"Fixture Compressor","Sub Categories":["Fx"]}]}
+    """)
+    try f.file("Plugins/LittlePlate.vst3/Contents/Resources/moduleinfo.json", """
+    {"Factory Info":{"Vendor":"Soundtoys"},"Classes":[{"Category":"Audio Module Class","Name":"LittlePlate","Sub Categories":["Fx"]}]}
+    """)
+    let record: [String: Any] = [
+        "id": "automatic-fixture-compressor", "kind": "plugin", "names": ["Fixture Compressor"],
+        "makers": ["FabFilter"], "endpoint": "https://www.fabfilter.com/products/pro-c-2-compressor-plug-in",
+        "page": "https://www.fabfilter.com/products/pro-c-2-compressor-plug-in", "format": "metaDescription",
+        "remoteName": "Fixture Compressor", "descriptionDigest": "", "networkEnabled": false,
+        "metadata": ["function": ["compressor"]], "reviewRecordID": "automatic-fixture-compressor",
+        "reviewedAt": "2026-10-06", "taxonomyVersion": 1,
+        "sourceFact": "Synthetic cache fixture.", "provenance": "automatic"
+    ]
+    let retired: [String: Any] = [
+        "id": "external-p-f3830ef59264", "kind": "plugin", "names": ["LittlePlate"],
+        "makers": ["Soundtoys"], "endpoint": "https://www.soundtoys.com/product/little-plate/",
+        "page": "https://www.soundtoys.com/product/little-plate/", "format": "metaDescription",
+        "remoteName": "LittlePlate", "descriptionDigest": "", "networkEnabled": false,
+        "metadata": ["function": ["wrong-cache-tag"]], "reviewRecordID": "external-p-f3830ef59264",
+        "reviewedAt": "2026-10-06", "taxonomyVersion": 1, "provenance": "curated"
+    ]
+    let cachedData = try JSONSerialization.data(withJSONObject: ["version": 2, "records": [retired], "automaticRecords": [record]])
+    let shared = SharedProductTagStore(url: f.root.appendingPathComponent("Private/shared.json"))
+    try await shared.save(SharedProductTagSnapshot(catalogData: cachedData, etag: "\"old\"",
+        misses: ["old-lookup": Date().addingTimeInterval(3_600)], serviceRetryAfter: Date().addingTimeInterval(3_600)))
+    let catalog = CatalogStore(url: f.root.appendingPathComponent("Private/catalog.sqlite"))
+    let plugins = f.root.appendingPathComponent("Plugins")
+    let model = CatalogModel(catalogStore: catalog, sharedTagStore: shared)
+    model.standardPlugins = false; model.addRoots([plugins], kind: .plugins)
+    model.scan(scannedKinds: [.plugin]); try await finish(model)
+    let asset = try #require(model.report?.assets.first { $0.name == "Fixture Compressor" })
+    #expect(model.productTagSource(asset)?.provenance == .automatic)
+    #expect(model.effectiveMetadata(asset: asset)[.function] == ["compressor"])
+    let little = try #require(model.report?.assets.first { $0.name == "LittlePlate" })
+    #expect(model.productTagSource(little)?.id == "soundtoys-little-plate")
+    #expect(model.effectiveMetadata(asset: little)[.function] == ["reverb"])
+    let subject = try #require(model.subject(asset: asset))
+    try await model.saveMetadata(MusicalMetadata(fields: ["function": []]), subject: subject)
+    #expect(model.effectiveMetadata(asset: asset)[.function] == [])
+    let reopened = CatalogModel(catalogStore: catalog, sharedTagStore: shared)
+    reopened.standardPlugins = false; reopened.addRoots([plugins], kind: .plugins)
+    await reopened.restoreSavedCatalog()
+    let cached = try #require(reopened.report?.assets.first { $0.name == "Fixture Compressor" })
+    #expect(reopened.productTagSource(cached)?.provenance == .automatic)
+    #expect(reopened.suggestedMetadata(asset: cached)[.function] == ["compressor"])
+    #expect(reopened.effectiveMetadata(asset: cached)[.function] == [])
+    let reopenedLittle = try #require(reopened.report?.assets.first { $0.name == "LittlePlate" })
+    #expect(reopened.productTagSource(reopenedLittle)?.id == "soundtoys-little-plate")
+    #expect(reopened.effectiveMetadata(asset: reopenedLittle)[.function] == ["reverb"])
+    #expect((try await shared.load()).misses.count == 1)
 }
 
 @Test @MainActor func vendorTagsRespectOverridesAndDoNotPromotePatches() async throws {
@@ -671,52 +1049,24 @@ private actor TagFetchCounter {
     try f.file("Libraries/Strings/Product.nicnt", "<ProductHints><Product><Name>Berlin Strings</Name><Company>Orchestral Tools</Company></Product></ProductHints>")
     try f.file("Libraries/Strings/Solo Piano.nki")
     let store = CatalogStore(url: f.root.appendingPathComponent("catalog.sqlite"))
-    let model = CatalogModel(catalogStore: store, tagFetcher: { source in
-        ProductTagRecord(sourceID: source.id, descriptionDigest: source.descriptionDigest, fetchedAt: Date())
-    })
+    let model = CatalogModel(catalogStore: store)
     model.standardPlugins = false; model.category = .library
     model.addRoots([f.root.appendingPathComponent("Libraries")], kind: .libraries)
     model.scan(); try await finish(model)
     let asset = try #require(model.report?.assets.first(where: { $0.kind == .library }))
-    model.setOnlineTags(true); try await finishTags(model)
     #expect(model.effectiveMetadata(asset: asset)[.technique] == ["legato"])
+    #expect(model.productTagProvenance(asset).contains("Reviewed metadata record berlin-strings v1"))
     let instrument = try #require(asset.libraryMetadata?.instruments.first)
     #expect(model.effectiveMetadata(asset: asset, instrument: instrument)[.technique] == nil)
     let subject = try #require(model.subject(asset: asset))
+    model.query = "legato"; #expect(!model.outline.nodes.isEmpty)
     try await model.saveMetadata(MusicalMetadata(fields: ["technique": []]), subject: subject)
-    model.refreshProductTags(force: true); try await finishTags(model)
+    #expect(model.outline.nodes.isEmpty)
+    try await model.undoMetadata(); #expect(!model.outline.nodes.isEmpty)
+    try await model.saveMetadata(MusicalMetadata(fields: ["technique": []]), subject: subject)
+    model.query = ""
     #expect(model.effectiveMetadata(asset: asset)[.technique] == [])
-    model.setOnlineTags(false)
     #expect(model.effectiveMetadata(asset: asset)[.technique] == [])
-}
-
-private actor TagCancellationProbe {
-    private var old: CheckedContinuation<Void, Never>?
-    var calls = 0
-    func fetch(_ source: ProductTagSource) async throws -> ProductTagRecord {
-        calls += 1
-        if calls == 1 {
-            await withCheckedContinuation { old = $0 }
-            throw URLError(.cancelled)
-        }
-        return ProductTagRecord(sourceID: source.id, descriptionDigest: source.descriptionDigest, fetchedAt: Date())
-    }
-    func release() { old?.resume(); old = nil }
-}
-@Test @MainActor func cancelledFetchErrorCannotReplaceNewerResult() async throws {
-    let f = try CatalogFixture(), probe = TagCancellationProbe()
-    try f.file("Berlin/Product.nicnt", "<ProductHints><Product><Name>Berlin Strings</Name><Company>Orchestral Tools</Company></Product></ProductHints>")
-    let model = CatalogModel(tagFetcher: { try await probe.fetch($0) })
-    model.standardPlugins = false; model.addRoots([f.root], kind: .libraries); model.scan(); try await finish(model)
-    model.setOnlineTags(true)
-    let deadline = Date().addingTimeInterval(5)
-    while await probe.calls == 0 && Date() < deadline { try await Task.sleep(for: .milliseconds(10)) }
-    #expect(await probe.calls == 1)
-    model.setOnlineTags(false); model.setOnlineTags(true); try await finishTags(model)
-    #expect(model.tagFetchStatus == "Product tags: 1 of 1 verified.")
-    await probe.release(); try await Task.sleep(for: .milliseconds(50))
-    #expect(model.tagFetchStatus == "Product tags: 1 of 1 verified.")
-    #expect(!model.isFetchingTags)
 }
 
 @Test @MainActor func headerOrderingUnknownsAndPlainSearch() async throws {
@@ -816,7 +1166,7 @@ private actor TagCancellationProbe {
     }
 }
 
-@Test @MainActor func appearanceSaveDoesNotInvalidateInventoryOrChangeOnlinePreference() async throws {
+@Test @MainActor func appearanceSaveDoesNotInvalidateInventoryAndIgnoresRetiredOnlinePreference() async throws {
     let f = try CatalogFixture(); let store = SetupStore(url: f.root.appendingPathComponent("setup.json"))
     try f.file("Samples/tone.wav")
     let model = CatalogModel(store: store); model.setStandardPlugins(false)
@@ -824,11 +1174,23 @@ private actor TagCancellationProbe {
     model.scan(); try await finish(model)
     #expect(!model.configurationChanged)
     let draft = model.setupDraft(); draft.appearance = .dark
-    model.setOnlineTags(true)
     try model.acceptSetup(draft, remember: true)
     #expect(!model.configurationChanged && !model.isScanning && model.report != nil)
     let reopened = CatalogModel(store: store)
-    #expect(reopened.appearance == .dark && reopened.onlineTags && reopened.roots == model.roots)
+    #expect(reopened.appearance == .dark && reopened.roots == model.roots)
+    // Older setup files can still contain the retired online preference.
+    let legacy = try Data(contentsOf: store.url)
+    var envelope = try #require(JSONSerialization.jsonObject(with: legacy) as? [String: Any])
+    var settings = try #require(envelope["settings"] as? [String: Any])
+    settings["online_tags"] = true
+    envelope["settings"] = settings
+    try JSONSerialization.data(withJSONObject: envelope).write(to: store.url)
+    let migrated = CatalogModel(store: store)
+    #expect(migrated.appearance == .dark && migrated.roots == model.roots)
+    try migrated.acceptSetup(migrated.setupDraft(), remember: true)
+    let saved = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: store.url)) as? [String: Any])
+    let savedSettings = try #require(saved["settings"] as? [String: Any])
+    #expect(savedSettings["online_tags"] == nil)
     let changed = model.setupDraft(); changed.addRoots([f.root], kind: .libraries)
     try model.acceptSetup(changed, remember: true)
     #expect(model.configurationChanged && !model.isScanning)
@@ -1060,7 +1422,8 @@ private func presentationReceipt(_ asset: Asset, id: String, seconds: Double) th
     #expect(model.installerDate(echo).detail.contains("Records for 1 of 2 installations"))
     #expect(model.installerDate(vst, grouped: false).date == nil)
     #expect(model.installerDate(echo).accessibility.contains("separate from Finder Date Added"))
-    #expect(model.additionDate(echo).value == "Unknown")
+    #expect(model.additionDate(echo).value != "Unknown")
+    #expect(model.additionDate(echo).detail.contains("Finder Date Added"))
     #expect(model.additionDate(echo).detail.contains("First indexed"))
     model.scan(scannedKinds: [.sample])
     #expect(model.installerDate(echo).date != nil)
@@ -1114,7 +1477,7 @@ private actor InstallerReadGate {
     failed.setStandardPlugins(false); failed.addRoots([f.root], kind: .plugins)
     await failed.restoreSavedCatalog()
     #expect(failed.installerDate(asset).value == "Unavailable")
-    #expect(failed.installerDate(asset).detail.contains("Scan to retry"))
+    #expect(failed.installerDate(asset).detail.contains("Check For Updates to retry"))
 }
 
 @Test @MainActor func additionPresentationSortsBoundsAndQualifiesSameDayIntervals() async throws {
@@ -1122,10 +1485,15 @@ private actor InstallerReadGate {
     let root = f.root.appendingPathComponent("Samples")
     _ = try f.file("Samples/Earlier.wav")
     var request = ScanRequest(); request.samples = [root]; let scope = CatalogScope(request)
-    let first = Scanner().scan(request)
+    func withoutNativeDate(_ report: ScanReport) -> ScanReport {
+        var assets = report.assets
+        for index in assets.indices { assets[index].finderDateAdded = nil }
+        return report.replacingAssets(assets)
+    }
+    let first = withoutNativeDate(Scanner().scan(request))
     _ = try await store.ingest(first, scope: scope, at: Date(timeIntervalSince1970: 100), additionContext: AdditionScanContext(scope: scope, startedAt: Date(timeIntervalSince1970: 90)))
     _ = try f.file("Samples/Later.wav")
-    _ = try await store.ingest(Scanner().scan(request), scope: scope, at: Date(timeIntervalSince1970: 200), additionContext: AdditionScanContext(scope: scope, startedAt: Date(timeIntervalSince1970: 190)))
+    _ = try await store.ingest(withoutNativeDate(Scanner().scan(request)), scope: scope, at: Date(timeIntervalSince1970: 200), additionContext: AdditionScanContext(scope: scope, startedAt: Date(timeIntervalSince1970: 190)))
     let model = CatalogModel(catalogStore: store); model.setStandardPlugins(false); model.addRoots([root], kind: .samples)
     await model.restoreSavedCatalog(); model.category = .sample; model.sort = .installed
     #expect(model.visibleAssets.map(\.name) == ["Earlier", "Later"])
@@ -1157,7 +1525,8 @@ private actor InstallerReadGate {
     let bounds = try #require(model.catalogObservations[id]?.addition)
     #expect(bounds.basis == .observedArrival)
     #expect(try #require(bounds.lower) <= baseline)
-    #expect(model.additionDate(asset).value == "Unknown")
+    #expect(model.additionDate(asset).value != "Unknown")
+    #expect(model.additionDate(asset).detail.contains("filesystem Date Added"))
     #expect(model.additionDate(asset).detail.contains("Observed arrival"))
 }
 
@@ -1169,9 +1538,10 @@ private actor InstallerReadGate {
     model.addRoots([f.root.appendingPathComponent("Libraries")], kind: .libraries)
     model.scan(scannedKinds: [.library]); try await finish(model)
     let asset = try #require(model.report?.assets.first { $0.kind == .library })
-    #expect(model.additionDate(asset).value == "Unknown")
+    #expect(model.additionDate(asset).value != "Unknown")
+    #expect(model.additionDate(asset).detail.contains("filesystem Date Added"))
     #expect(model.additionDate(asset).detail.contains("First indexed"))
-    #expect(model.lastUsed(asset).value == "Not recorded")
+    #expect(model.lastUsed(asset).value == "Not Used Yet")
 }
 
 @Test @MainActor func pluginSizesAndOriginalDatesGroupConservativelyAcrossFormatsAndReopen() async throws {
@@ -1197,15 +1567,14 @@ private actor InstallerReadGate {
     #expect(glow.installations.count == 3)
     let expected = glow.installations.compactMap(\.logicalBytes).reduce(0, +)
     #expect(expected > 300 && model.pluginSize(glow.representative).completeBytes == expected)
-    #expect(model.pluginSize(partial.representative).completeBytes == nil)
-    #expect(model.pluginSize(partial.representative).value == "Partial")
-    #expect(model.pluginSize(partial.representative).detail.contains("Known subtotal"))
+    #expect(model.pluginSize(partial.representative).completeBytes != nil)
+    #expect(model.pluginSize(partial.representative).detail.contains("Measured bundle files"))
     #expect(model.additionDate(glow.representative).evidence?.basis == .exact || model.additionDate(glow.representative).value == "Unknown")
     #expect(model.outline.roots.first { $0.title == "Glow" }?.sizeText == model.pluginSize(glow.representative).value)
     model.sort = .size
     #expect(model.visibleAssets.map(\.name) == ["Glow", "Partial"])
     model.sortReversed = true
-    #expect(model.visibleAssets.map(\.name) == ["Glow", "Partial"])
+    #expect(model.visibleAssets.map(\.name) == ["Partial", "Glow"])
     let original = Date(timeIntervalSince1970: 1_700_000_000)
     let additions = try glow.installations.enumerated().map { index, asset -> AssetDateEvidence in
         let id = try #require(asset.catalogID)
@@ -1224,7 +1593,7 @@ private actor InstallerReadGate {
     await reopened.restoreSavedCatalog()
     let savedGlow = try #require(reopened.pluginProducts.first { $0.name == "Glow" })
     #expect(reopened.pluginSize(savedGlow.representative).completeBytes == expected)
-    #expect(reopened.pluginSize(savedGlow.representative).detail.contains("Saved size; scan to verify"))
+    #expect(reopened.pluginSize(savedGlow.representative).detail.contains("Saved size; choose Check For Updates to verify"))
     #expect(reopened.additionDate(savedGlow.representative).evidence?.upper == original)
 }
 
@@ -1241,6 +1610,7 @@ private actor InstallerReadGate {
     var assets = try #require(model.report?.assets)
     let earliest = Date(timeIntervalSince1970: 1_762_480_000)
     for index in assets.indices {
+        assets[index].finderDateAdded = nil
         if assets[index].format == "aaxplugin" { assets[index].finderDateAdded = earliest }
         if assets[index].format == "vst3" { assets[index].finderDateAdded = earliest.addingTimeInterval(3600) }
     }
@@ -1286,7 +1656,18 @@ private actor InstallerReadGate {
             kind: .confirmedUse, eventDate: nil, ingestedAt: Date(), hostUsage: usage)
         try await store.appendDateEvidence([record], asOf: Date())
     }
-    await model.reloadUsage(); model.sort = .recency
+    // The scan's own projection can finish after isScanning clears. Wait until
+    // both durable records are visible before asserting sort and filter behavior.
+    let usageDeadline = Date().addingTimeInterval(2)
+    repeat {
+        await model.reloadUsage()
+        let names = ["Earlier", "Later"]
+        if names.allSatisfy({ name in
+            model.report?.assets.first(where: { $0.name == name }).flatMap { model.usageRecord($0) } != nil
+        }) { break }
+        try await Task.sleep(for: .milliseconds(10))
+    } while Date() < usageDeadline
+    model.sort = .recency
     #expect(model.visibleAssets.map(\.name) == ["Later", "Earlier", "Unknown"])
     #expect(model.outline.roots.map(\.title) == ["Later", "Earlier", "Unknown"])
     model.sortReversed = true
@@ -1324,6 +1705,40 @@ private actor InstallerReadGate {
     let bound = CubaseBoundPluginUse(use: use, pluginPath: asset.path, cid: String(repeating: "A", count: 32))
     let replay = try await store.recordCubaseUsage(bound, for: id, at: Date(timeIntervalSince1970: 1_790_474_085))
     #expect(replay == record)
+}
+
+@Test @MainActor func cubaseAttemptKeepsFirstDurableEventAcrossReplay() async throws {
+    let f = try CatalogFixture(), store = CatalogStore(url: f.root.appendingPathComponent("Private/catalog.sqlite"))
+    _ = try f.file("Plugins/Q.vst3/Contents/Info.plist", "<plist><dict><key>CFBundleIdentifier</key><string>fabfilter.q</string></dict></plist>")
+    let model = CatalogModel(catalogStore: store); model.setStandardPlugins(false)
+    model.addRoots([f.root.appendingPathComponent("Plugins")], kind: .plugins)
+    model.scan(scannedKinds: [.plugin]); try await finish(model)
+    let asset = try #require(model.report?.assets.first), id = try #require(asset.catalogID)
+    let attempt = CubasePluginUse(name: "Q", vendor: "FabFilter", version: "1", architecture: "arm64",
+        eventID: "same-event", projectID: "p", reportedMilliseconds: 1_790_474_024_000,
+        qualification: "nativeAddAttempt")
+    let mislabeled = AssetDateEvidence(sourceID: CubasePluginUse.sourceID,
+        evidenceID: attempt.eventID, subjectID: id, kind: .confirmedUse,
+        eventDate: attempt.reportedDate, ingestedAt: Date(timeIntervalSince1970: 1_790_474_025),
+        cubaseUsage: attempt)
+    #expect(throws: (any Error).self) {
+        try AssetDateResolver.summarize([mislabeled], for: id,
+            asOf: Date(timeIntervalSince1970: 1_790_474_025))
+    }
+    let bound = CubaseBoundPluginUse(use: attempt, pluginPath: asset.path, cid: String(repeating: "A", count: 32))
+    let first = try await store.recordCubaseUsage(bound, for: id, at: Date(timeIntervalSince1970: 1_790_474_025))
+    #expect(first.kind == .loadAttempt)
+    let historical = CubasePluginUse(name: attempt.name, vendor: attempt.vendor, version: attempt.version,
+        architecture: attempt.architecture, eventID: attempt.eventID, projectID: attempt.projectID,
+        reportedMilliseconds: attempt.reportedMilliseconds)
+    let replay = try await store.recordCubaseUsage(
+        CubaseBoundPluginUse(use: historical, pluginPath: asset.path, cid: bound.cid),
+        for: id, at: Date(timeIntervalSince1970: 1_790_474_026))
+    #expect(replay == first)
+    await model.reloadUsage()
+    #expect(model.lastUsed(asset).detail.contains("instantiation attempt"))
+    #expect(try await store.dateSummary(for: id, asOf: Date(timeIntervalSince1970: 1_790_474_026)).lastUsed == attempt.reportedDate)
+    #expect(try await store.dateEvidence(for: id, asOf: Date(timeIntervalSince1970: 1_790_474_026)).count == 1)
 }
 
 @Test @MainActor func groupedAbsoluteHostUsageChoosesLaterInstant() async throws {
@@ -1376,6 +1791,41 @@ private actor InstallerReadGate {
         #expect(model.usageRecord(second) == expected)
         #expect(try await store.latestHostUsage(for: [secondID], asOf: Date())[Data(secondID.utf8)] == expected)
     }
+}
+
+@Test @MainActor func proToolsPartialAttemptSurvivesCompletionWithoutDuplicateEvent() async throws {
+    let f = try CatalogFixture(), store = CatalogStore(url: f.root.appendingPathComponent("Private/catalog.sqlite"))
+    _ = try f.file("Plugins/Test.aaxplugin/Contents/Info.plist")
+    let model = CatalogModel(catalogStore: store); model.setStandardPlugins(false)
+    model.addRoots([f.root.appendingPathComponent("Plugins")], kind: .plugins)
+    model.scan(scannedKinds: [.plugin]); try await finish(model)
+    let asset = try #require(model.report?.assets.first { $0.format == "aaxplugin" })
+    let prefix = """
+    *** Digidesign Session Trace for:\t/Applications/Pro Tools.app (pid=0x1234, version=24.10.2)
+    *** Starting Timestamp:\tSaturday, September 26, 2026 at 3:42:40 PM Pacific Daylight Time (94.000000 s)
+    100.000000,00103,0f09: Local wall clock:  9/26/2026 15:42:46
+    100.100000,00103,0033: SMgr_DSPCache::InstantiatePlugIn - pluginType: Host, name: "Test", track "Audio 1"
+    """
+    let attempt = try #require(ProToolsUsageLog.parse(Data((prefix + "\n").utf8)).first)
+    let now = Date()
+    let bound = ProToolsBoundPluginUse(use: attempt, pluginPath: asset.path)
+    let first = try await store.recordProToolsUsage(bound, for: asset.catalogID!, at: now)
+    #expect(first.sourceID == ProToolsPluginUse.attemptedSourceID && first.kind == .loadAttempt)
+    let complete = prefix + "\n101.000000,00103,0e0c: PtSess_RunTime::PutDocumentInfo - session was last saved with app version: 2024.10.2\n"
+    let restored = try #require(ProToolsUsageLog.parse(Data(complete.utf8)).first)
+    #expect(restored.eventSourceID == ProToolsPluginUse.restoreV2SourceID && restored.eventID == attempt.eventID)
+    let replay = try await store.recordProToolsUsage(ProToolsBoundPluginUse(use: restored, pluginPath: asset.path),
+        for: asset.catalogID!, at: now.addingTimeInterval(60))
+    #expect(replay == first)
+    #expect(try await store.dateEvidence(for: asset.catalogID!, asOf: now.addingTimeInterval(60)).count == 1)
+    let projectionDeadline = Date().addingTimeInterval(2)
+    repeat {
+        await model.reloadUsage()
+        if model.usageRecord(asset, grouped: false) == first { break }
+        try await Task.sleep(for: .milliseconds(10))
+    } while Date() < projectionDeadline
+    #expect(model.usageRecord(asset, grouped: false) == first)
+    #expect(model.lastUsed(asset).detail.contains("instantiation attempt"))
 }
 
 @Test @MainActor func aaxAndLogicUsageSurviveReplayAndReachCatalog() async throws {

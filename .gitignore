@@ -2,6 +2,7 @@
 .build/
 .swiftpm/
 build/
+release-build/
 Builds/
 cmake-build-*/
 out/

@@ -92,7 +92,13 @@ import AppKit
         text.toolTip = [value, subtitle, context].compactMap { $0 }.joined(separator: "\n")
         text.setAccessibilityLabel([value, context].compactMap { $0 }.joined(separator: " · ")); textField = text
         if !query.isEmpty {
-            let attributed = NSMutableAttributedString(string: value, attributes: [.font: text.font!, .foregroundColor: text.textColor!])
+            // Search emphasis must carry the cell's line layout. An attributed
+            // string without this style can silently clip a one-line title.
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.lineBreakMode = wrap ? .byWordWrapping : .byTruncatingMiddle
+            let attributed = NSMutableAttributedString(string: value, attributes: [
+                .font: text.font!, .foregroundColor: text.textColor!, .paragraphStyle: paragraph
+            ])
             let match = (value as NSString).range(of: query, options: [.caseInsensitive, .diacriticInsensitive])
             if match.location != NSNotFound { attributed.addAttribute(.font, value: NSFont.systemFont(ofSize: 12, weight: .bold), range: match) }
             text.attributedStringValue = attributed

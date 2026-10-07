@@ -3,7 +3,8 @@ import CryptoKit
 
 /// A reviewed official product source. Website descriptions are never treated as patch inventories.
 public struct ProductTagSource: Sendable {
-    public enum Format: Sendable { case shopify, productJSONLD, wordpress, metaDescription }
+    public enum Format: String, Codable, Sendable { case shopify, productJSONLD, wordpress, metaDescription }
+    public enum Provenance: String, Codable, Sendable { case curated, automatic }
     public let id: String
     public let kind: AssetKind
     public let names: [String]
@@ -15,17 +16,77 @@ public struct ProductTagSource: Sendable {
     public let remoteName: String
     public let descriptionDigest: String
     public let metadata: MusicalMetadata
+    public let networkEnabled: Bool
+    /// Reviewed catalog provenance, distinct from an ephemeral fetch/cache receipt.
+    public let reviewRecordID: String
+    public let reviewedAt: String
+    public let taxonomyVersion: Int
+    /// Concise reviewed claim tied to the cited product page, not scraped user data.
+    public let sourceFact: String?
+    public let provenance: Provenance
 
-    public func matches(_ asset: Asset) -> Bool {
-        guard asset.kind == kind, names.map(Self.identity).contains(Self.identity(asset.name)) else { return false }
+    public init(id: String, kind: AssetKind, names: [String], makers: [String], bundlePrefix: String?,
+                endpoint: URL, page: URL, format: Format, remoteName: String,
+                descriptionDigest: String, metadata: MusicalMetadata, networkEnabled: Bool = true,
+                reviewRecordID: String? = nil, reviewedAt: String = "2026-09-26", taxonomyVersion: Int = 1,
+                sourceFact: String? = nil, provenance: Provenance = .curated) {
+        self.id = id; self.kind = kind; self.names = names; self.makers = makers
+        self.bundlePrefix = bundlePrefix; self.endpoint = endpoint; self.page = page
+        self.format = format; self.remoteName = remoteName; self.descriptionDigest = descriptionDigest
+        self.metadata = metadata; self.networkEnabled = networkEnabled
+        self.reviewRecordID = reviewRecordID ?? id; self.reviewedAt = reviewedAt; self.taxonomyVersion = taxonomyVersion
+        self.sourceFact = sourceFact
+        self.provenance = provenance
+    }
+
+    public func validateReviewRecord() throws {
+        guard reviewRecordID == id, taxonomyVersion == 1,
+              reviewedAt.range(of: #"^20[0-9]{2}-[0-9]{2}-[0-9]{2}$"#, options: .regularExpression) != nil,
+              endpoint.scheme == "https", endpoint.host != nil, endpoint.user == nil, endpoint.password == nil,
+              page.scheme == "https", page.host != nil, page.user == nil, page.password == nil,
+              !metadata.fields.isEmpty,
+              (kind != .plugin || bundlePrefix != nil || !makers.isEmpty),
+              sourceFact == nil || (sourceFact!.utf8.count <= 512 && !sourceFact!.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty),
+              provenance != .automatic || (!networkEnabled && sourceFact != nil && !makers.isEmpty && names.count == 1) else {
+            throw ProductTagError.invalidCache
+        }
+        if networkEnabled {
+            guard descriptionDigest.count == 64,
+                  descriptionDigest.allSatisfy({ "0123456789abcdef".contains($0) }) else { throw ProductTagError.invalidCache }
+        } else if !descriptionDigest.isEmpty { throw ProductTagError.invalidCache }
+        _ = try metadata.validated()
+    }
+
+    public func matches(_ asset: Asset, libraryRoots: [URL] = []) -> Bool {
+        let normalizedName = Self.identity(asset.name)
+        guard asset.kind == kind, names.contains(where: { Self.identity($0) == normalizedName }),
+              (try? validateReviewRecord()) != nil else { return false }
         if kind == .plugin {
-            guard let bundlePrefix, let bundle = asset.bundleIdentifier else { return false }
-            return bundle.lowercased().hasPrefix(bundlePrefix.lowercased() + ".")
+            if let bundlePrefix {
+                guard let bundle = asset.bundleIdentifier else { return false }
+                return bundle.lowercased().hasPrefix(bundlePrefix.lowercased() + ".")
+            }
+            guard let vendor = asset.vst3Categories?.vendor else { return false }
+            return makers.map(Self.identity).contains(Self.identity(vendor))
         }
         guard let maker = asset.libraryMetadata?.maker else { return false }
-        return makers.map(Self.identity).contains(Self.identity(maker))
+        if makers.map(Self.identity).contains(Self.identity(maker)) { return true }
+        guard maker == "Unknown maker",
+              let evidence = asset.libraryMetadata?.identity?.evidence,
+              evidence == .proposed || evidence == .unresolved else { return false }
+        // A reviewed exact product name may be corroborated by an explicit maker
+        // label on the package. Keep the discovered maker unchanged and never use
+        // arbitrary ancestor names or a generic instrument folder as identity.
+        let name = Self.identity(asset.name)
+        if makers.contains(where: { name.hasPrefix(Self.identity($0) + " ") }) { return true }
+        let parent = URL(fileURLWithPath: asset.path).deletingLastPathComponent().standardizedFileURL.path
+        let withinSelectedRoot = libraryRoots.contains { root in
+            let path = root.standardizedFileURL.path
+            return parent == path || parent.hasPrefix(path + "/")
+        }
+        return withinSelectedRoot && makers.contains { Self.identity(parent.components(separatedBy: "/").last ?? "") == Self.identity($0) }
     }
-    static func identity(_ value: String) -> String {
+    public static func identity(_ value: String) -> String {
         value.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "en_US_POSIX"))
             .components(separatedBy: CharacterSet.alphanumerics.inverted).filter { !$0.isEmpty }.joined(separator: " ")
     }
@@ -35,6 +96,7 @@ public struct ProductTagSource: Sendable {
         return SHA256.hash(data: Data(text.utf8)).map { String(format: "%02x", $0) }.joined()
     }
     public func parse(_ data: Data) throws -> ProductTagRecord {
+        try validateReviewRecord()
         guard data.count <= ProductTagClient.maximumBytes else { throw ProductTagError.tooLarge }
         let name: String, description: String
         switch format {
@@ -93,7 +155,7 @@ public struct ProductTagSource: Sendable {
     }
 }
 
-/// No page bodies, local filenames, or user edits are persisted in the online cache.
+/// No page bodies, local filenames, or user edits are persisted in the local historical cache.
 public struct ProductTagRecord: Codable, Sendable, Equatable {
     public let sourceID: String
     public let descriptionDigest: String
@@ -127,7 +189,8 @@ private final class ProductTagRedirectPolicy: NSObject, URLSessionTaskDelegate, 
 public enum ProductTagClient {
     public static let maximumBytes = 2 * 1024 * 1024
     public static func fetch(_ source: ProductTagSource) async throws -> ProductTagRecord {
-        guard source.endpoint.scheme == "https" else { throw ProductTagError.response }
+        try source.validateReviewRecord()
+        guard source.networkEnabled, source.endpoint.scheme == "https" else { throw ProductTagError.response }
         let configuration = URLSessionConfiguration.ephemeral
         configuration.httpCookieStorage = nil; configuration.httpShouldSetCookies = false
         configuration.urlCredentialStorage = nil; configuration.urlCache = nil
@@ -164,7 +227,8 @@ public actor ProductTagStore {
         guard LibraryMetadataReader.safe(url),
               let data = try? BoundedFile.read(url, limit: 262_144),
               let envelope = try? JSONDecoder().decode(Envelope.self, from: data), envelope.version == 1,
-              envelope.records.count <= 64, (envelope.failures?.count ?? 0) <= 64,
+              envelope.records.count <= ProductTagSources.maximumSources,
+              (envelope.failures?.count ?? 0) <= ProductTagSources.maximumSources,
               (envelope.failures ?? [:]).allSatisfy({ id, date in
                   ProductTagSources.all.contains { $0.id == id } && date.timeIntervalSince1970 > 0 && date <= Date().addingTimeInterval(300)
               }) else { throw ProductTagError.invalidCache }
@@ -183,6 +247,7 @@ public actor ProductTagStore {
             // A reviewed descriptor update is ordinary cache invalidation, not corrupt storage.
             guard let source = ProductTagSources.all.first(where: { $0.id == record.sourceID }),
                   source.descriptionDigest == record.descriptionDigest else { continue }
+            try source.validateReviewRecord()
             result[record.sourceID] = record
         }
         return result
@@ -200,7 +265,7 @@ public actor ProductTagStore {
     }
     public func save(_ records: [String: ProductTagRecord]) throws {
         _ = try load() // Preserve unreadable/future caches.
-        guard records.count <= 64, records.allSatisfy({ key, record in
+        guard records.count <= ProductTagSources.maximumSources, records.allSatisfy({ key, record in
             key == record.sourceID && record.fetchedAt.timeIntervalSince1970 > 0 && record.fetchedAt <= Date().addingTimeInterval(300) && ProductTagSources.all.contains { $0.id == key && $0.descriptionDigest == record.descriptionDigest }
         }) else { throw ProductTagError.invalidCache }
         var failures = try envelope()?.failures ?? [:]

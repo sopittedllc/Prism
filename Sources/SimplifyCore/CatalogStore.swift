@@ -57,13 +57,14 @@ public struct CatalogSnapshot: Sendable {
 }
 
 public enum CatalogStoreError: LocalizedError {
-    case unavailable, incompatible, invalid, busy
+    case unavailable, incompatible, invalid, busy, sourceChanged
     public var errorDescription: String? {
         switch self {
         case .unavailable: "The saved catalog is unavailable. Current scan results can still be used."
         case .incompatible: "The saved catalog belongs to an unsupported version and has been left unchanged."
         case .invalid: "The saved catalog could not be read and has been left unchanged."
         case .busy: "The saved catalog is busy. Current scan results can still be used."
+        case .sourceChanged: "A library changed during indexing. Scan again to reconcile its current contents."
         }
     }
 }
@@ -71,20 +72,52 @@ public enum CatalogStoreError: LocalizedError {
 /// Local inventory graph. All SQLite work is serialized by this actor, off the UI actor.
 /// Only final scans are ingested. Missing observations are retained and labeled stale.
 public actor CatalogStore {
-    public let url: URL
+    public nonisolated let url: URL
     public init(url: URL) { self.url = url }
+    /// Discard resumable scan work when the user resets the local collection.
+    public nonisolated func clearDiscoveryJournals() { LibraryScanJournal.clearAll(baseURL: url) }
     public static var application: CatalogStore {
         CatalogStore(url: FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("Simplify/catalog.sqlite"))
     }
 
     private func productID(for asset: Asset, nodeID: String, db: CatalogDatabase) throws -> String {
-        if let id = try db.rows("SELECT product_id FROM plugin_installations WHERE node_id=?", [nodeID]).first?.first { return id }
         let key = PluginProduct.verifiedIdentity(asset)
+        let current = try db.rows("""
+            SELECT p.id,p.identity_key,p.metadata,CAST(p.earliest_date AS TEXT)
+            FROM plugin_installations i JOIN plugin_products p ON p.id=i.product_id
+            WHERE i.node_id=?
+            """, [nodeID]).first
+        if let current, current[1] == (key ?? "") { return current[0] }
+        if key == nil, let current { return current[0] }
         let matches = try key.map { try db.rows("SELECT id FROM plugin_products WHERE identity_key=? LIMIT 2", [$0]) } ?? []
-        let id = matches.count == 1 ? matches[0][0] : UUID().uuidString
-        if matches.count != 1 {
+        let id: String
+        if matches.count == 1 { id = matches[0][0] }
+        else if let current, matches.isEmpty {
+            // A product-specific canonicalizer may improve after an earlier scan.
+            // Re-key the existing row so its edits and lifecycle evidence survive.
+            id = current[0]
+            try db.run("UPDATE plugin_products SET identity_key=? WHERE id=?", [key!, id])
+        } else {
+            id = UUID().uuidString
             try db.run("INSERT INTO plugin_products(id,identity_key,name,archived) VALUES(?,?,?,0)", [id, key ?? "", asset.name])
+        }
+        if let current, current[0] != id {
+            let target = try db.rows("SELECT metadata,CAST(earliest_date AS TEXT) FROM plugin_products WHERE id=?", [id]).first
+            if let target {
+                // Preserve an explicit product edit when only one of the formerly
+                // split format rows owns one. Conflicting explicit edits remain on
+                // their source rows rather than being guessed together.
+                if target[0].isEmpty, !current[2].isEmpty {
+                    try db.run("UPDATE plugin_products SET metadata=? WHERE id=?", [current[2], id])
+                }
+                let dates = [Double(target[1]), Double(current[3])].compactMap { $0 }.filter(\.isFinite)
+                if let earliest = dates.min() {
+                    try db.run("UPDATE plugin_products SET earliest_date=? WHERE id=?", [String(earliest), id])
+                }
+            }
+            try db.run("UPDATE plugin_installations SET product_id=? WHERE node_id=?", [id, nodeID])
+            try db.run("UPDATE plugin_products SET archived=1 WHERE id=? AND NOT EXISTS (SELECT 1 FROM plugin_installations WHERE product_id=?)", [current[0], current[0]])
         }
         return id
     }
@@ -106,7 +139,7 @@ public actor CatalogStore {
         guard let row = try db.strictRows("SELECT configuration FROM scopes WHERE generation!='unscanned' ORDER BY CAST(saved_at AS REAL) DESC LIMIT 1").first else { return nil }
         let scope = try decode(CatalogScope.self, row[0])
         let paths = scope.roots.values.flatMap { $0 }
-        guard paths.count <= 512, !paths.isEmpty,
+        guard !paths.isEmpty,
               paths.allSatisfy({ $0.hasPrefix("/") && !$0.contains("\0") }) else { throw CatalogStoreError.invalid }
         return scope
     }
@@ -114,7 +147,8 @@ public actor CatalogStore {
     /// Writes inventory, graph memberships and observations in a single transaction.
     /// The returned projection strips removal identities; callers keep fresh identities
     /// only for items independently observed by their current scan.
-    public func ingest(_ report: ScanReport, scope: CatalogScope, scannedKinds: Set<AssetKind> = Set(AssetKind.allCases), at date: Date = Date(), additionContext: AdditionScanContext? = nil) throws -> CatalogSnapshot {
+    public func ingest(_ report: ScanReport, scope: CatalogScope, scannedKinds: Set<AssetKind> = Set(AssetKind.allCases), at date: Date = Date(), additionContext: AdditionScanContext? = nil, libraryJournalSource: URL? = nil) throws -> CatalogSnapshot {
+        try Task.checkCancellation()
         let db = try CatalogDatabase(url)
         try db.execute("BEGIN IMMEDIATE")
         do {
@@ -168,8 +202,99 @@ public actor CatalogStore {
                 }
             }
             var identities = PhysicalKeys()
+            var manifestSources: [(String, String)] = []
+            var articulationSources: [(String, String)] = []
+            var physicalClusters: [([String], String)] = []
+            var sinePairOwners: [String: Int] = [:]
+            for asset in report.assets where asset.kind == .library && asset.format == "SINE" &&
+                asset.libraryMetadata?.identity?.evidence == .vendorCatalog {
+                let paths = Set((asset.libraryMetadata?.instruments ?? []).flatMap { $0.contentPaths ?? [] })
+                for path in paths where URL(fileURLWithPath: path).pathExtension.lowercased() == "otmeta" {
+                    let archive = URL(fileURLWithPath: path).deletingPathExtension().appendingPathExtension("otarc").path
+                    if paths.contains(archive) { sinePairOwners[path, default: 0] += 1 }
+                }
+            }
+            struct PriorUnassociated {
+                let nodeID: String
+                let asset: Asset
+                let firstSeen: String
+            }
+            let priorUnassociated = try db.rows("""
+                SELECT m.node_id,m.payload,CAST(n.first_seen AS TEXT) FROM scope_members m
+                JOIN nodes n ON n.id=m.node_id WHERE m.scope_id=? AND n.kind='library'
+                """, [scope.key]).compactMap { row -> PriorUnassociated? in
+                    let old = try decode(Asset.self, row[1])
+                    return old.classification == "unassociatedPhysicalContent"
+                        ? PriorUnassociated(nodeID: row[0], asset: old, firstSeen: row[2]) : nil
+                }
+            struct PriorManifestBackup {
+                let nodeID: String
+                let path: String
+                let asset: Asset
+            }
+            let priorManifestBackups = try db.rows("""
+                SELECT m.node_id,m.path,m.payload FROM scope_members m
+                JOIN nodes n ON n.id=m.node_id WHERE m.scope_id=? AND n.kind='library'
+                """, [scope.key]).compactMap { row -> PriorManifestBackup? in
+                    let old = try decode(Asset.self, row[2])
+                    guard old.libraryMetadata?.identity?.evidence == .manifest else { return nil }
+                return PriorManifestBackup(nodeID: row[0], path: row[1], asset: old)
+            }
+            let priorLooseKontakt = try db.rows("""
+                SELECT m.node_id,m.path,m.payload FROM scope_members m
+                JOIN nodes n ON n.id=m.node_id WHERE m.scope_id=? AND n.kind='library'
+                """, [scope.key]).compactMap { row -> (nodeID: String, path: String)? in
+                    let old = try decode(Asset.self, row[2])
+                    return old.format == "Kontakt" && old.libraryMetadata?.identity?.evidence == .unresolved
+                        ? (row[0], row[1]) : nil
+                }
+            let currentClusterPaths = Set(report.assets.filter { $0.classification == "unassociatedPhysicalContent" }.map(\.path))
+            var bridgedClusterIDs = Set<String>()
             for asset in report.assets where scannedKinds.contains(asset.kind) {
-                let product = asset.libraryMetadata?.identity?.productID ?? ""
+                if asset.kind == .library,
+                   asset.libraryMetadata?.identity?.productID?.hasPrefix("spectrasonics:") == true,
+                   !SpectrasonicsLibraryIndex.sourceMatches(asset) { throw CatalogStoreError.sourceChanged }
+                if asset.kind == .library, asset.libraryMetadata?.sizeBasis == .installedContent {
+                    let paths = Array(Set((asset.libraryMetadata?.instruments ?? []).flatMap { $0.contentPaths ?? [] }))
+                    guard let fingerprint = asset.libraryMetadata?.sizeSourceFingerprint,
+                          let current = LibraryMetadataReader.physicalContentSnapshot(paths),
+                          current.fingerprint == fingerprint, current.bytes == asset.logicalBytes else {
+                        throw CatalogStoreError.sourceChanged
+                    }
+                    physicalClusters.append((paths, fingerprint))
+                }
+                if asset.kind == .library, asset.classification == "unassociatedPhysicalContent" {
+                    guard let paths = asset.libraryMetadata?.physicalContentPaths,
+                          let fingerprint = asset.libraryMetadata?.identity?.sourceFingerprint,
+                          let physicalIdentity = asset.libraryMetadata?.physicalContentIdentity,
+                          let current = LibraryMetadataReader.physicalContentSnapshot(paths),
+                          current.bytes == asset.logicalBytes,
+                          current.fingerprint == fingerprint,
+                          current.physicalIdentity == physicalIdentity else { throw CatalogStoreError.sourceChanged }
+                    physicalClusters.append((paths, fingerprint))
+                }
+                if asset.kind == .library, asset.libraryMetadata?.identity?.evidence == .manifest {
+                    let source = asset.libraryMetadata?.identity?.sourceFingerprint
+                        ?? LibraryMetadataReader.kontaktManifestFingerprint(URL(fileURLWithPath: asset.path))
+                    guard let source, LibraryMetadataReader.kontaktManifestFingerprint(URL(fileURLWithPath: asset.path)) == source else {
+                        throw CatalogStoreError.sourceChanged
+                    }
+                    manifestSources.append((asset.path, source))
+                }
+                var product = asset.libraryMetadata?.identity?.productID ?? ""
+                if asset.kind == .library, asset.libraryMetadata?.identity?.evidence == .manifest, product.isEmpty {
+                    // A manifest without a vendor ID has no proven logical continuity
+                    // across replacement at the same inode/path. Its bounded metadata
+                    // bytes distinguish a different product from the old history.
+                    guard let fingerprint = manifestSources.last?.1 else { throw CatalogStoreError.sourceChanged }
+                    product = "unidentified-manifest:" + fingerprint
+                }
+                if asset.kind == .library, asset.classification == "unassociatedPhysicalContent" {
+                    guard let physicalIdentity = asset.libraryMetadata?.physicalContentIdentity else {
+                        throw CatalogStoreError.sourceChanged
+                    }
+                    product = "unassociated-cluster:" + physicalIdentity
+                }
                 let physicalKey = identities.key(asset.path)
                 let identity = asset.kind.rawValue + ":" + asset.format + ":" + product + ":" + physicalKey
                 let existing = try db.rows("SELECT id FROM nodes WHERE identity=?", [identity]).first?.first
@@ -183,14 +308,46 @@ public actor CatalogStore {
                 let baseline = !covered || knownReplacement
                 var header = asset; header.catalogID = id; header.pluginProductID = pluginProductID; header.fileIdentity = nil
                 let instruments = header.libraryMetadata?.instruments ?? []
+                for instrument in instruments {
+                    if let signature = instrument.articulationCoverage.sourceSignature {
+                        guard let current = LibraryScanJournal.stamp(instrument.path),
+                              LibraryScanJournal.signature(current) == signature else {
+                            throw CatalogStoreError.sourceChanged
+                        }
+                        articulationSources.append((instrument.path, signature))
+                    }
+                }
                 header.libraryMetadata?.instruments = []
+                // A verified physical identity can survive moves/reconnects while
+                // its current-directory added date changes or becomes unavailable.
+                // Retain the earliest qualified date already observed for that
+                // same identity; never transfer dates by display name or path alone.
+                func earlierDate(_ current: Date?, _ previous: Date?) -> Date? {
+                    [current, previous].compactMap { $0 }.filter {
+                        $0.timeIntervalSince1970.isFinite && $0.timeIntervalSince1970 > 0 && $0 <= date
+                    }.min()
+                }
+                if existing != nil, asset.kind != .plugin {
+                    for row in try db.rows("SELECT payload FROM scope_members WHERE node_id=?", [id]) {
+                        let prior = try decode(Asset.self, row[0])
+                        header.finderDateAdded = earlierDate(header.finderDateAdded, prior.finderDateAdded)
+                    }
+                }
+                var previousInstrumentDates: [String: Date] = [:]
+                if existing != nil, !instruments.isEmpty {
+                    for row in try db.rows("SELECT id,payload FROM instruments WHERE node_id=?", [id]) {
+                        let prior = try decode(LibraryInstrument.self, row[1])
+                        previousInstrumentDates[row[0]] = earlierDate(previousInstrumentDates[row[0]], prior.finderDateAdded)
+                    }
+                }
                 try db.run("""
                     INSERT INTO nodes(id,identity,product_key,kind,path,first_seen,last_seen,baseline)
                     VALUES(?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET
                     path=excluded.path,last_seen=excluded.last_seen
                     """, [id, identity, product, asset.kind.rawValue, asset.path, stamp(date), stamp(date), baseline ? "1" : "0"])
+                try db.run("INSERT OR IGNORE INTO date_subjects(subject_id,parent_node_id,kind,identity_key) VALUES(?,?, 'asset','')", [id, id])
                 if let pluginProductID {
-                    try db.run("INSERT OR IGNORE INTO plugin_installations(node_id,product_id) VALUES(?,?)", [id, pluginProductID])
+                    try db.run("INSERT INTO plugin_installations(node_id,product_id) VALUES(?,?) ON CONFLICT(node_id) DO UPDATE SET product_id=excluded.product_id", [id, pluginProductID])
                 }
                 if existing == nil {
                     let lower = knownReplacement || !physicalKey.hasPrefix("file:") ? nil : continuousRoots.filter {
@@ -203,15 +360,53 @@ public actor CatalogStore {
                 // Retain unobserved children; a bounded adapter cannot prove their absence.
                 for instrument in instruments {
                     let key = instrument.vendorID ?? identities.key(instrument.path)
+                    let subjectID = AssetUsageSubject.instrumentID(parentNodeID: id, instrument: instrument)
+                    let identityKey = AssetUsageSubject.instrumentIdentityKey(instrument)
+                    try db.run("INSERT INTO date_subjects(subject_id,parent_node_id,kind,identity_key) VALUES(?,?, 'instrument',?) ON CONFLICT(parent_node_id,kind,identity_key) DO NOTHING", [subjectID, id, identityKey])
+                    var retainedInstrument = instrument
+                    retainedInstrument.finderDateAdded = earlierDate(instrument.finderDateAdded, previousInstrumentDates[key])
+                    var bridgedPair: PriorUnassociated?
+                    if asset.kind == .library, asset.format == "SINE",
+                       asset.libraryMetadata?.identity?.evidence == .vendorCatalog {
+                        let members = Set(instrument.contentPaths ?? [])
+                        bridgedPair = priorUnassociated.first { old in
+                            guard let paths = old.asset.libraryMetadata?.physicalContentPaths, paths.count >= 2,
+                                  paths.count.isMultiple(of: 2),
+                                  paths.filter({ URL(fileURLWithPath: $0).pathExtension.lowercased() == "otmeta" }).count * 2 == paths.count,
+                                  paths.filter({ URL(fileURLWithPath: $0).pathExtension.lowercased() == "otmeta" }).allSatisfy({ meta in
+                                      paths.contains(URL(fileURLWithPath: meta).deletingPathExtension().appendingPathExtension("otarc").path)
+                                          && sinePairOwners[meta] == 1
+                                  }),
+                                  members.isSuperset(of: paths),
+                                  let snapshot = LibraryMetadataReader.physicalContentSnapshot(paths) else { return false }
+                            return snapshot.physicalIdentity == old.asset.libraryMetadata?.physicalContentIdentity
+                        }
+                        if let bridgedPair, bridgedPair.asset.path == instrument.path {
+                            retainedInstrument.finderDateAdded = earlierDate(retainedInstrument.finderDateAdded,
+                                                                             bridgedPair.asset.finderDateAdded)
+                        }
+                    }
                     try db.run("""
-                        INSERT INTO instruments(scope_id,node_id,id,payload,generation,observed_at) VALUES(?,?,?,?,?,?)
-                        ON CONFLICT(scope_id,node_id,id) DO UPDATE SET payload=excluded.payload,generation=excluded.generation,observed_at=excluded.observed_at
-                        """, [scope.key, id, key, try encode(instrument), generation, stamp(date)])
+                        INSERT INTO instruments(scope_id,node_id,id,usage_subject_id,payload,generation,observed_at) VALUES(?,?,?,?,?,?,?)
+                        ON CONFLICT(scope_id,node_id,id) DO UPDATE SET usage_subject_id=excluded.usage_subject_id,payload=excluded.payload,generation=excluded.generation,observed_at=excluded.observed_at
+                        """, [scope.key, id, key, subjectID, try encode(retainedInstrument), generation, stamp(date)])
+                    if let bridgedPair {
+                        bridgedClusterIDs.insert(bridgedPair.nodeID)
+                        let destination = MetadataSubject(nodeID: id, instrument: instrument).key
+                        let source = MetadataSubject(nodeID: bridgedPair.nodeID).key
+                        try db.run("INSERT OR IGNORE INTO metadata_overrides(subject,node_id,payload) SELECT ?,?,payload FROM metadata_overrides WHERE subject=?", [destination, id, source])
+                    }
                     for path in instrument.contentPaths ?? [] {
-                        try db.run("INSERT INTO physical_members(scope_id,node_id,instrument_id,path,generation,observed_at) VALUES(?,?,?,?,?,?) ON CONFLICT(scope_id,node_id,instrument_id,path) DO UPDATE SET generation=excluded.generation,observed_at=excluded.observed_at", [scope.key, id, key, path, generation, stamp(date)])
+                        let observed = bridgedPair?.asset.libraryMetadata?.physicalContentPaths?.contains(path) == true
+                            ? bridgedPair!.firstSeen : stamp(date)
+                        try db.run("INSERT INTO physical_members(scope_id,node_id,instrument_id,path,generation,observed_at) VALUES(?,?,?,?,?,?) ON CONFLICT(scope_id,node_id,instrument_id,path) DO UPDATE SET generation=excluded.generation,observed_at=MIN(physical_members.observed_at,excluded.observed_at)", [scope.key, id, key, path, generation, observed])
                     }
                 }
-                try db.run("DELETE FROM scope_members WHERE scope_id=? AND path=? AND node_id!=? AND node_id IN (SELECT id FROM nodes WHERE product_key=? AND kind=?)", [scope.key, asset.path, id, product, asset.kind.rawValue])
+                if asset.kind == .library, asset.libraryMetadata?.identity?.evidence == .manifest {
+                    try db.run("DELETE FROM scope_members WHERE scope_id=? AND path=? AND node_id!=? AND node_id IN (SELECT id FROM nodes WHERE kind='library')", [scope.key, asset.path, id])
+                } else {
+                    try db.run("DELETE FROM scope_members WHERE scope_id=? AND path=? AND node_id!=? AND node_id IN (SELECT id FROM nodes WHERE product_key=? AND kind=?)", [scope.key, asset.path, id, product, asset.kind.rawValue])
+                }
                 try db.run("INSERT INTO scope_members(scope_id,node_id,path,payload,generation,baseline,observed_at) VALUES(?,?,?,?,?,?,?) ON CONFLICT(scope_id,node_id) DO UPDATE SET path=excluded.path,payload=excluded.payload,generation=excluded.generation,observed_at=excluded.observed_at", [scope.key, id, asset.path, try encode(header), generation, baseline ? "1" : "0", stamp(date)])
                 if let pluginProductID { try db.run("UPDATE plugin_products SET archived=0 WHERE id=?", [pluginProductID]) }
                 if let pluginProductID, let added = asset.finderDateAdded {
@@ -220,8 +415,345 @@ public actor CatalogStore {
                 }
                 if asset.kind == .plugin { try db.run("DELETE FROM removals WHERE path=?", [asset.path]) }
             }
-            let evidence = ScanReport(schemaVersion: report.schemaVersion, assets: [], projects: report.projects,
+            // A formerly discovered nested copy of the same NICNT may have been
+            // retained after a newer scanner learned to suppress metadata-only
+            // backups. Retire only the visible scope row when a byte-identical,
+            // vendor-qualified parent now owns actual patches. Keep the node,
+            // dates and any edits untouched; edited backups remain visible.
+            for current in report.assets where scannedKinds.contains(.library) {
+                guard let identity = current.libraryMetadata?.identity,
+                      identity.evidence == .manifest,
+                      let productID = identity.productID, !productID.isEmpty,
+                      let fingerprint = identity.sourceFingerprint,
+                      let installationRoot = identity.installationRoot,
+                      current.libraryMetadata?.instruments.isEmpty == false,
+                      URL(fileURLWithPath: current.path).deletingLastPathComponent().standardizedFileURL.path
+                        == URL(fileURLWithPath: installationRoot).standardizedFileURL.path else { continue }
+                for old in priorManifestBackups {
+                    guard old.nodeID != current.catalogID,
+                          let oldIdentity = old.asset.libraryMetadata?.identity,
+                          oldIdentity.productID == productID,
+                          oldIdentity.sourceFingerprint == fingerprint,
+                          old.asset.libraryMetadata?.instruments.isEmpty != false,
+                          CatalogScope.contains(old.path, root: installationRoot),
+                          old.path != current.path,
+                          try db.rows("SELECT 1 FROM instruments WHERE scope_id=? AND node_id=? LIMIT 1", [scope.key, old.nodeID]).isEmpty,
+                          try db.rows("SELECT 1 FROM metadata_overrides WHERE node_id=? LIMIT 1", [old.nodeID]).isEmpty else { continue }
+                    try db.run("DELETE FROM scope_members WHERE scope_id=? AND node_id=?", [scope.key, old.nodeID])
+                }
+            }
+            // A better structural owner can absorb an old loose patch folder. Hide
+            // only a completely rehomed, unedited row after a complete root scan;
+            // keep its node and any uncertain history instead of guessing a transfer.
+            if scannedKinds.contains(.library) {
+                let owners = report.assets.filter { asset in
+                    guard asset.kind == .library, asset.format == "Kontakt",
+                          let evidence = asset.libraryMetadata?.identity?.evidence else { return false }
+                    return evidence == .proposed || evidence == .manifest
+                }
+                for old in priorLooseKontakt {
+                    guard !report.assets.contains(where: { $0.kind == .library && $0.path == old.path }),
+                          try db.rows("SELECT 1 FROM metadata_overrides WHERE node_id=? LIMIT 1", [old.nodeID]).isEmpty,
+                          try db.rows("SELECT 1 FROM date_evidence WHERE subject_id IN (SELECT subject_id FROM date_subjects WHERE parent_node_id=?) LIMIT 1", [old.nodeID]).isEmpty else { continue }
+                    let oldPaths = Set(try db.rows("SELECT payload FROM instruments WHERE scope_id=? AND node_id=?", [scope.key, old.nodeID])
+                        .map { try decode(LibraryInstrument.self, $0[0]).path })
+                    guard !oldPaths.isEmpty else { continue }
+                    let matches = owners.filter { owner in
+                        guard let root = owner.libraryMetadata?.identity?.installationRoot,
+                              old.path.hasPrefix(root + "/") else { return false }
+                        let currentPaths = Set(owner.libraryMetadata?.instruments.map(\.path) ?? [])
+                        return currentPaths.isSuperset(of: oldPaths)
+                    }
+                    guard matches.count == 1, let root = matches[0].libraryMetadata?.identity?.installationRoot,
+                          scope.roots(for: "library").contains(where: { selected in
+                              CatalogScope.contains(root, root: selected) &&
+                                  !report.issues.contains(where: { issue in
+                                      CatalogScope.contains(issue.path, root: selected) ||
+                                          CatalogScope.contains(selected, root: issue.path)
+                                  })
+                          }) else { continue }
+                    try db.run("DELETE FROM scope_members WHERE scope_id=? AND node_id=?", [scope.key, old.nodeID])
+                }
+            }
+            for old in priorUnassociated {
+                if bridgedClusterIDs.contains(old.nodeID) || currentClusterPaths.contains(old.asset.path) {
+                    // The new exact physical owner or a new version of this
+                    // unresolved cluster supersedes the old visible scope row.
+                    let newSamePath = report.assets.first { $0.classification == "unassociatedPhysicalContent" && $0.path == old.asset.path }
+                    let samePhysicalIdentity = newSamePath?.libraryMetadata?.physicalContentIdentity
+                        == old.asset.libraryMetadata?.physicalContentIdentity
+                    if bridgedClusterIDs.contains(old.nodeID) || !samePhysicalIdentity {
+                        try db.run("DELETE FROM scope_members WHERE scope_id=? AND node_id=?", [scope.key, old.nodeID])
+                    }
+                }
+            }
+            var boundProjects = report.projects
+            if scannedKinds.contains(.sample) {
+                let libraryRows = try db.rows("""
+                    SELECT m.node_id,m.payload FROM scope_members m JOIN nodes n ON n.id=m.node_id
+                    WHERE m.scope_id=? AND n.kind='library'
+                    """, [scope.key])
+                var libraryAssets = try libraryRows.map { try decode(Asset.self, $0[1]) }
+                // Headers omit child instruments. Load only the players with
+                // structurally identified saved-state membership.
+                let childOwnerIDs = libraryRows.enumerated().compactMap { index, row in
+                    ["Spectrasonics", "SINE"].contains(libraryAssets[index].format) ? row[0] : nil
+                }
+                if !childOwnerIDs.isEmpty {
+                    var children: [String: [LibraryInstrument]] = [:]
+                    for start in stride(from: 0, to: childOwnerIDs.count, by: 400) {
+                        let chunk = Array(childOwnerIDs[start..<min(start + 400, childOwnerIDs.count)])
+                        let marks = Array(repeating: "?", count: chunk.count).joined(separator: ",")
+                        let childRows = try db.rows("SELECT node_id,payload,generation FROM instruments WHERE scope_id=? AND node_id IN (\(marks))",
+                            [scope.key] + chunk)
+                        for row in childRows {
+                            var child = try decode(LibraryInstrument.self, row[1])
+                            child.catalogStale = row[2] != generation
+                            children[row[0], default: []].append(child)
+                        }
+                    }
+                    for index in libraryAssets.indices where ["Spectrasonics", "SINE"].contains(libraryAssets[index].format) {
+                        libraryAssets[index].libraryMetadata?.instruments = children[libraryRows[index][0]] ?? []
+                    }
+                }
+                let liveClassIDs = Set(boundProjects.filter { $0.adapter == "ableton-kontakt-live12" }
+                    .flatMap { $0.pluginClasses ?? [] }.map(\.classID))
+                let cubaseClassIDs = Set(boundProjects.filter { $0.adapter == "cubase-kontakt-15.0.30" }
+                    .flatMap { $0.pluginClasses ?? [] }.map(\.classID))
+                let pluginAssets = try db.rows("""
+                    SELECT m.payload FROM scope_members m JOIN nodes n ON n.id=m.node_id
+                    WHERE m.scope_id=? AND n.kind='plugin'
+                    """, [scope.key]).map { try decode(Asset.self, $0[0]) }
+                let sampleRows = try db.rows("""
+                    SELECT m.node_id,m.path,n.identity FROM scope_members m JOIN nodes n ON n.id=m.node_id
+                    WHERE m.scope_id=? AND n.kind='sample' AND m.generation=?
+                    """, [scope.key, generation])
+                let samplesByPath = Dictionary(grouping: sampleRows, by: { $0[1] })
+                let home = FileManager.default.homeDirectoryForCurrentUser
+                let liveCache = home.appendingPathComponent("Library/Application Support/Ableton/Live Database/Live-plugins-1.db")
+                let liveBindings = liveClassIDs.isEmpty ? [] :
+                    ((try? LivePluginCache.bindings(LivePluginCache.read(liveCache).filter { liveClassIDs.contains($0.classID) },
+                        assets: pluginAssets)) ?? [])
+                let cubaseCache = home.appendingPathComponent("Library/Preferences/Cubase 15/Cubase Pro VST3 Cache (arm64)/vst3plugins.xml")
+                let cubaseClasses = cubaseClassIDs.isEmpty ? [] :
+                    ((try? CubasePluginCache.read(cubaseCache).filter { cubaseClassIDs.contains($0.cid) }) ?? [])
+                var membershipRecords: [AssetDateEvidence] = []
+                for index in boundProjects.indices {
+                    guard boundProjects[index].kontaktStates != nil || boundProjects[index].spectrasonicsStates != nil ||
+                          boundProjects[index].sineInstrumentIDs != nil ||
+                          boundProjects[index].pluginClasses != nil || boundProjects[index].aaxPlugins != nil ||
+                          boundProjects[index].logicAUReferences != nil ||
+                          !boundProjects[index].references.isEmpty,
+                          let fingerprint = boundProjects[index].sourceSHA256,
+                          let savedAt = boundProjects[index].projectModifiedAt else { continue }
+                    let projectURL = URL(fileURLWithPath: boundProjects[index].path)
+                    let sourceURL = URL(fileURLWithPath: boundProjects[index].sourcePath ?? projectURL.path)
+                    if boundProjects[index].adapter == "logic-saved-au" {
+                        guard let sourcePath = boundProjects[index].sourcePath,
+                              CatalogScope.contains(sourcePath, root: projectURL.path + "/Alternatives") &&
+                              sourceURL.lastPathComponent == "ProjectData",
+                              (try? ProjectReader.selectedLogicProjectData(projectURL).path) == sourcePath
+                        else { throw CatalogStoreError.sourceChanged }
+                    }
+                    if boundProjects[index].readerPolicyVersion == ProjectReader.policyVersion,
+                       let signature = boundProjects[index].sourceSignature,
+                       signature.utf8.count == 64, fingerprint.utf8.count == 64 {
+                        // The reader stamped before and after its bounded read.
+                        // Recheck that same source at commit without reading the
+                        // entire saved project a second time on every refresh.
+                        guard LibraryMetadataReader.safe(sourceURL),
+                              let stamp = LibraryScanJournal.stamp(sourceURL.path),
+                              LibraryScanJournal.signature(stamp) == signature else {
+                            throw CatalogStoreError.sourceChanged
+                        }
+                    } else {
+                        // Old or externally supplied reports have no trusted read
+                        // boundary; keep the original byte-for-byte check.
+                        let current = try BoundedFile.read(sourceURL, limit: ProjectReader.maximumInputBytes)
+                        let currentHash = SHA256.hash(data: current).map { String(format: "%02x", $0) }.joined()
+                        guard currentHash == fingerprint else { throw CatalogStoreError.sourceChanged }
+                    }
+                    let pathHash = SHA256.hash(data: Data(boundProjects[index].path.utf8))
+                        .map { String(format: "%02x", $0) }.joined()
+                    var itemSubjects = Set<String>()
+                    func appendItem(_ subjectID: String, kind: AssetKind, identity: String,
+                                    adapter: String) throws {
+                        guard itemSubjects.insert(subjectID).inserted, savedAt <= date else { return }
+                        let provenance = ProjectItemMembership(adapter: adapter, subjectKind: kind,
+                            sourceIdentity: identity, projectSHA256: fingerprint, projectPathSHA256: pathHash)
+                        let eventID = try provenance.eventID(subjectID: subjectID, savedAt: savedAt)
+                        if let prior = try db.dateRows("SELECT source_id,evidence_id,subject_id,payload FROM date_evidence WHERE source_id=? AND evidence_id=?",
+                            [ProjectItemMembership.sourceID, eventID]).first {
+                            let existing = try decodeDateEvidence(prior)
+                            guard existing.subjectID == subjectID, existing.projectItemMembership == provenance,
+                                  existing.eventDate == savedAt else { throw AssetDateEvidenceError.conflictingEvidenceID }
+                            return
+                        }
+                        membershipRecords.append(AssetDateEvidence(sourceID: ProjectItemMembership.sourceID,
+                            evidenceID: eventID, subjectID: subjectID, kind: .projectReference,
+                            eventDate: savedAt, ingestedAt: date, projectItemMembership: provenance))
+                    }
+                    if let classes = boundProjects[index].pluginClasses {
+                        for item in classes {
+                            if boundProjects[index].adapter == "ableton-kontakt-live12" {
+                                let matches = liveBindings.filter { $0.classID == item.classID }
+                                guard matches.count == 1, let binding = matches.first,
+                                      (try? binding.revalidate()) != nil,
+                                      let asset = pluginAssets.first(where: { $0.path == binding.path && $0.format == "vst3" && $0.catalogStale != true }),
+                                      let subjectID = asset.catalogID else { continue }
+                                try appendItem(subjectID, kind: .plugin, identity: item.classID, adapter: "ableton-vst3-live12")
+                            } else if boundProjects[index].adapter == "cubase-kontakt-15.0.30" {
+                                let matches = cubaseClasses.filter { $0.cid == item.classID && $0.category == "Audio Module Class" }
+                                guard matches.count == 1, let match = matches.first,
+                                      LibraryMetadataReader.safe(URL(fileURLWithPath: match.path)),
+                                      FileManager.default.fileExists(atPath: match.path),
+                                      let asset = pluginAssets.first(where: { $0.path == match.path && $0.format == "vst3" && $0.catalogStale != true }),
+                                      let subjectID = asset.catalogID else { continue }
+                                try appendItem(subjectID, kind: .plugin, identity: item.classID, adapter: "cubase-vst3-15.0.30")
+                            }
+                        }
+                    }
+                    if let entries = boundProjects[index].aaxPlugins,
+                       boundProjects[index].adapter == "protools-ptx-plugin-list" {
+                        for entry in entries {
+                            let pieces = entry.effectID.lowercased().split(separator: ".")
+                            guard pieces.count >= 4 else { continue }
+                            let makerNamespace = pieces.prefix(2).joined(separator: ".") + "."
+                            let matches = pluginAssets.filter { asset in
+                                asset.format == "aaxplugin" && asset.catalogStale != true &&
+                                asset.name == entry.name &&
+                                asset.bundleIdentifier?.lowercased().hasPrefix(makerNamespace) == true &&
+                                LibraryMetadataReader.safe(URL(fileURLWithPath: asset.path)) &&
+                                Bundle(url: URL(fileURLWithPath: asset.path))?.bundleIdentifier == asset.bundleIdentifier
+                            }
+                            guard matches.count == 1, let subjectID = matches.first?.catalogID else { continue }
+                            try appendItem(subjectID, kind: .plugin, identity: entry.effectID, adapter: "protools-ptx-aax")
+                        }
+                    }
+                    if let references = boundProjects[index].logicAUReferences,
+                       boundProjects[index].adapter == "logic-saved-au" {
+                        for reference in Set(references) {
+                            let matches = pluginAssets.filter { asset in
+                                guard asset.format == "component", asset.catalogStale != true,
+                                      LibraryMetadataReader.safe(URL(fileURLWithPath: asset.path)),
+                                      let bundle = Bundle(url: URL(fileURLWithPath: asset.path)),
+                                      bundle.bundleIdentifier == asset.bundleIdentifier,
+                                      let components = bundle.infoDictionary?["AudioComponents"] as? [[String: Any]] else { return false }
+                                return components.contains { component in
+                                    component["type"] as? String == reference.type &&
+                                    component["subtype"] as? String == reference.subtype &&
+                                    component["manufacturer"] as? String == reference.manufacturer
+                                }
+                            }
+                            guard matches.count == 1, let subjectID = matches.first?.catalogID else { continue }
+                            try appendItem(subjectID, kind: .plugin, identity: reference.identity, adapter: "logic-saved-au")
+                        }
+                    }
+                    if let sineIDs = boundProjects[index].sineInstrumentIDs,
+                       boundProjects[index].adapter == "cubase-kontakt-15.0.30" {
+                        for instrumentID in Set(sineIDs) {
+                            let matches = libraryAssets.filter { $0.format == "SINE" && $0.catalogStale != true }
+                                .flatMap { asset in (asset.libraryMetadata?.instruments ?? []).compactMap { instrument -> (Asset, LibraryInstrument)? in
+                                    guard instrument.vendorID?.hasSuffix(":instrument:\(instrumentID)") == true,
+                                          instrument.catalogStale != true else { return nil }
+                                    return (asset, instrument)
+                                }}
+                            guard matches.count == 1, let (asset, instrument) = matches.first,
+                                  let parentID = asset.catalogID,
+                                  !(instrument.contentPaths ?? []).isEmpty,
+                                  (instrument.contentPaths ?? []).allSatisfy({ LibraryMetadataReader.safe(URL(fileURLWithPath: $0)) && FileManager.default.fileExists(atPath: $0) }) else { continue }
+                            let subjectID = AssetUsageSubject.instrumentID(parentNodeID: parentID, instrument: instrument)
+                            try appendItem(subjectID, kind: .library, identity: instrumentID, adapter: "cubase-sine-15.0.30")
+                        }
+                    }
+                    if ["rpp", "ableton-kontakt-live12"].contains(boundProjects[index].adapter) {
+                        var physicalKeys = PhysicalKeys()
+                        for reference in boundProjects[index].references where reference.kind == .sample {
+                            guard let path = reference.resolvedPath,
+                                  scope.includes(kind: "sample", path: path),
+                                  LibraryMetadataReader.safe(URL(fileURLWithPath: path)),
+                                  let candidates = samplesByPath[path], candidates.count == 1,
+                                  let row = candidates.first else { continue }
+                            let physical = physicalKeys.key(path)
+                            guard physical.hasPrefix("file:"), row[2].hasSuffix(":" + physical) else { continue }
+                            try appendItem(row[0], kind: .sample, identity: physical,
+                                adapter: boundProjects[index].adapter == "rpp" ? "reaper-rpp" : "ableton-sample-live12")
+                        }
+                    }
+                    if let states = boundProjects[index].kontaktStates {
+                        let ids = Array(Set(states.flatMap(\.libraryIDs))).sorted()
+                        let resolved = KontaktLibraryBinding.resolve(libraryIDs: ids, assets: libraryAssets)
+                        var outcomes: [KontaktLibraryOutcome] = []
+                        var recordedSubjects = Set<String>()
+                        for state in states { for id in state.libraryIDs {
+                            let binding = resolved.bindings[id]
+                            outcomes.append(KontaktLibraryOutcome(instanceOrdinal: state.instanceOrdinal,
+                                libraryID: id, catalogID: binding?.catalogID,
+                                status: binding == nil ? "unknownLibraryID" : "identifiedLibrary"))
+                            guard let subjectID = binding?.catalogID, recordedSubjects.insert(subjectID).inserted,
+                                  savedAt <= date else { continue }
+                            let provenance = ProjectLibraryMembership(adapter: boundProjects[index].adapter,
+                                publicLibraryID: id, projectSHA256: fingerprint, projectPathSHA256: pathHash)
+                            let eventID = try provenance.eventID(subjectID: subjectID, savedAt: savedAt)
+                            if let prior = try db.dateRows("SELECT source_id,evidence_id,subject_id,payload FROM date_evidence WHERE source_id=? AND evidence_id=?",
+                                [ProjectLibraryMembership.sourceID, eventID]).first {
+                                let existing = try decodeDateEvidence(prior)
+                                guard existing.subjectID == subjectID, existing.projectMembership == provenance,
+                                      existing.eventDate == savedAt else { throw AssetDateEvidenceError.conflictingEvidenceID }
+                                continue
+                            }
+                            membershipRecords.append(AssetDateEvidence(sourceID: ProjectLibraryMembership.sourceID,
+                                evidenceID: eventID,
+                                subjectID: subjectID, kind: .projectReference, eventDate: savedAt,
+                                ingestedAt: date, projectMembership: provenance))
+                        }}
+                        boundProjects[index].kontaktOutcomes = outcomes
+                    }
+                    if let states = boundProjects[index].spectrasonicsStates {
+                        var outcomes: [SpectrasonicsLibraryOutcome] = []
+                        var recordedSubjects = Set<String>()
+                        for state in states { for part in state.state.parts {
+                            let binding = SpectrasonicsLibraryIndex.resolve(part: part, player: state.state.player,
+                                assets: libraryAssets)
+                            let subjectID = binding?.asset.catalogID
+                            outcomes.append(SpectrasonicsLibraryOutcome(instanceOrdinal: state.instanceOrdinal,
+                                partSlot: part.slot, libraryName: part.library, presetName: part.name,
+                                catalogID: subjectID, status: binding?.match ?? "unidentifiedContent"))
+                            guard let subjectID, recordedSubjects.insert(subjectID).inserted,
+                                  let identity = binding?.asset.libraryMetadata?.identity,
+                                  let productID = identity.productID, savedAt <= date else { continue }
+                            let provenance = ProjectLibraryMembership(adapter: "cubase-spectrasonics-15.0.30",
+                                publicLibraryID: productID, projectSHA256: fingerprint,
+                                projectPathSHA256: pathHash, player: binding?.asset.libraryMetadata?.player,
+                                presetName: part.name)
+                            let eventID = try provenance.eventID(subjectID: subjectID, savedAt: savedAt)
+                            if let prior = try db.dateRows("SELECT source_id,evidence_id,subject_id,payload FROM date_evidence WHERE source_id=? AND evidence_id=?",
+                                [ProjectLibraryMembership.spectrasonicsSourceID, eventID]).first {
+                                let existing = try decodeDateEvidence(prior)
+                                guard existing.subjectID == subjectID, existing.projectMembership == provenance,
+                                      existing.eventDate == savedAt else { throw AssetDateEvidenceError.conflictingEvidenceID }
+                                continue
+                            }
+                            membershipRecords.append(AssetDateEvidence(sourceID: ProjectLibraryMembership.spectrasonicsSourceID,
+                                evidenceID: eventID, subjectID: subjectID, kind: .projectReference,
+                                eventDate: savedAt, ingestedAt: date, projectMembership: provenance))
+                        }}
+                        boundProjects[index].spectrasonicsOutcomes = outcomes
+                    }
+                }
+                try appendDateEvidence(membershipRecords, asOf: date, to: db)
+            }
+            var evidence = ScanReport(schemaVersion: report.schemaVersion, assets: [], projects: boundProjects,
                 sampleInclusions: report.sampleInclusions, issues: report.issues, durationSeconds: report.durationSeconds).merging(previous: previous, scannedKinds: scannedKinds)
+            // A full scan's inclusion rows are exactly reproducible from its
+            // committed sample nodes and bound project references. Keep legacy or
+            // independently supplied rows explicit unless equivalence is proven.
+            if scannedKinds == Set(AssetKind.allCases),
+               evidence.sampleInclusions == ScanReport.deriveSampleInclusions(assets: report.assets, projects: evidence.projects) {
+                evidence = ScanReport(schemaVersion: evidence.schemaVersion, assets: [], projects: evidence.projects,
+                    sampleInclusions: [], issues: evidence.issues, durationSeconds: evidence.durationSeconds,
+                    sampleInclusionsDerived: true)
+            }
             try db.run("""
                 INSERT INTO scopes(id,configuration,evidence,saved_at,generation,complete) VALUES(?,?,?,?,?,?)
                 ON CONFLICT(id) DO UPDATE SET evidence=excluded.evidence,saved_at=excluded.saved_at,
@@ -240,6 +772,31 @@ public actor CatalogStore {
                     }
                 }
             }
+            for (path, fingerprint) in manifestSources {
+                guard LibraryMetadataReader.kontaktManifestFingerprint(URL(fileURLWithPath: path)) == fingerprint else {
+                    throw CatalogStoreError.sourceChanged
+                }
+            }
+            for (path, signature) in articulationSources {
+                guard let current = LibraryScanJournal.stamp(path),
+                      LibraryScanJournal.signature(current) == signature else {
+                    throw CatalogStoreError.sourceChanged
+                }
+            }
+            for (paths, fingerprint) in physicalClusters {
+                guard LibraryMetadataReader.physicalContentSnapshot(paths)?.fingerprint == fingerprint else {
+                    throw CatalogStoreError.sourceChanged
+                }
+            }
+            if let libraryJournalSource, scannedKinds.contains(.library),
+               !report.issues.contains(where: { $0.kind == .library }) {
+                for root in scope.roots(for: "library") {
+                    let rootURL = URL(fileURLWithPath: root)
+                    let journal = try LibraryScanJournal(baseURL: url, scope: scope, root: rootURL, source: libraryJournalSource)
+                    guard try journal.validateCompleted() else { throw CatalogStoreError.sourceChanged }
+                }
+            }
+            try Task.checkCancellation()
             try db.execute("COMMIT")
         } catch { try? db.execute("ROLLBACK"); throw error }
         guard let snapshot = try read(db, scope: scope) else { throw CatalogStoreError.invalid }
@@ -272,6 +829,7 @@ public actor CatalogStore {
                                                 to db: CatalogDatabase) throws {
         var counts: [Data: Int] = [:]
         for record in records {
+            guard try !db.dateRows("SELECT subject_id FROM date_subjects WHERE subject_id=?", [record.subjectID]).isEmpty else { throw CatalogStoreError.invalid }
             let key = Data(record.subjectID.utf8)
             if counts[key] == nil {
                 counts[key] = try readDateEvidence(db, for: record.subjectID, asOf: asOf).count
@@ -422,12 +980,12 @@ public actor CatalogStore {
         } catch { try? db.execute("ROLLBACK"); throw error }
     }
 
-    /// Retain a Cubase completed-load event only when its current catalog node still
+    /// Retain a qualified Cubase event only when its current catalog node still
     /// points at the exact cache-resolved VST3 path. The class history is explicit;
     /// physical byte lineage is not inferred.
     public func recordCubaseUsage(_ use: CubaseBoundPluginUse, for nodeID: String, at date: Date) throws -> AssetDateEvidence {
         let record = AssetDateEvidence(sourceID: CubasePluginUse.sourceID, evidenceID: use.use.eventID,
-            subjectID: nodeID, kind: .confirmedUse, eventDate: use.use.reportedDate, ingestedAt: date,
+            subjectID: nodeID, kind: use.use.evidenceKind, eventDate: use.use.reportedDate, ingestedAt: date,
             cubaseUsage: use.use)
         _ = try AssetDateResolver.summarize([record], for: nodeID, asOf: date)
         let db = try CatalogDatabase(url); try db.execute("BEGIN IMMEDIATE")
@@ -437,8 +995,10 @@ public actor CatalogStore {
                   use.cid.utf8.count == 32 else { throw CatalogStoreError.invalid }
             if let row = try db.dateRows("SELECT source_id,evidence_id,subject_id,payload FROM date_evidence WHERE source_id=? AND evidence_id=?", [record.sourceID, record.evidenceID]).first {
                 let prior = try decodeDateEvidence(row)
-                guard prior.subjectID == record.subjectID, prior.kind == record.kind,
-                      prior.eventDate == record.eventDate, prior.cubaseUsage == record.cubaseUsage else { throw AssetDateEvidenceError.conflictingEvidenceID }
+                guard prior.subjectID == record.subjectID,
+                      (prior.kind == .confirmedUse || prior.kind == .loadAttempt),
+                      prior.eventDate == record.eventDate,
+                      prior.cubaseUsage?.isSameHostEvent(as: use.use) == true else { throw AssetDateEvidenceError.conflictingEvidenceID }
                 try db.execute("COMMIT"); return prior
             } else { try appendDateEvidence([record], asOf: date, to: db) }
             try db.execute("COMMIT"); return record
@@ -446,15 +1006,24 @@ public actor CatalogStore {
     }
 
     public func recordProToolsUsage(_ use: ProToolsBoundPluginUse, for nodeID: String, at date: Date) throws -> AssetDateEvidence {
-        let record = AssetDateEvidence(sourceID: ProToolsPluginUse.restoreV2SourceID,
+        let sourceID = use.use.eventSourceID
+        let record = AssetDateEvidence(sourceID: sourceID,
             evidenceID: use.use.subjectEventID(nodeID),
-            subjectID: nodeID, kind: .confirmedUse, eventDate: nil, ingestedAt: date,
+            subjectID: nodeID, kind: sourceID == ProToolsPluginUse.attemptedSourceID ? .loadAttempt : .confirmedUse,
+            eventDate: nil, ingestedAt: date,
             proToolsUsage: use.use)
         _ = try AssetDateResolver.summarize([record], for: nodeID, asOf: date)
         let db = try CatalogDatabase(url); try db.execute("BEGIN IMMEDIATE")
         do {
             let node = try db.dateRows("SELECT kind,path FROM nodes WHERE id=?", [nodeID])
             guard node.count == 1, node[0].count == 2, node[0][0] == "plugin", node[0][1] == use.pluginPath else { throw CatalogStoreError.invalid }
+            let siblingSource = sourceID == ProToolsPluginUse.attemptedSourceID
+                ? ProToolsPluginUse.restoreV2SourceID : ProToolsPluginUse.attemptedSourceID
+            if let sibling = try db.dateRows("SELECT source_id,evidence_id,subject_id,payload FROM date_evidence WHERE source_id=? AND evidence_id=?", [siblingSource, record.evidenceID]).first {
+                let prior = try decodeDateEvidence(sibling)
+                guard prior.subjectID == nodeID, prior.proToolsUsage?.eventID == use.use.eventID else { throw AssetDateEvidenceError.conflictingEvidenceID }
+                try db.execute("COMMIT"); return prior
+            }
             if let row = try db.dateRows("SELECT source_id,evidence_id,subject_id,payload FROM date_evidence WHERE source_id=? AND evidence_id=?", [record.sourceID, record.evidenceID]).first {
                 let prior = try decodeDateEvidence(row)
                 guard prior.subjectID == record.subjectID, prior.kind == record.kind,
@@ -488,7 +1057,8 @@ public actor CatalogStore {
     /// Same-day Live records compare their full source-local clock. Incomparable host
     /// clocks use a stable family order, never an inferred cross-host chronology.
     /// One atomic read; corruption yields no partial projection.
-    public func latestHostUsage(for nodeIDs: [String], asOf: Date) throws -> [Data: AssetDateEvidence] {
+    public func latestHostUsage(for nodeIDs: [String], asOf: Date,
+                                savedProjectOnly: Bool = false) throws -> [Data: AssetDateEvidence] {
         try Task.checkCancellation()
         guard nodeIDs.count <= 2048, FileManager.default.fileExists(atPath: url.path) else { throw CatalogStoreError.invalid }
         let db = try CatalogDatabase(url); try db.execute("BEGIN")
@@ -499,9 +1069,10 @@ public actor CatalogStore {
                 let records = try readDateEvidence(db, for: id, asOf: asOf); total += records.count
                 guard total <= 100_000 else { throw AssetDateEvidenceError.tooManyRecords }
                 let usage = records.filter {
-                    $0.hostUsage != nil || $0.cubaseUsage != nil ||
-                    ($0.sourceID == ProToolsPluginUse.restoreV2SourceID && $0.proToolsUsage != nil) ||
-                    $0.logicUsage != nil
+                    if savedProjectOnly { return $0.projectItemMembership != nil }
+                    return $0.itemAccess != nil || $0.hostUsage != nil || $0.cubaseUsage != nil ||
+                        (($0.sourceID == ProToolsPluginUse.restoreV2SourceID || $0.sourceID == ProToolsPluginUse.attemptedSourceID) && $0.proToolsUsage != nil) ||
+                        $0.logicUsage != nil
                 }.sorted { HostUsageOrdering.precedes($0, $1) }
                 if let first = usage.first { result[Data(id.utf8)] = first }
             }
@@ -509,8 +1080,106 @@ public actor CatalogStore {
         } catch { try? db.execute("ROLLBACK"); throw error }
     }
 
+    /// Latest typed item activity for exact current assets and their library instruments.
+    /// Input is a batch of parent node IDs; existing evidence rows join the current registry,
+    /// so large instrument inventories cost one bounded query rather than one hash/query each.
+    public func latestItemUsage(for parentNodeIDs: [String], in scope: CatalogScope,
+                                asOf: Date, savedProjectOnly: Bool = false) throws -> [Data: AssetDateEvidence] {
+        try Task.checkCancellation()
+        guard parentNodeIDs.count <= 2_048, FileManager.default.fileExists(atPath: url.path) else { throw CatalogStoreError.invalid }
+        let db = try CatalogDatabase(url); try db.execute("BEGIN")
+        do {
+            try Task.checkCancellation()
+            let parentIDs = Array(Set(parentNodeIDs)).sorted()
+            if parentIDs.isEmpty { try db.execute("COMMIT"); return [:] }
+            for id in parentIDs { _ = try AssetDateResolver.summarize([], for: id, asOf: asOf) }
+            let marks = Array(repeating: "?", count: parentIDs.count).joined(separator: ",")
+            let registered = try db.dateRows("SELECT parent_node_id FROM date_subjects WHERE kind='asset' AND subject_id=parent_node_id AND parent_node_id IN (\(marks))", parentIDs)
+            guard Set(registered.map { $0.first ?? "" }) == Set(parentIDs) else { throw CatalogStoreError.invalid }
+            let rows = try db.dateRows("""
+                SELECT e.source_id,e.evidence_id,e.subject_id,e.payload,s.parent_node_id,s.kind,s.identity_key,COALESCE(i.payload,'') FROM date_evidence e
+                JOIN date_subjects s ON s.subject_id=e.subject_id
+                LEFT JOIN instruments i ON i.node_id=s.parent_node_id AND i.usage_subject_id=s.subject_id AND i.scope_id=?
+                WHERE s.parent_node_id IN (\(marks)) AND s.kind IN ('asset','instrument') AND e.source_id IN (?,?,?,?)
+                ORDER BY e.subject_id,e.source_id,e.evidence_id LIMIT 100001
+                """, [scope.key] + parentIDs + [ItemAccessProvenance.sourceID, ProjectLibraryMembership.sourceID,
+                                            ProjectLibraryMembership.spectrasonicsSourceID, ProjectItemMembership.sourceID])
+            guard rows.count <= 100_000 else { throw AssetDateEvidenceError.tooManyRecords }
+            var grouped: [String: [AssetDateEvidence]] = [:], parents: [String: String] = [:]
+            var kinds: [String: String] = [:], identityKeys: [String: String] = [:], paths: [String: String] = [:]
+            for row in rows {
+                try Task.checkCancellation()
+                guard row.count == 8 else { throw CatalogStoreError.invalid }
+                let record = try decodeDateEvidence(Array(row.prefix(4)))
+                grouped[record.subjectID, default: []].append(record)
+                parents[record.subjectID] = row[4]; kinds[record.subjectID] = row[5]
+                identityKeys[record.subjectID] = row[6]
+                if row[5] == "instrument", !row[7].isEmpty {
+                    paths[record.subjectID] = try decode(LibraryInstrument.self, row[7]).path
+                }
+            }
+            var result: [Data: AssetDateEvidence] = [:]
+            func merge(_ record: AssetDateEvidence, for key: Data) {
+                if let current = result[key], !HostUsageOrdering.precedes(record, current) { return }
+                result[key] = record
+            }
+            for (id, records) in grouped {
+                _ = try AssetDateResolver.summarize(records, for: id, asOf: asOf)
+                guard records.count <= AssetDateResolver.maximumRecords else { throw AssetDateEvidenceError.tooManyRecords }
+                if let first = records.filter({ savedProjectOnly
+                    ? ($0.projectMembership != nil || $0.projectItemMembership != nil)
+                    : ($0.itemAccess != nil || $0.projectMembership != nil || $0.projectItemMembership != nil)
+                }).sorted(by: { HostUsageOrdering.precedes($0, $1) }).first {
+                    if kinds[id] == "asset" { merge(first, for: Data(id.utf8)) }
+                    if paths[id] != nil, let parent = parents[id], let identityKey = identityKeys[id] {
+                        let projectionKey = AssetUsageSubject.instrumentUsageKey(parentNodeID: parent, identityKey: identityKey)
+                        merge(first, for: Data(projectionKey.utf8))
+                    }
+                    if kinds[id] == "instrument", let parent = parents[id] {
+                        let key = Data(parent.utf8)
+                        merge(first, for: key)
+                    }
+                }
+            }
+            try db.execute("COMMIT"); return result
+        } catch { try? db.execute("ROLLBACK"); throw error }
+    }
+
+    /// Record a source-qualified access after the collector has bound it to an exact
+    /// registered asset or instrument. The write is atomic and idempotent.
+    func recordItemAccess(_ access: ItemAccessProvenance, parentNodeID: String,
+                          instrument: LibraryInstrument? = nil, eventDate: Date,
+                          ingestedAt date: Date) throws -> AssetDateEvidence {
+        let subjectID = instrument.map { AssetUsageSubject.instrumentID(parentNodeID: parentNodeID, instrument: $0) } ?? parentNodeID
+        let record = AssetDateEvidence(sourceID: ItemAccessProvenance.sourceID,
+            evidenceID: try access.eventID(subjectID: subjectID), subjectID: subjectID,
+            kind: access.evidenceKind, eventDate: eventDate, ingestedAt: date, itemAccess: access)
+        _ = try AssetDateResolver.summarize([record], for: subjectID, asOf: date)
+        let db = try CatalogDatabase(url); try db.execute("BEGIN IMMEDIATE")
+        do {
+            let registration = try db.dateRows("SELECT parent_node_id,kind,identity_key FROM date_subjects WHERE subject_id=?", [subjectID])
+            if let instrument {
+                guard registration.count == 1, registration[0][0] == parentNodeID,
+                      registration[0][1] == "instrument",
+                      registration[0][2] == AssetUsageSubject.instrumentIdentityKey(instrument) else { throw CatalogStoreError.invalid }
+            } else {
+                guard subjectID == parentNodeID, registration.count == 1,
+                      registration[0][0] == parentNodeID, registration[0][1] == "asset" else { throw CatalogStoreError.invalid }
+            }
+            if let priorRow = try db.dateRows("SELECT source_id,evidence_id,subject_id,payload FROM date_evidence WHERE source_id=? AND evidence_id=?", [record.sourceID, record.evidenceID]).first {
+                let prior = try decodeDateEvidence(priorRow)
+                guard prior.subjectID == record.subjectID, prior.eventDate == eventDate,
+                      prior.kind == record.kind, prior.itemAccess == access else { throw AssetDateEvidenceError.conflictingEvidenceID }
+                try db.execute("COMMIT"); return prior
+            }
+            try appendDateEvidence([record], asOf: date, to: db)
+            try db.execute("COMMIT"); return record
+        } catch { try? db.execute("ROLLBACK"); throw error }
+    }
+
     /// Product history includes qualified events from prior format installations.
-    public func latestProductUsage(for productIDs: [String], asOf: Date) throws -> [Data: AssetDateEvidence] {
+    public func latestProductUsage(for productIDs: [String], asOf: Date,
+                                   savedProjectOnly: Bool = false) throws -> [Data: AssetDateEvidence] {
         guard productIDs.count <= 2048 else { throw AssetDateEvidenceError.tooManyRecords }
         let db = try CatalogDatabase(url)
         var owners: [Data: String] = [:]
@@ -523,7 +1192,8 @@ public actor CatalogStore {
         var result: [Data: AssetDateEvidence] = [:]
         let nodes = owners.keys.map { String(decoding: $0, as: UTF8.self) }.sorted()
         for offset in stride(from: 0, to: nodes.count, by: 2048) {
-            let records = try latestHostUsage(for: Array(nodes[offset..<min(offset + 2048, nodes.count)]), asOf: asOf)
+            let records = try latestHostUsage(for: Array(nodes[offset..<min(offset + 2048, nodes.count)]),
+                                              asOf: asOf, savedProjectOnly: savedProjectOnly)
             for (node, record) in records {
                 guard let product = owners[node] else { continue }
                 let key = Data(product.utf8)
@@ -629,7 +1299,7 @@ public actor CatalogStore {
     }
 
     private nonisolated func readDateEvidence(_ db: CatalogDatabase, for nodeID: String, asOf: Date) throws -> [AssetDateEvidence] {
-        guard try !db.rows("SELECT id FROM nodes WHERE id=?", [nodeID]).isEmpty else { throw CatalogStoreError.invalid }
+        guard try !db.rows("SELECT subject_id FROM date_subjects WHERE subject_id=?", [nodeID]).isEmpty else { throw CatalogStoreError.invalid }
         let rows = try db.dateRows("SELECT source_id,evidence_id,subject_id,payload FROM date_evidence WHERE subject_id=? ORDER BY source_id,evidence_id LIMIT 10001", [nodeID])
         let records = try rows.map(decodeDateEvidence)
         _ = try AssetDateResolver.summarize(records, for: nodeID, asOf: asOf)
@@ -702,12 +1372,12 @@ public actor CatalogStore {
             }
             // Children carry their own observation dates: an offline scan must not win
             // over a newer patch/member merely because its containing scope was saved later.
-            let children = try db.rows("SELECT id,payload,observed_at FROM instruments WHERE node_id=? ORDER BY observed_at DESC", [row[1]])
+            let children = try db.rows("SELECT id,payload,observed_at,usage_subject_id FROM instruments WHERE node_id=? ORDER BY observed_at DESC", [row[1]])
             var childIDs = Set<String>()
             for child in children where childIDs.insert(child[0]).inserted {
                 let instrument = try decode(LibraryInstrument.self, child[1])
                 guard scope.includes(kind: "library", path: instrument.path) else { continue }
-                try db.run("INSERT INTO instruments(scope_id,node_id,id,payload,generation,observed_at) VALUES(?,?,?,?,'retained',?) ON CONFLICT(scope_id,node_id,id) DO UPDATE SET payload=excluded.payload,generation=excluded.generation,observed_at=excluded.observed_at WHERE excluded.observed_at>instruments.observed_at", [scope.key, row[1], child[0], child[1], child[2]])
+                try db.run("INSERT INTO instruments(scope_id,node_id,id,payload,generation,observed_at,usage_subject_id) VALUES(?,?,?,?,'retained',?,?) ON CONFLICT(scope_id,node_id,id) DO UPDATE SET payload=excluded.payload,generation=excluded.generation,observed_at=excluded.observed_at WHERE excluded.observed_at>instruments.observed_at", [scope.key, row[1], child[0], child[1], child[2], child[3]])
                 for member in try db.rows("SELECT path,MAX(observed_at) FROM physical_members WHERE node_id=? AND instrument_id=? GROUP BY path", [row[1], child[0]]) {
                     try db.run("INSERT INTO physical_members(scope_id,node_id,instrument_id,path,generation,observed_at) VALUES(?,?,?,?,'retained',?) ON CONFLICT(scope_id,node_id,instrument_id,path) DO UPDATE SET generation=excluded.generation,observed_at=excluded.observed_at WHERE excluded.observed_at>physical_members.observed_at", [scope.key, row[1], child[0], member[0], member[1]])
                 }
@@ -727,7 +1397,8 @@ public actor CatalogStore {
                 let saved = try decode(ScanReport.self, row[2])
                 let section = ScanReport(schemaVersion: saved.schemaVersion, assets: [],
                     projects: kind == .sample ? saved.projects : [], sampleInclusions: kind == .sample ? saved.sampleInclusions : [],
-                    issues: saved.issues.filter { $0.kind == kind || $0.kind == nil }, durationSeconds: 0)
+                    issues: saved.issues.filter { $0.kind == kind || $0.kind == nil }, durationSeconds: 0,
+                    sampleInclusionsDerived: kind == .sample ? saved.sampleInclusionsDerived : nil)
                 evidence = section.merging(previous: evidence, scannedKinds: [kind])
                 // Only equal observations transfer freshness. Newer incompatible observations
                 // stay retained/stale; no observation or baseline timestamp is advanced.
@@ -849,8 +1520,11 @@ public actor CatalogStore {
                     lastSeen: Date(timeIntervalSince1970: last), baseline: row[4] == "1", stale: stale,
                     addition: try additions[Data(row[0].utf8)] ?? AdditionDateEvidence(basis: .presentBy, lower: nil, upper: Date(timeIntervalSince1970: first)))
             }
+            let inclusions = evidence.sampleInclusionsDerived == true
+                ? ScanReport.deriveSampleInclusions(assets: assets.filter { $0.catalogStale != true }, projects: evidence.projects)
+                : evidence.sampleInclusions
             let report = ScanReport(schemaVersion: evidence.schemaVersion, assets: assets, projects: evidence.projects,
-                sampleInclusions: evidence.sampleInclusions, issues: evidence.issues, durationSeconds: evidence.durationSeconds)
+                sampleInclusions: inclusions, issues: evidence.issues, durationSeconds: evidence.durationSeconds)
             let metadataRows = try db.rows("SELECT subject,payload FROM metadata_overrides WHERE node_id IN (SELECT node_id FROM scope_members WHERE scope_id=?)", [scope.key])
             var metadata = try Dictionary(uniqueKeysWithValues: metadataRows.map { ($0[0], try decode(MusicalMetadata.self, $0[1]).validated()) })
             let productRows = try db.rows("SELECT id,metadata,CAST(earliest_date AS TEXT),name FROM plugin_products")
@@ -912,16 +1586,19 @@ private final class CatalogDatabase {
         }
         do {
             sqlite3_busy_timeout(handle, 250)
-            sqlite3_limit(handle, SQLITE_LIMIT_LENGTH, 16 * 1024 * 1024)
+            // A 99,000-sample scan can produce about 20 MiB of per-sample reference
+            // evidence in the single scope row. Keep a bounded cell above that size;
+            // rows() also enforces its separate 128 MiB total-result limit.
+            sqlite3_limit(handle, SQLITE_LIMIT_LENGTH, 32 * 1024 * 1024)
             let version = try rows("PRAGMA user_version").first?.first
             let application = try rows("PRAGMA application_id").first?.first
             if version == "0", application == "0" {
                 guard try rows("SELECT name FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'").isEmpty else { throw CatalogStoreError.incompatible }
                 try transaction {
                     try execute(Self.schema)
-                    try execute("PRAGMA application_id=\(Self.applicationID); PRAGMA user_version=5")
+                    try execute("PRAGMA application_id=\(Self.applicationID); PRAGMA user_version=6")
                 }
-            } else if application != String(Self.applicationID) || !["1", "2", "3", "4", "5"].contains(version ?? "") { throw CatalogStoreError.incompatible }
+            } else if application != String(Self.applicationID) || !["1", "2", "3", "4", "5", "6"].contains(version ?? "") { throw CatalogStoreError.incompatible }
             if let version, ["1", "2", "3", "4"].contains(version) {
                 try transaction {
                     guard try rows("PRAGMA user_version").first?.first == version else { throw CatalogStoreError.busy }
@@ -958,6 +1635,26 @@ private final class CatalogDatabase {
                     try execute("PRAGMA user_version=5")
                 }
             }
+            if try rows("PRAGMA user_version").first?.first == "5" {
+                try transaction {
+                    guard try rows("PRAGMA user_version").first?.first == "5" else { throw CatalogStoreError.busy }
+                    let backupURL = url.deletingLastPathComponent().appendingPathComponent("catalog-v5-backup-" + UUID().uuidString + ".sqlite")
+                    let target = try CatalogDatabase(backupURL)
+                    var reader: OpaquePointer?
+                    defer { if let reader { sqlite3_close(reader) } }
+                    guard sqlite3_open_v2(url.path, &reader, SQLITE_OPEN_READONLY | SQLITE_OPEN_NOFOLLOW, nil) == SQLITE_OK,
+                          let backup = sqlite3_backup_init(target.handle, "main", reader, "main") else { throw CatalogStoreError.unavailable }
+                    let copied = sqlite3_backup_step(backup, -1); let finished = sqlite3_backup_finish(backup)
+                    guard copied == SQLITE_DONE, finished == SQLITE_OK,
+                          try target.rows("PRAGMA user_version").first?.first == "5",
+                          try target.rows("PRAGMA quick_check").first?.first == "ok" else { throw CatalogStoreError.unavailable }
+                    try migrateUsageSubjects()
+                    try execute("PRAGMA user_version=6")
+                }
+            }
+            // These predicates run once per discovered asset during ingest. Both
+            // indexes are also installed for existing v5 catalogs on first open.
+            try execute(Self.lookupIndexes)
             try execute("PRAGMA foreign_keys=ON; PRAGMA synchronous=FULL")
         } catch {
             sqlite3_close(handle); handle = nil; throw error
@@ -998,6 +1695,24 @@ private final class CatalogDatabase {
             let metadata = try MusicalMetadata(fields: facets).validated()
             try run("UPDATE plugin_products SET metadata=? WHERE id=?", [String(decoding: try encoder.encode(metadata), as: UTF8.self), id])
         }
+    }
+    private func migrateUsageSubjects() throws {
+        try execute("ALTER TABLE instruments ADD COLUMN usage_subject_id TEXT;")
+        try execute(Self.dateSubjectsSchema)
+        try run("INSERT INTO date_subjects(subject_id,parent_node_id,kind,identity_key) SELECT id,id,'asset','' FROM nodes")
+        let decoder = JSONDecoder()
+        for row in try rows("SELECT node_id,id,payload FROM instruments ORDER BY node_id,id") {
+            guard row.count == 3, let instrument = try? decoder.decode(LibraryInstrument.self, from: Data(row[2].utf8)) else { throw CatalogStoreError.invalid }
+            let key = AssetUsageSubject.instrumentIdentityKey(instrument)
+            let subjectID = AssetUsageSubject.instrumentID(parentNodeID: row[0], identityKey: key)
+            try run("INSERT INTO date_subjects(subject_id,parent_node_id,kind,identity_key) VALUES(?,?,'instrument',?) ON CONFLICT(parent_node_id,kind,identity_key) DO NOTHING", [subjectID, row[0], key])
+            try run("UPDATE instruments SET usage_subject_id=? WHERE node_id=? AND id=?", [subjectID, row[0], row[1]])
+        }
+        try execute("ALTER TABLE date_evidence RENAME TO date_evidence_v5; DROP INDEX IF EXISTS date_evidence_subject;")
+        try execute(Self.currentDateEvidenceSchema)
+        try execute("INSERT INTO date_evidence(source_id,evidence_id,subject_id,payload) SELECT source_id,evidence_id,subject_id,payload FROM date_evidence_v5;")
+        try execute("DROP TABLE date_evidence_v5;")
+        guard try rows("PRAGMA foreign_key_check").isEmpty else { throw CatalogStoreError.invalid }
     }
     func transaction<T>(isolation: isolated (any Actor)? = #isolation, _ operation: () throws -> T) throws -> T {
         try execute("BEGIN IMMEDIATE")
@@ -1069,6 +1784,18 @@ private final class CatalogDatabase {
       PRIMARY KEY(source_id,evidence_id),FOREIGN KEY(subject_id) REFERENCES nodes(id));
     CREATE INDEX date_evidence_subject ON date_evidence(subject_id);
     """
+    static let dateSubjectsSchema = """
+    CREATE TABLE date_subjects(subject_id TEXT PRIMARY KEY,parent_node_id TEXT NOT NULL,kind TEXT NOT NULL CHECK(kind IN ('asset','instrument')),
+      identity_key TEXT NOT NULL,UNIQUE(parent_node_id,kind,identity_key),
+      FOREIGN KEY(parent_node_id) REFERENCES nodes(id));
+    CREATE INDEX date_subjects_parent ON date_subjects(parent_node_id,kind);
+    """
+    static let currentDateEvidenceSchema = """
+    CREATE TABLE date_evidence(source_id TEXT COLLATE BINARY NOT NULL,evidence_id TEXT COLLATE BINARY NOT NULL,
+      subject_id TEXT COLLATE BINARY NOT NULL,payload TEXT NOT NULL,
+      PRIMARY KEY(source_id,evidence_id),FOREIGN KEY(subject_id) REFERENCES date_subjects(subject_id));
+    CREATE INDEX date_evidence_subject ON date_evidence(subject_id);
+    """
     static let additionSchema = """
     CREATE TABLE scan_coverage(kind TEXT NOT NULL,root TEXT NOT NULL,exclusions TEXT NOT NULL,policy TEXT NOT NULL,root_identity TEXT NOT NULL,started REAL NOT NULL,finished REAL NOT NULL,PRIMARY KEY(kind,root,exclusions));
     CREATE TABLE node_addition_bounds(node_id TEXT PRIMARY KEY,payload TEXT NOT NULL,FOREIGN KEY(node_id) REFERENCES nodes(id));
@@ -1079,15 +1806,21 @@ private final class CatalogDatabase {
     CREATE INDEX plugin_products_identity ON plugin_products(identity_key);
     CREATE INDEX plugin_installations_product ON plugin_installations(product_id);
     """
+    static let lookupIndexes = """
+    CREATE INDEX IF NOT EXISTS nodes_kind_path ON nodes(kind,path);
+    CREATE INDEX IF NOT EXISTS nodes_product_kind ON nodes(product_key,kind);
+    CREATE INDEX IF NOT EXISTS members_scope_path ON scope_members(scope_id,path);
+    CREATE INDEX IF NOT EXISTS instruments_usage_subject ON instruments(scope_id,node_id,usage_subject_id);
+    """
     static let schema = """
     CREATE TABLE nodes(id TEXT PRIMARY KEY,identity TEXT UNIQUE NOT NULL,product_key TEXT NOT NULL,
       kind TEXT NOT NULL,path TEXT NOT NULL,first_seen REAL NOT NULL,last_seen REAL NOT NULL,baseline INTEGER NOT NULL);
-    CREATE TABLE instruments(scope_id TEXT NOT NULL,node_id TEXT NOT NULL,id TEXT NOT NULL,payload TEXT NOT NULL,generation TEXT NOT NULL,PRIMARY KEY(scope_id,node_id,id), FOREIGN KEY(node_id) REFERENCES nodes(id), FOREIGN KEY(scope_id) REFERENCES scopes(id) DEFERRABLE INITIALLY DEFERRED);
+    CREATE TABLE instruments(scope_id TEXT NOT NULL,node_id TEXT NOT NULL,id TEXT NOT NULL,usage_subject_id TEXT,payload TEXT NOT NULL,generation TEXT NOT NULL,PRIMARY KEY(scope_id,node_id,id), FOREIGN KEY(node_id) REFERENCES nodes(id), FOREIGN KEY(scope_id) REFERENCES scopes(id) DEFERRABLE INITIALLY DEFERRED);
     CREATE TABLE physical_members(scope_id TEXT NOT NULL,node_id TEXT NOT NULL,instrument_id TEXT NOT NULL,path TEXT NOT NULL,generation TEXT NOT NULL,PRIMARY KEY(scope_id,node_id,instrument_id,path), FOREIGN KEY(scope_id,node_id,instrument_id) REFERENCES instruments(scope_id,node_id,id));
     CREATE TABLE scopes(id TEXT PRIMARY KEY,configuration TEXT NOT NULL,evidence TEXT NOT NULL,saved_at REAL NOT NULL,generation TEXT NOT NULL,complete INTEGER NOT NULL);
     CREATE TABLE scope_members(scope_id TEXT NOT NULL,node_id TEXT NOT NULL,path TEXT NOT NULL,payload TEXT NOT NULL,generation TEXT NOT NULL,baseline INTEGER NOT NULL,PRIMARY KEY(scope_id,node_id), FOREIGN KEY(node_id) REFERENCES nodes(id), FOREIGN KEY(scope_id) REFERENCES scopes(id) DEFERRABLE INITIALLY DEFERRED);
     CREATE TABLE removals(path TEXT PRIMARY KEY);
     CREATE INDEX instruments_parent ON instruments(node_id);
     CREATE INDEX members_scope ON scope_members(scope_id);
-    """ + discoverySchema + dateEvidenceSchema + additionSchema + productSchema
+    """ + discoverySchema + dateSubjectsSchema + currentDateEvidenceSchema + additionSchema + productSchema + lookupIndexes
 }

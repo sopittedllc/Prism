@@ -60,12 +60,13 @@ private struct ProToolsNativeRestoreSummary: Decodable {
     let afterInsert = try #require(parsedByName["runtime-after-insert.log"])
     let afterRemove = try #require(parsedByName["runtime-after-remove.log"])
     let expectedNames = ["FabFilter Pro-Q 4", "Kontakt 8", "Diva"]
-    #expect(before.map(\.name).sorted() == (expectedNames + ["AudioInjection PlugIn"]).sorted())
-    #expect(before.filter { $0.name == "AudioInjection PlugIn" }.count == 1)
-    #expect(before.allSatisfy { $0.eventSourceID == ProToolsPluginUse.restoreV2SourceID })
+    #expect(before.filter { expectedNames.contains($0.name) }.map(\.name).sorted() == expectedNames.sorted())
+    #expect(before.filter { $0.name == "AudioInjection PlugIn" }.count == 3)
+    #expect(before.filter { $0.eventSourceID == ProToolsPluginUse.restoreV2SourceID }.count == 4)
     #expect(before.allSatisfy { $0.localTime?.dayKey == "2026-10-03" && $0.reportedDate == nil })
     #expect(!before.contains { $0.name == "Glow" }) // earlier kCantInstantiatePlugIn is not use
-    #expect(afterInsert == before && afterRemove == before) // Add/Free have no restore completion
+    #expect(afterInsert.count == before.count + 1 && afterRemove == afterInsert)
+    #expect(afterInsert.filter { $0.name == "FabFilter Pro-Q 4" && $0.eventSourceID == ProToolsPluginUse.attemptedSourceID }.count == 1)
 
     // Re-run production exact-name binding against current installed AAX inventory, but
     // stage captured logs under a private synthetic home so no live log or user catalog is touched.
@@ -94,8 +95,8 @@ private struct ProToolsNativeRestoreSummary: Decodable {
     let collection = ProToolsUsageCollector.collect(assets: snapshot.report.assets, home: privateHome)
     // The host-internal AudioInjection restore candidate has no unique installed AAX
     // asset, so the production collector correctly leaves it unbound in each snapshot.
-    #expect(collection.failures == snapshots.count)
-    #expect(collection.uses.map { $0.use.name }.sorted() == expectedNames.sorted())
+    #expect(collection.failures == snapshots.count * 3)
+    #expect(collection.uses.map { $0.use.name }.sorted() == (expectedNames + ["FabFilter Pro-Q 4"]).sorted())
     #expect(!collection.uses.contains { $0.use.name == "AudioInjection PlugIn" })
 
     let now = Date(), later = now.addingTimeInterval(5)
@@ -104,15 +105,16 @@ private struct ProToolsNativeRestoreSummary: Decodable {
         let asset = try #require(snapshot.report.assets.first { $0.path == bound.pluginPath })
         let id = try #require(asset.catalogID)
         let saved = try await store.recordProToolsUsage(bound, for: id, at: now)
-        #expect(saved.sourceID == ProToolsPluginUse.restoreV2SourceID)
-        #expect(saved.eventDate == nil && saved.proToolsUsage?.eventSourceID == ProToolsPluginUse.restoreV2SourceID)
+        #expect([ProToolsPluginUse.restoreV2SourceID, ProToolsPluginUse.attemptedSourceID].contains(saved.sourceID))
+        #expect(saved.eventDate == nil && saved.proToolsUsage?.eventSourceID == saved.sourceID)
         let replay = try await reopened.recordProToolsUsage(bound, for: id, at: later)
         #expect(replay == saved)
         let history = try await CatalogStore(url: isolatedCatalog).latestHostUsage(for: [id], asOf: later)
         #expect(history[Data(id.utf8)] == saved)
         let presentation = UsageDatePresentation(record: saved)
         #expect(presentation.value == "2026-10-03")
-        #expect(presentation.detail.contains("Pro Tools session restore"))
+        #expect(presentation.detail.contains(saved.sourceID == ProToolsPluginUse.attemptedSourceID
+            ? "Pro Tools plugin instantiation attempt" : "Pro Tools session restore"))
         #expect(presentation.detail.contains("time zone unknown"))
     }
 }

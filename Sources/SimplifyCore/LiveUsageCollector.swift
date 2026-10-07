@@ -68,12 +68,25 @@ public enum LivePluginCache {
             SELECT p.dev_identifier,m.path,p.version,m.fingerprint,CAST(p.enabled AS TEXT),CAST(p.scanstate AS TEXT),CAST(m.scanstate AS TEXT)
             FROM plugins p JOIN plugin_modules m ON p.module_id=m.module_id WHERE p.dev_identifier LIKE 'device:vst3:%' LIMIT 10001
             """, limit: 10000)
-        return try rows.map { row in
+        return try rows.compactMap { row in
+            guard row.count == 7 else { throw CatalogStoreError.invalid }
+            func state(_ text: String) -> Int? {
+                guard !text.isEmpty, text.utf8.count <= 10,
+                      text.utf8.allSatisfy({ (48...57).contains($0) }),
+                      let value = Int(text), value >= 0 else { return nil }
+                return value
+            }
+            guard let enabled = state(row[4]), let pluginScan = state(row[5]),
+                  let moduleScan = state(row[6]) else { throw CatalogStoreError.invalid }
+            // Live's cache has per-row scan states beyond Boolean values (the current
+            // schema includes module state 3). Only state 1 is a completed, enabled
+            // binding; other valid states do not invalidate independent usable rows.
+            guard enabled == 1, pluginScan == 1, moduleScan == 1 else { return nil }
             let parts = row[0].split(separator: ":", omittingEmptySubsequences: false)
             guard parts.count == 4, parts[0] == "device", parts[1] == "vst3", ["instr", "audiofx"].contains(parts[2]),
                   parts[3].utf8.allSatisfy({ (48...57).contains($0) || (65...70).contains($0) || (97...102).contains($0) || $0 == 45 }),
                   HostUsageProvenance.validClassID(String(parts[3]).uppercased()), row[1].hasPrefix("/"), row[1].hasSuffix(".vst3"),
-                  row[4] == "1", row[5] == "1", row[6] == "1" else { throw CatalogStoreError.invalid }
+                  !row[2].isEmpty, !row[3].isEmpty else { throw CatalogStoreError.invalid }
             return Entry(classID: String(parts[3]).uppercased(), path: row[1], version: row[2], fingerprint: row[3])
         }
     }

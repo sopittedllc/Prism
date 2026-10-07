@@ -12,11 +12,12 @@ let package = Package(
     targets: [
         .systemLibrary(name: "CZlib"),
         .systemLibrary(name: "CSQLite"),
-        .target(name: "SimplifyCore", dependencies: ["CZlib", "CSQLite"]),
+        .target(name: "CFastLZ", publicHeadersPath: "include"),
+        .target(name: "SimplifyCore", dependencies: ["CZlib", "CSQLite", "CFastLZ"], resources: [.process("Resources")]),
         .target(name: "SimplifyCatalog", dependencies: ["SimplifyCore"]),
-        .executableTarget(name: "SimplifyApp", dependencies: ["SimplifyCatalog", "SimplifyCore"]),
+        .executableTarget(name: "SimplifyApp", dependencies: ["SimplifyCatalog", "SimplifyCore", "CSQLite"]),
         .executableTarget(name: "SimplifyProbe", dependencies: ["SimplifyCore"]),
-        .testTarget(name: "SimplifyCoreTests", dependencies: ["SimplifyCore"]),
+        .testTarget(name: "SimplifyCoreTests", dependencies: ["SimplifyCore", "CFastLZ"]),
         .testTarget(name: "SimplifyCatalogTests", dependencies: ["SimplifyCatalog", "SimplifyCore"]),
     ]
 )

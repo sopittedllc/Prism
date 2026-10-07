@@ -504,47 +504,6 @@
     },
     {
       "default": false,
-      "id": "online_tags",
-      "value_type": "boolean",
-      "introduced_in": 1,
-      "policies": {
-        "preset": {
-          "decision": "excluded",
-          "reason": "Collection browsing is not an audio preset. No serializer exists."
-        },
-        "project_persistence": "included",
-        "default_reset": "included",
-        "migration": "included",
-        "undo": {
-          "decision": "excluded",
-          "reason": "View navigation/filter changes can be directly reversed; no document mutation."
-        },
-        "automation": {
-          "decision": "excluded",
-          "reason": "No DAW automation surface for browser state."
-        },
-        "copy_paste": {
-          "decision": "excluded",
-          "reason": "Native search/path text controls handle text; no structured state clipboard."
-        },
-        "sync": {
-          "decision": "excluded",
-          "reason": "Local session only; no account or sync."
-        },
-        "accessibility": "included",
-        "privacy": "included",
-        "analytics": {
-          "decision": "excluded",
-          "reason": "No telemetry is collected."
-        },
-        "export_import": {
-          "decision": "excluded",
-          "reason": "No GUI state export/import; CLI reports are separate immutable observations."
-        }
-      }
-    },
-    {
-      "default": false,
       "id": "sort_reversed",
       "value_type": "boolean",
       "introduced_in": 1,
@@ -649,15 +608,15 @@
         },
         "default_reset": {
           "decision": "included",
-          "reason": "Empty on first run. Session Reset does not delete the durable catalog."
+          "reason": "Empty on first run. Session Reset retains the durable catalog, including qualified patch techniques and unassociated physical SINE pairs."
         },
         "migration": {
           "decision": "included",
-          "reason": "SQLite schema version 1; initialize only empty schema; reject unknown versions without replacing. No previous released catalog."
+          "reason": "Existing catalog schema is unchanged; older instrument JSON without extraction coverage decodes to unknown and legacy labels are not presented as verified choices. Older library metadata without physical pair paths remains valid. Unsupported SQLite versions are rejected without replacement."
         },
         "undo": {
           "decision": "excluded",
-          "reason": "Derived scan observations and recoverable removal intents; no editable user tags in this increment."
+          "reason": "Derived articulation labels have no independent edits; patch tag overrides keep existing session Undo."
         },
         "automation": {
           "decision": "excluded",
@@ -673,7 +632,7 @@
         },
         "accessibility": {
           "decision": "included",
-          "reason": "Cached/stale/errors use existing native status and inspector text. Measured plugin logical bytes and grouped Partial/Unknown coverage appear in row, inspector and format details; no new custom controls."
+          "reason": "Native outline exposes named choices only for indexed coverage; singleton choices use the patch row and multi-choice patches disclose children with source and maker breadcrumbs. Techniques have no independent size, date or use claim."
         },
         "privacy": {
           "decision": "included",
@@ -685,7 +644,7 @@
         },
         "export_import": {
           "decision": "included",
-          "reason": "Consistent local SQLite backup API; no import/merge UI yet."
+          "reason": "Consistent local SQLite backup includes instrument JSON and optional derived articulation lists; no import/merge UI."
         }
       }
     },
@@ -984,7 +943,7 @@
         },
         "undo": {
           "decision": "excluded",
-          "reason": "Derived vendor cache is not a user edit; disabling online tags excludes its suggestions."
+          "reason": "Derived vendor cache is not a user edit; manual overrides take precedence over offline suggestions."
         },
         "automation": {
           "decision": "excluded",
@@ -1033,7 +992,7 @@
         },
         "migration": {
           "decision": "included",
-          "reason": "SQLite v1-v4 migrates transactionally to v5 with a verified pre-migration backup. Existing source-bound evidence and exact-root scan bounds remain intact; future versions remain untouched."
+          "reason": "SQLite v1-v5 migrates transactionally through ordered migrations to v6 with a verified pre-migration backup. Existing source-bound evidence payloads remain byte-identical, and current exact subjects are registered."
         },
         "undo": {
           "decision": "excluded",
@@ -1053,7 +1012,7 @@
         },
         "accessibility": {
           "decision": "included",
-          "reason": "One short qualified Date added and Last used value appears per sound. Finder Date Added covers physical plugins, samples, libraries and exact instruments when available; historical plugin dates and valid use persist on the canonical product. Unknown and saved values are labeled without an inspector history wall."
+          "reason": "Shared Last Used projections show source, exact item scope, local date, partial coverage and saved/unavailable status for plugins, samples, libraries and instruments."
         },
         "privacy": {
           "decision": "included",
@@ -1065,7 +1024,63 @@
         },
         "export_import": {
           "decision": "included",
-          "reason": "Existing consistent local SQLite backup includes the ledger and optional receipt provenance; no import/merge feature. Optional host provenance and addition bounds are included in the same backup."
+          "reason": "Consistent local SQLite backup includes history and its exact-subject registry; no import/merge feature."
+        }
+      }
+    },
+    {
+      "id": "catalog.date_subjects",
+      "value_type": "object",
+      "default": {},
+      "introduced_in": 6,
+      "policies": {
+        "preset": {
+          "decision": "excluded",
+          "reason": "Evidence is local catalog history, not an audio preset."
+        },
+        "project_persistence": {
+          "decision": "excluded",
+          "reason": "Stored in the private application catalog, never a DAW project."
+        },
+        "default_reset": {
+          "decision": "included",
+          "reason": "Registry is seeded from exact catalog nodes and retained instrument records during migration. Session reset retains the catalog and evidence subjects."
+        },
+        "migration": {
+          "decision": "included",
+          "reason": "SQLite v5 migrates transactionally to v6 with a verified pre-migration backup. Asset subject IDs and existing evidence payloads remain byte-identical; instrument subjects are scoped to exact owning library identity."
+        },
+        "undo": {
+          "decision": "excluded",
+          "reason": "Immutable source evidence, no user-edit or correction feature in this increment."
+        },
+        "automation": {
+          "decision": "excluded",
+          "reason": "Internal registry populated atomically with inventory ingest; no external automation command or background service."
+        },
+        "copy_paste": {
+          "decision": "excluded",
+          "reason": "No evidence clipboard interface."
+        },
+        "sync": {
+          "decision": "excluded",
+          "reason": "Local only; no account or synchronization."
+        },
+        "accessibility": {
+          "decision": "included",
+          "reason": "Subject identity is internal; visible Last Used derives from evidence attached to that exact asset or instrument."
+        },
+        "privacy": {
+          "decision": "included",
+          "reason": "Private local SQLite registry contains opaque IDs, exact instrument identity keys, and owning catalog node references. No upload."
+        },
+        "analytics": {
+          "decision": "excluded",
+          "reason": "No analytics or telemetry collected."
+        },
+        "export_import": {
+          "decision": "included",
+          "reason": "Registry and history are included in consistent local SQLite backups; no import/merge feature."
         }
       }
     },
@@ -1123,6 +1138,82 @@
           "decision": "included",
           "reason": "Consistent local SQLite backup API; no import/merge UI yet."
         }
+      }
+    },
+    {
+      "id": "catalog.discovery_journal",
+      "value_type": "object",
+      "default": {},
+      "introduced_in": 5,
+      "policies": {
+        "preset": {
+          "decision": "excluded",
+          "reason": "Private library scan progress has no audio preset meaning."
+        },
+        "project_persistence": {
+          "decision": "excluded",
+          "reason": "Private application work journal, never a DAW project."
+        },
+        "default_reset": {
+          "decision": "included",
+          "reason": "Empty on first run; explicit collection Reset deletes all journals. A cancelled scan retains committed work for a compatible retry."
+        },
+        "migration": {
+          "decision": "included",
+          "reason": "The journal has its own versioned source identity. Policy or source changes discard it and rebuild without migrating catalog history."
+        },
+        "undo": {
+          "decision": "excluded",
+          "reason": "Derived, disposable traversal progress has no user edits."
+        },
+        "automation": {
+          "decision": "excluded",
+          "reason": "Internal scan only; no external automation command."
+        },
+        "copy_paste": {
+          "decision": "excluded",
+          "reason": "No journal clipboard interface."
+        },
+        "sync": {
+          "decision": "excluded",
+          "reason": "Local work only; no account or synchronization."
+        },
+        "accessibility": {
+          "decision": "included",
+          "reason": "Cancellation announces that the next scan resumes saved indexing; progress remains available during scanning."
+        },
+        "privacy": {
+          "decision": "included",
+          "reason": "Private 0700 directory and 0600 SQLite journal contain local paths and derived names only; no audio or vendor payload is copied or transmitted."
+        },
+        "analytics": {
+          "decision": "excluded",
+          "reason": "No telemetry collected."
+        },
+        "export_import": {
+          "decision": "excluded",
+          "reason": "Disposable traversal work is rebuilt when needed; catalog backup contains only completed observations."
+        }
+      }
+    },
+    {
+      "id": "catalog.decoded_facts",
+      "value_type": "object",
+      "default": {},
+      "introduced_in": 6,
+      "policies": {
+        "preset": { "decision": "excluded", "reason": "Derived metadata has no audio preset meaning." },
+        "project_persistence": { "decision": "excluded", "reason": "Private application cache, never a DAW project." },
+        "default_reset": { "decision": "included", "reason": "Empty by default; collection Reset deletes the disposable SQLite file." },
+        "migration": { "decision": "included", "reason": "Reader policy versions invalidate facts; catalog history does not migrate through this cache." },
+        "undo": { "decision": "excluded", "reason": "Derived metadata contains no user edit." },
+        "automation": { "decision": "excluded", "reason": "Internal scan only." },
+        "copy_paste": { "decision": "excluded", "reason": "No cache clipboard interface." },
+        "sync": { "decision": "excluded", "reason": "Local disposable work only." },
+        "accessibility": { "decision": "excluded", "reason": "The cache has no independent UI; scan progress is accessible separately." },
+        "privacy": { "decision": "included", "reason": "Private 0700 directory and 0600 SQLite file store bounded decoded metadata and local paths, never original payload bytes or remote data." },
+        "analytics": { "decision": "excluded", "reason": "No telemetry collected." },
+        "export_import": { "decision": "excluded", "reason": "Disposable facts are rebuilt; catalog export excludes the cache." }
       }
     }
   ]

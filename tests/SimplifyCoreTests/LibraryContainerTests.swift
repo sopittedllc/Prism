@@ -26,7 +26,7 @@ private final class ContainerFixture {
     let manifest = try f.file(product + "/Example.nicnt", "<ProductHints><Product><Name>Example Folk</Name><Company>Example Maker</Company></Product></ProductHints>")
     let patch = try f.file(product + "/Instruments/Accordion.nki")
     try f.file(product + "/Samples/Not an instrument.nki")
-    var request = ScanRequest(); request.libraries = [f.root.appendingPathComponent("Disk")]
+    var request = ScanRequest(); request.libraryScanMode = .boundedDiagnostic; request.libraries = [f.root.appendingPathComponent("Disk")]
     let ancestor = f.scan(request)
     request.libraries = [f.root.appendingPathComponent(product)]
     let direct = f.scan(request)
@@ -46,7 +46,7 @@ private final class ContainerFixture {
     let product = "Disk/Samples/Collection/Example Strings"
     let patch = try f.file(product + "/Instruments/Violin.nki")
     try f.file(product + "/Samples/Decoy.nki")
-    var request = ScanRequest(); request.libraries = [f.root.appendingPathComponent("Disk")]
+    var request = ScanRequest(); request.libraryScanMode = .boundedDiagnostic; request.libraries = [f.root.appendingPathComponent("Disk")]
     let result = f.scan(request)
     #expect(result.assets.count == 1 && result.issues.isEmpty)
     #expect(result.assets.first?.libraryMetadata?.identity?.evidence == .proposed)
@@ -64,7 +64,7 @@ private final class ContainerFixture {
     let linkedRoot = f.root.appendingPathComponent("LinkedRoot")
     try FileManager.default.createDirectory(at: linkedRoot, withIntermediateDirectories: true)
     try FileManager.default.createSymbolicLink(at: linkedRoot.appendingPathComponent("Samples"), withDestinationURL: f.root.appendingPathComponent("Actual"))
-    var request = ScanRequest(); request.libraries = [linkedRoot]
+    var request = ScanRequest(); request.libraryScanMode = .boundedDiagnostic; request.libraries = [linkedRoot]
     #expect(f.scan(request).assets.isEmpty)
     try f.file("Disk/Samples/Collection/Instruments/Banjo.nki")
     try f.file("Disk/Samples/Collection/Samples/payload.wav")
@@ -77,4 +77,21 @@ private final class ContainerFixture {
     #expect(shallow.assets.isEmpty && shallow.issues.contains { $0.reason.contains("depth limit") })
     request.maximumDepth = 64
     #expect(f.scan(request).assets.count == 1)
+}
+
+@Test func completeLibraryTraversalFindsEveryPresetBeyondDiagnosticBudgets() throws {
+    let f = try ContainerFixture()
+    try f.file("Library/Example.nicnt", "<ProductHints><Product><Name>Example</Name><Company>Maker</Company></Product></ProductHints>")
+    let deep = "Library/" + Array(repeating: "Nested", count: 36).joined(separator: "/")
+    var expected = Set<String>()
+    for path in ["Library/Instruments/Instrument.nki", "Library/Multis/Ensemble.nkm",
+                 "Library/Snapshots/Variant.nksn", "Library/Samples/Actual instrument.nki", deep + "/Deep.nki"] {
+        expected.insert(try f.file(path).path)
+    }
+    for index in 0..<2001 { expected.insert(try f.file("Library/Instruments/Patch \(index).nki").path) }
+    var request = ScanRequest(); request.libraries = [f.root]; request.maximumEntries = 2; request.maximumDepth = 1
+    let result = f.scan(request)
+    #expect(result.issues.isEmpty)
+    #expect(result.assets.count == 1)
+    #expect(Set(result.assets.flatMap { $0.libraryMetadata?.instruments.map(\.path) ?? [] }) == expected)
 }

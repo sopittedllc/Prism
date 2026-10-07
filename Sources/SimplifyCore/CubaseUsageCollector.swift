@@ -16,6 +16,18 @@ public struct CubaseUsageCollection: Sendable, Equatable {
 /// open projects, execute plugins, or transmit source data.
 public enum CubaseUsageCollector {
     public static let maximumLogBytes = 64 * 1024 * 1024
+    /// Modification time selects a bounded recent source window; event dates come
+    /// exclusively from qualified records inside the selected logs.
+    static func recentLogs(_ entries: [URL]) -> [URL] {
+        let json = entries.filter { $0.pathExtension == "json" }
+        let dated: [(URL, Date)] = json.map { url in
+            let date = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? .distantPast
+            return (url, date)
+        }
+        return dated.sorted { left, right in
+            left.1 == right.1 ? left.0.path > right.0.path : left.1 > right.1
+        }.prefix(16).map(\.0)
+    }
     public static func collect(home: URL = FileManager.default.homeDirectoryForCurrentUser) -> CubaseUsageCollection {
         let logRoot = home.appendingPathComponent("Library/Logs/Steinberg/usagelogger")
         let cache = home.appendingPathComponent("Library/Preferences/Cubase 15/Cubase Pro VST3 Cache (arm64)/vst3plugins.xml")
@@ -26,7 +38,7 @@ public enum CubaseUsageCollector {
             return CubaseUsageCollection(uses: [], failures: 1, unavailable: true)
         }
         var uses: [CubaseBoundPluginUse] = [], failures = 0, total = 0
-        for url in entries.filter({ $0.pathExtension == "json" }).sorted(by: { $0.path < $1.path }).prefix(16) {
+        for url in recentLogs(entries) {
             guard let attrs = try? FileManager.default.attributesOfItem(atPath: url.path),
                   let size = attrs[.size] as? NSNumber, size.intValue <= maximumLogBytes,
                   let data = try? Data(contentsOf: url), data.count <= maximumLogBytes else { failures += 1; continue }

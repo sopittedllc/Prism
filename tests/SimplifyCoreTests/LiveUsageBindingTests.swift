@@ -89,6 +89,15 @@ private func usageEvent(_ cid: String, qualification: String = HostUsageProvenan
         """)
     let entries = try LivePluginCache.read(db)
     #expect(entries.count == 1 && entries[0].classID == "12345678-1234-5678-ABCD-123456789ABC")
+    try usageSQL(db, """
+        INSERT INTO plugin_modules VALUES(2,'/fixtures/Disabled.vst3','2:3',1);
+        INSERT INTO plugins VALUES(2,'device:vst3:audiofx:AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE','1.0',0,1);
+        INSERT INTO plugin_modules VALUES(3,'/fixtures/Unscanned.vst3','3:4',0);
+        INSERT INTO plugins VALUES(3,'device:vst3:audiofx:FFFFFFFF-BBBB-CCCC-DDDD-EEEEEEEEEEEE','1.0',1,0);
+        INSERT INTO plugin_modules VALUES(4,'/fixtures/OtherState.vst3','4:5',3);
+        INSERT INTO plugins VALUES(4,'device:vst3:audiofx:11111111-BBBB-CCCC-DDDD-EEEEEEEEEEEE','1.0',1,1);
+        """)
+    #expect(try LivePluginCache.read(db).map(\.classID) == ["12345678-1234-5678-ABCD-123456789ABC"])
     #expect(throws: CatalogStoreError.self) { try LivePluginCache.read(db, deadline: 0) }
     try usageSQL(db, "UPDATE version SET version=2")
     #expect(throws: CatalogStoreError.self) { try LivePluginCache.read(db) }

@@ -106,7 +106,7 @@ prove two products sharing one physical file retain separate selection.
 ## Persistent inventory catalog (schema 1)
 
 This supersedes the session-only lifetime of derived inventory above. Setup keeps its
-existing JSON registry. CatalogPersistenceRegistry is the runtime authority for four
+existing JSON registry. CatalogPersistenceRegistry is the runtime authority for catalog
 logical field groups, mirrored under catalog_fields in feature-registry.json and checked
 by catalog_state_check.py:
 
@@ -116,6 +116,11 @@ by catalog_state_check.py:
 | catalog.observations | Global first/last seen, per-scope baseline, generation-derived stale flags |
 | catalog.scopes | Exact selected roots, last final evidence snapshot, saved date, complete-baseline state |
 | catalog.removal_intents | Explicit plugin paths excluded before reviewed Trash starts |
+| catalog.date_evidence | Immutable source-qualified dates and access outcomes |
+| catalog.date_subjects | Exact asset and library-scoped instrument evidence subjects |
+| catalog.plugin_products | Verified plugin identity and installation lineage |
+| catalog.discovery_journal | Disposable work file for resumable local discovery |
+| catalog.decoded_facts | Disposable, source-stamped decoded metadata cache |
 
 All are local app data, excluded from audio presets, DAW project persistence, external
 automation, structured clipboard, sync and telemetry. Empty database defaults; Reset
@@ -189,32 +194,42 @@ per field and 80 characters per value; BPM is one finite positive number at most
 Root baseline coverage records nested opposite-category exclusions, so changing a folder
 from samples to libraries (or back) establishes indexing rather than inventing acquisitions.
 
+Derived `LibraryInstrument.articulations` and `articulationCoverage` belong to the
+existing `catalog.inventory` group and patch identity. Older payloads decode to
+unknown coverage, even if they contain a legacy label list; unknown labels are not
+presented as verified choices. SQLite and setup schemas do not change. Coverage
+records indexed, known-empty or unknown status, adapter/version and, for supported
+Kontakt files, a source stamp checked before and after parsing and at catalog commit.
+The derived list stores stable source-local IDs, factual titles and source labels from
+verified SINE instrument relations, reviewed exact Kontakt individual-patch mappings,
+or a versioned Spitfire numbered brush relation. Rest-shell placeholders are excluded.
+A cached restore preserves qualified labels, while an unobserved patch and its children
+share stale status. New final scans replace the derived list from current qualified
+evidence. No articulation owns a separate file,
+size, date, usage, tag override or removal target. Finder and patch metadata edits
+resolve through the owning instrument. This is local inventory in the existing backup
+and privacy policy, excluded from presets, DAW projects, automation, sync, telemetry
+and structured clipboard. Existing patch-tag Undo remains the only metadata Undo;
+navigation selection/expansion is session-only and inherits `outline_state` policy.
+
 Usage filter (`usage_filter`, default `all`) is session-only browser navigation.
 It shares query policies: resettable, accessible, local; excluded from persistence,
 presets, undo, automation, sync, analytics and export. Category changes and Clear
 filters reset it. Only all/unknown are supported until verified host evidence exists;
 no new durable usage or installation-date schema is introduced by this UI slice.
 
-Online product metadata uses persisted `online_tags` (default false) in local setup
-version1; missing keys on older setup default false. It is excluded from presets/DAW
-automation/undo/sync/analytics/export and included in local persistence, reset,
-accessibility and privacy. Reset disables in session; explicit checkbox changes persist
-through the existing setup writer. Requests use only reviewed official product endpoints;
-no local inventory, filenames, samples, credentials or cookies are sent.
-
-`catalog.product_tags` is a derived sidecar cache with its own version1 envelope,
-introduced alongside catalog schema2 without changing SQLite. It stores source ID,
-reviewed-description digest and fetch date; taxonomy/source URLs come from reviewed
-adapters. Missing means local-only suggestions. Structurally invalid/future cache is preserved and
-reported; valid records for retired or updated descriptors expire individually. Seven-day freshness, offline retention with dates, atomic writes; disabling
-online tags retains cache but excludes its suggestions. Source descriptions changing
-fail closed, with prior cached suggestions still dated. User overrides and empty
-suppression take precedence. Product descriptions never propagate to individual patches.
+Product tags use the bundled local catalog, user edits, and compatible historical caches.
+The retired `online_tags` setup key is ignored when older settings are read and is
+omitted on the next save. No product lookup or tag network request runs in the app.
+`catalog.product_tags` and the former shared catalog sidecar remain decodable so
+previously fetched suggestions can still work offline. Invalid cache data is rejected
+without replacing the last good file. Manual overrides, including intentionally empty
+fields, take precedence over all derived facts. Product facts do not propagate to
+individual patches without qualified articulation metadata.
 
 `sort_reversed` is session navigation with default false; each column has a useful initial
 direction. Reset clears it, header indicators expose it accessibly, and no persisted
-schema changes. Its full policy mirrors sort in the feature registry. Tag settings
-popover visibility is transient presentation; online_tags remains the persisted opt-in.
+schema changes. Its full policy mirrors sort in the feature registry. Tag popover visibility is transient presentation; there is no tag-network preference.
 
 Tag-pill add drafts and popover visibility are disposable presentation state, reset on
 close; they do not participate in persistence, migration, presets, automation, sync,
@@ -254,7 +269,7 @@ context menu; pills remain the normal editing route.
 ## Qualified date evidence (catalog schema 3)
 
 `catalog.date_evidence` is local immutable source history keyed by source/event IDs
-and exact existing catalog node IDs. It is empty by default and on v1/v2 migration;
+and exact registered asset or instrument subject IDs. Schema 6 adds `catalog.date_subjects`; asset IDs remain node IDs, while instrument IDs are deterministic and scoped to their owning library plus exact vendor ID or path. It is empty by default and on v1/v2 migration;
 first discovery is never promoted into installation or use. Session reset and offline
 scans retain the ledger. Native SQLite tests cover migration with pre-change backup,
 reopen, verified moves, replacement isolation, local backup, corruption and atomic
@@ -325,3 +340,80 @@ cancel collection; read/scan generations reject stale publication and stale task
 Polling is 60 seconds only while the app runs, bounded and changed-source gated. No host
 is launched or automated by production collection. No presets, undo, DAW automation,
 clipboard, telemetry, sync or external export changes; consistent backups include it.
+
+### Library discovery journal
+
+`catalog.discovery_journal` is a separate, disposable SQLite work file under the
+private catalog directory. The native registry and feature registry declare every
+cross-cutting policy. It stores completed directory records, derived patch identities,
+and the remaining frontier in bounded transactions. A cancelled scan keeps committed
+work; no partial directory becomes catalog coverage. An exact scope, scan policy,
+root identity, SINE catalog identity, and every completed directory/candidate stamp
+must still agree before replay. A mismatch discards the journal and restarts discovery.
+Transient source errors disable further checkpoints for that pass while discovery
+continues; they cannot establish a complete baseline. Session Reset deletes journals;
+completed catalog history remains. The journal is local only, excluded from presets,
+projects, undo, automation, clipboard, sync, telemetry and backup/export.
+
+`catalog.decoded_facts` is a separate private
+SQLite file beside the journal. It holds bounded decoded metadata only, with policy
+and dependency stamps including observed absent sidecars. The scan rechecks current
+physical content, ownership and source stamps; cached facts cannot establish removal
+or availability. Cancellation, unstable reads and cache damage fail to a fresh read
+or incomplete coverage. Reset deletes the file and policy changes invalidate entries.
+
+### Four-step onboarding and complete coverage
+
+First-run navigation now has Sample Libraries, optional Individual Sounds, optional
+Projects, and Review & Scan. The step, draft and focus are session-only; final Review
+still accepts the existing `roots`, `standard_plugins` and `onboarding_completed` IDs.
+Standard plugin discovery is automatic in production. Previously saved custom plugin
+roots remain visible and removable, but there is no new add control. Setup saves reject
+payloads above the existing 1 MiB read bound, leaving the prior file unchanged. Scanning
+reads local content only; it does not edit, upload or share user files.
+
+Normal file discovery ignores diagnostic entry/depth limits for sample, project and
+plugin roots, including retained legacy plugin roots. `completeFileScan` and the
+existing project/library diagnostic modes are transient request policy, excluded from
+presets, DAW projects, persistence, undo, automation, clipboard, sync, analytics and
+export. Reachable supported files are measured by metadata; failed measurement has a
+source issue. A measured candidate or shared-content basis never claims a complete
+product footprint, and unavailable/unsupported roots never authorize removal.
+
+New full-scan `catalog.scopes` evidence may set optional `sampleInclusionsDerived` and
+omit inclusion rows only after exact equality with rows derived from the incoming
+sample assets and bound project references. Restore reconstructs those rows from fresh
+current-generation sample members only; retained stale members acquire no new reference
+conclusion. Older evidence without the marker keeps its explicit rows, including
+unusual externally supplied rows. The marker changes no SQLite schema or registry ID;
+the 32 MiB per-cell and 128 MiB query bounds remain. Cancellation and source checks
+still guard the transaction. Backups include this local catalog representation; there
+is no preset, DAW, automation, clipboard, sync, analytics or network export.
+
+Unassociated SINE `.otmeta`/`.otarc` pairs are durable physical inventory in
+`catalog.inventory`, with literal paths, complete pair logical bytes and unresolved
+product identity. Their local stat fingerprint is checked at catalog commit and a
+changed pair starts a new physical observation without inheriting product history.
+They contain no invented instrument or articulation. Missing or
+linked mates and a missing local SINE database leave catalog coverage incomplete.
+An exact, unique later catalog pair binding replaces the unassociated scope row;
+physical observation alone never assigns a vendor product ID or transfers unrelated
+product history.
+
+### Exact item usage subjects (schema 6)
+
+The v5-to-v6 migration takes a verified pre-migration backup and transactionally creates
+`date_subjects`. Existing asset subject IDs and `date_evidence` source IDs, event IDs,
+subject IDs and payload text are copied unchanged. Existing instruments are seeded from
+the saved catalog payloads; IDs combine the owning library node with the exact vendor ID
+or exact instrument path, so equal vendor IDs in separate libraries remain isolated.
+New library instruments are registered in the same transaction as catalog ingest.
+
+Typed item access can represent opened, loaded, attempted and failed attempts with a
+separately qualified event time and ingestion time. Only explicitly recognized music-app
+bundle IDs are eligible; old untyped attempt records remain readable but do not count as
+Last Used. The app has no real general sample/patch observer yet: the ledger and UI path
+are testable, but source acquisition stays gated on controlled native host records and
+negative Quick Look, Preview and Splice sample-preview controls. No synthetic collector
+is installed. Last Used for a library can roll up a qualifying exact instrument event;
+that event never appears on siblings.

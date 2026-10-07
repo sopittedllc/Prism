@@ -18,7 +18,10 @@ public enum CatalogPersistenceRegistry {
         Field(id: "catalog.product_tags", value_type: "object", default: [:], introduced_in: 2),
         Field(id: "catalog.root_baselines", value_type: "object", default: [:], introduced_in: 2),
         Field(id: "catalog.date_evidence", value_type: "object", default: [:], introduced_in: 3),
+        Field(id: "catalog.date_subjects", value_type: "object", default: [:], introduced_in: 6),
         Field(id: "catalog.plugin_products", value_type: "object", default: [:], introduced_in: 5),
+        Field(id: "catalog.discovery_journal", value_type: "object", default: [:], introduced_in: 5),
+        Field(id: "catalog.decoded_facts", value_type: "object", default: [:], introduced_in: 6),
     ]
-    public static let schemaVersion = 5
+    public static let schemaVersion = 6
 }

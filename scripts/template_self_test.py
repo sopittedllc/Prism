@@ -120,7 +120,9 @@ def exercise_gate() -> None:
 def exercise_revision_bound_evidence() -> None:
     with tempfile.TemporaryDirectory(prefix="claude-evidence-test-") as temp:
         copy = Path(temp) / "project"
-        shutil.copytree(ROOT, copy)
+        # Revision tests need product sources and .git, not generated binaries or
+        # native captures. Copying those can exhaust a developer's temp volume.
+        shutil.copytree(ROOT, copy, ignore=shutil.ignore_patterns(".build", "build", "captures", ".cache"))
         toolchain_path = copy / ".workflow" / "toolchain.json"
         toolchain = json.loads(toolchain_path.read_text())
         toolchain["checks"]["unit-tests"]["argv"] = [sys.executable, "-c", "raise SystemExit(0)"]

@@ -1,6 +1,158 @@
 import AppKit
 import SimplifyCore
 
+/// A read-only pill with text centered inside explicit, equal vertical insets.
+@MainActor final class ReadOnlyTagPill: NSView {
+    let facet: MusicalFacet
+    let title: NSTextField
+    static let pillHeight: CGFloat = 20
+
+    init(facet: MusicalFacet, value: String) {
+        self.facet = facet
+        title = NSTextField(labelWithString: MusicalTagDisplay.title(value))
+        super.init(frame: .zero)
+        title.font = .systemFont(ofSize: 10, weight: .medium)
+        title.textColor = .labelColor
+        title.lineBreakMode = .byClipping
+        title.setAccessibilityLabel(facet.title + ": " + title.stringValue)
+        toolTip = facet.title + ": " + title.stringValue
+        wantsLayer = true; layer?.cornerRadius = 9
+        addSubview(title)
+        updateColor()
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: ceil(title.fittingSize.width) + 16,
+               height: Self.pillHeight)
+    }
+    override func layout() {
+        super.layout()
+        let textHeight = ceil(title.fittingSize.height)
+        title.frame = NSRect(x: 8, y: (bounds.height - textHeight) / 2,
+                             width: max(0, bounds.width - 16), height: textHeight)
+    }
+    override func viewDidChangeEffectiveAppearance() { super.viewDidChangeEffectiveAppearance(); updateColor() }
+    private func updateColor() {
+        effectiveAppearance.performAsCurrentDrawingAppearance {
+            layer?.backgroundColor = CatalogTheme.tagColor(facet).withAlphaComponent(0.22).cgColor
+        }
+    }
+}
+
+/// Compact read-only tag presentation for a visible collection outline cell.
+/// Layout is recalculated only when this cell's width changes; the outline never
+/// computes pill geometry for offscreen instruments.
+@MainActor final class CollectionTagCell: NSTableCellView {
+    private let heading = NSTextField(labelWithString: "")
+    private let subtitleLabel: NSTextField?
+    private let tagViews: [(MusicalFacet, String, ReadOnlyTagPill)]
+    private let more = NSButton(title: "", target: nil, action: nil)
+    private let allTags: [(MusicalFacet, String)]
+    private let showAll: (NSButton, [(MusicalFacet, String)]) -> Void
+    private var laidOutWidth: CGFloat = -1
+
+    init(title: String, subtitle: String? = nil, tags: [(MusicalFacet, String)], context: String, query: String = "", showAll: @escaping (NSButton, [(MusicalFacet, String)]) -> Void) {
+        self.subtitleLabel = subtitle.map { value in
+            let text = NSTextField(labelWithString: value)
+            text.font = .systemFont(ofSize: 10)
+            text.textColor = .secondaryLabelColor
+            text.lineBreakMode = .byTruncatingMiddle
+            text.maximumNumberOfLines = 1
+            text.toolTip = value
+            return text
+        }
+        self.allTags = tags; self.showAll = showAll
+        self.tagViews = tags.map { facet, value in
+            (facet, value, ReadOnlyTagPill(facet: facet, value: value))
+        }
+        super.init(frame: .zero)
+        heading.stringValue = title; heading.font = .systemFont(ofSize: 12, weight: .medium)
+        heading.lineBreakMode = .byTruncatingMiddle
+        heading.maximumNumberOfLines = 1
+        if !query.isEmpty {
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.lineBreakMode = .byTruncatingMiddle
+            let attributed = NSMutableAttributedString(string: title, attributes: [
+                .font: heading.font!, .foregroundColor: heading.textColor!, .paragraphStyle: paragraph
+            ])
+            let match = (title as NSString).range(of: query, options: [.caseInsensitive, .diacriticInsensitive])
+            if match.location != NSNotFound {
+                attributed.addAttribute(.font, value: NSFont.systemFont(ofSize: 12, weight: .bold), range: match)
+            }
+            heading.attributedStringValue = attributed
+        }
+        heading.toolTip = [title, subtitle, context].compactMap { $0 }.joined(separator: "\n")
+        heading.setAccessibilityElement(true)
+        let fullTags = tags.map { $0.0.title + ": " + MusicalTagDisplay.title($0.1) }.joined(separator: ", ")
+        heading.setAccessibilityLabel(title + (subtitle.map { " · " + $0 } ?? "") + (context.isEmpty ? "" : " · " + context) + (fullTags.isEmpty ? "" : " · Tags: " + fullTags))
+        heading.setAccessibilityHelp(fullTags)
+        textField = heading; addSubview(heading)
+        if let subtitleLabel { addSubview(subtitleLabel) }
+        for (_, _, text) in tagViews { addSubview(text) }
+        more.isBordered = false; more.font = .systemFont(ofSize: 10, weight: .semibold)
+        more.contentTintColor = CatalogTheme.accent
+        more.target = self; more.action = #selector(showMore)
+        more.setAccessibilityRole(.button)
+        addSubview(more)
+        setAccessibilityHelp(tags.map { $0.0.title + ": " + MusicalTagDisplay.title($0.1) }.joined(separator: ", "))
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) unavailable") }
+    override func layout() {
+        super.layout()
+        let width = max(0, bounds.width - 16)
+        heading.frame = NSRect(x: 8, y: bounds.height - 21, width: width, height: 16)
+        subtitleLabel?.frame = NSRect(x: 8, y: bounds.height - 38, width: width, height: 13)
+        guard abs(width - laidOutWidth) > 0.5 else { return }
+        laidOutWidth = width
+        let lineHeight: CGFloat = 21, gap: CGFloat = 4
+        var placements: [(Int, CGFloat, CGFloat, CGFloat)] = []
+        var line = 0, x: CGFloat = 8
+        for (index, entry) in tagViews.enumerated() {
+            let pillWidth = entry.2.intrinsicContentSize.width
+            if pillWidth > width { continue }
+            if x + pillWidth > width + 8 { line += 1; x = 8 }
+            if line >= 2 { break }
+            placements.append((index, x, CGFloat(line), pillWidth)); x += pillWidth + gap
+        }
+        var hiddenCount = tagViews.count - placements.count
+        if hiddenCount > 0 {
+            repeat {
+                hiddenCount = tagViews.count - placements.count
+                let moreWidth = ceil(("+\(hiddenCount) more" as NSString).size(withAttributes: [.font: more.font!]).width) + 10
+                let last = placements.last
+                let lastLine = last.map { Int($0.2) } ?? 0
+                let end = last.map { $0.1 + $0.3 + gap } ?? 8
+                if moreWidth <= width && (end + moreWidth <= width + 8 || (lastLine == 0 && moreWidth <= width)) { break }
+                if placements.isEmpty { break }
+                placements.removeLast()
+            } while true
+        }
+        for (_, _, text) in tagViews { text.isHidden = true }
+        for (index, px, row, pillWidth) in placements {
+            let text = tagViews[index].2
+            let offset: CGFloat = subtitleLabel == nil ? 42 : 59
+            text.frame = NSRect(x: px, y: bounds.height - offset - row * lineHeight,
+                                width: pillWidth, height: ReadOnlyTagPill.pillHeight)
+            text.isHidden = false
+        }
+        more.isHidden = hiddenCount == 0
+        if hiddenCount > 0 {
+            more.title = "+\(hiddenCount) more"
+            more.setAccessibilityLabel("Show all \(allTags.count) tags for \(heading.stringValue)")
+            let last = placements.last
+            let sameLineEnd = last.map { $0.1 + $0.3 + gap } ?? 8
+            let sameLine = last.map { Int($0.2) } ?? 0
+            let moreWidth = min(width, ceil((more.title as NSString).size(withAttributes: [.font: more.font!]).width) + 10)
+            let row = sameLineEnd + moreWidth <= width + 8 ? sameLine : min(1, sameLine + 1)
+            let px = row == sameLine ? sameLineEnd : 8
+            let offset: CGFloat = subtitleLabel == nil ? 42 : 59
+            more.frame = NSRect(x: px, y: bounds.height - offset - CGFloat(row) * lineHeight,
+                                width: moreWidth, height: ReadOnlyTagPill.pillHeight)
+        }
+    }
+    @objc private func showMore() { showAll(more, allTags) }
+}
+
 /// Category colors inspired by Logic's track palette. Text/category labels remain authoritative.
 @MainActor extension CatalogTheme {
     static func tagColor(_ facet: MusicalFacet) -> NSColor {

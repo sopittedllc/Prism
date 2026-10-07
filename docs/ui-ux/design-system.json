@@ -48,10 +48,10 @@
     },
     "numeric_unit_formatting": {
       "counts": "localized formatted integers",
-      "size": "ByteCountFormatter for measured plugin-bundle logical bytes; grouped totals require every installation measured. Partial/Unknown groups disclose only qualified known subtotals. Library footprint remains Not measured; instrument storage is Shared with library.",
+      "size": "ByteCountFormatter for measured logical bytes with explicit size basis. Plugin grouped totals require every installation measured; Partial/Unknown groups disclose qualified known subtotals. Failed library measurement says Size unavailable with a scan issue; only a unique whole installation folder is a complete product total. Patch storage is Shared with library and techniques have no independent size.",
       "recency": "project modification date proxy; samples only",
       "installer_record": "Plugin installer history appears in inspector/per-format details, independent of Date added and Last used.",
-      "addition_bounds": "Plugin Date added uses exact Finder file-location Date Added metadata and shows the earliest available current format date, with source disclosed in Details. It is not an installation claim. Confirmed original addition remains a fallback when Finder metadata is absent; scan, birth, modification, receipt, and use dates never substitute. Other categories use confirmed original addition. Unknown dates sort last; instruments never inherit library/player dates."
+      "addition_bounds": "Qualified original-addition evidence takes precedence over exact Finder file-location Date Added metadata. Native Date Added is a location date, not an installation claim. Scan, birth, modification, receipt, and use dates never substitute. Unknown dates sort last; instruments never inherit library/player dates and techniques have no independent date."
     }
   },
   "components": [
@@ -107,7 +107,13 @@
       ],
       "examples": [
         "setup-welcome",
-        "setup-mixed",
+        "setup-libraries-light",
+        "setup-sounds-light",
+        "setup-projects-light",
+        "setup-review-light",
+        "setup-sounds-dark",
+        "setup-projects-dark",
+        "setup-review-dark",
         "setup-long-folders",
         "setup-save-error"
       ],
@@ -140,9 +146,10 @@
       "semantic_role": "scan progress",
       "authority": "ScanProgress / CatalogWindow.refreshProgress",
       "states": [
-        "discovering indeterminate",
-        "reading determinate",
-        "matching determinate",
+        "checking for changes indeterminate",
+        "updating collection determinate",
+        "matching references determinate",
+        "Check For Updates changes to Stop while active",
         "finished with retained issues"
       ],
       "examples": [
@@ -257,14 +264,17 @@
         "wrapped scrolling tags",
         "add draft validation and retry",
         "atomic grouped edit and Undo",
-        "single native locations sheet",
+        "three-step first-run native sheet",
         "setup save recovery"
       ],
       "examples": [
         "tag-pill-add",
         "tag-pills-keyboard",
         "setup-welcome",
-        "setup-mixed",
+        "setup-libraries-light",
+        "setup-sounds-light",
+        "setup-projects-light",
+        "setup-review-light",
         "setup-long-folders",
         "setup-save-error"
       ],
@@ -281,14 +291,14 @@
     "Full selectable paths and per-format Finder actions live in Location; tags and lifecycle facts lead the inspector",
     "No numeric cleanup/savings claims from incomplete evidence",
     "Table text is centered vertically inside 38pt rows with 8pt horizontal inset.",
-    "Setup uses one native Type/Folder table; selected removal retains list focus.",
+    "First-run setup moves Sample Libraries → Individual Sounds → Projects → Review & Scan within one native sheet; Back retains draft and Cancel discards it. Standard system plugins are automatic; legacy plugin roots remain removable but cannot be newly added. Scanning is local and read-only. Settings uses a flat Type/Folder editor.",
     "Stream inventory before project analysis; pending references remain explicit. Determinate progress has no animation lag.",
     "Native outline uses 16pt indentation with the shared 38pt row and 8pt text inset.",
     "Search keeps matching patch ancestors; flat sample results show a root-relative breadcrumb and distinguish equal root names.",
-    "Unmeasured library footprint remains Not measured; instrument storage is Shared with library.",
+    "Measured library logical size is sortable globally with a source-specific basis; failed measurement says Size unavailable and instrument storage is Shared with library.",
     "Tag dropdowns and Last used occupy separate rows. Unknown usage is not inactivity; unavailable age ranges remain disabled.",
     "Settings appearance uses native popup Light/Dark/Match system preference; Light default, live preview, Cancel rollback, atomic Save without scan; app-wide semantic colors.",
-    "Scan targets the captured active section; plugin formats form the name subtitle with no duplicate format column; standard plugin roots automatic; one Settings entry for preferences."
+    "Check For Updates checks all configured roots from every tab and becomes Stop during work; plugin formats form the name subtitle with no duplicate format column; standard plugin roots automatic; one Settings entry for preferences."
   ],
   "exceptions": [
     {

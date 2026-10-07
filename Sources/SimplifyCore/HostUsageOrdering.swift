@@ -8,6 +8,9 @@ public enum HostUsageOrdering {
         if let cubase = record.cubaseUsage { return absoluteDay(cubase.reportedDate, timeZone: timeZone) }
         if let proTools = record.proToolsUsage { return proTools.localTime?.dayKey ?? "" }
         if let logic = record.logicUsage { return absoluteDay(logic.reportedDate, timeZone: timeZone) }
+        if let date = (record.itemAccess != nil || record.projectMembership != nil || record.projectItemMembership != nil) ? record.eventDate : nil {
+            return absoluteDay(date, timeZone: timeZone)
+        }
         return ""
     }
 
@@ -36,6 +39,8 @@ public enum HostUsageOrdering {
            al.reportedDate != bl.reportedDate {
             return al.reportedDate > bl.reportedDate
         }
+        if let ad = (a.itemAccess != nil || a.projectMembership != nil || a.projectItemMembership != nil) ? a.eventDate : nil,
+           let bd = (b.itemAccess != nil || b.projectMembership != nil || b.projectItemMembership != nil) ? b.eventDate : nil, ad != bd { return ad > bd }
         return a.evidenceID.utf8.lexicographicallyPrecedes(b.evidenceID.utf8)
     }
 
@@ -43,7 +48,9 @@ public enum HostUsageOrdering {
         if record.hostUsage != nil { return 0 }
         if record.cubaseUsage != nil { return 1 }
         if record.proToolsUsage != nil { return 2 }
-        return 3
+        if record.itemAccess != nil { return 3 }
+        if record.projectMembership != nil || record.projectItemMembership != nil { return 4 }
+        return 5
     }
 
     private static func absoluteDay(_ date: Date, timeZone: TimeZone) -> String {

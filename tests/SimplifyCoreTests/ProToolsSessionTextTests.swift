@@ -10,7 +10,7 @@ private let ptPlugins = "P L U G - I N S  L I S T I N G\nMANUFACTURER\tPLUG-IN N
 private let ptRow = "Example maker   \tExample synth   \t1.0\tAAX Native\tStereo / Stereo\t1 active\n"
 private func ptData(_ body: String) -> Data { Data((ptHeader + body).utf8) }
 
-@Test func proToolsUsageRequiresRestoreCompletionAndKeepsAttemptsUnknown() throws {
+@Test func proToolsRestoreAndManualAttemptKeepDistinctQualifiedSources() throws {
     let complete = """
     *** Digidesign Session Trace for:\t/Applications/Pro Tools.app (pid=0x1234, version=24.10.2)
     *** Starting Timestamp:\tSaturday, September 26, 2026 at 3:42:40 PM Pacific Daylight Time (94.000000 s)
@@ -25,6 +25,10 @@ private func ptData(_ body: String) -> Data { Data((ptHeader + body).utf8) }
     #expect(result.first?.localTime?.canonical == "2026-09-26T15:42:46.000000")
     #expect(result.first?.eventSourceID == ProToolsPluginUse.restoreV2SourceID)
     #expect(try ProToolsUsageLog.parse(Data(attempt.utf8)).isEmpty)
+    let manual = complete.replacingOccurrences(of: "101.000000,00103,0e0c: PtSess_RunTime::PutDocumentInfo - session was last saved with app version: 2024.10.2", with: "101.000000,00103,0033: SMgr_DSPCache::FreePlugIn - name: \"FabFilter Pro-Q 4\"")
+    let attempted = try #require(ProToolsUsageLog.parse(Data((manual + "\n").utf8)).first)
+    #expect(attempted.eventSourceID == ProToolsPluginUse.attemptedSourceID)
+    #expect(attempted.name == "FabFilter Pro-Q 4")
 }
 
 @Test func capturedProToolsRestoreLogYieldsOnlyCompletedHostInstancesWhenPresent() throws {
@@ -107,14 +111,14 @@ private func ptTrace(_ body: String, launch: String = "Saturday, September 26, 2
     #expect(first.eventID != secondRun.eventID)
     #expect(first.subjectEventID("A") != first.subjectEventID("B"))
     let failed = beginning.replacingOccurrences(of: "101.000000,00103,0e0c", with: "100.500000,00103,0033: CFicAAXWidget::CreateComponentInstance - converting -14013 to kCantInstantiatePlugIn\n101.000000,00103,0e0c")
-    #expect(try ProToolsUsageLog.parse(ptTrace(failed + "\n")).isEmpty)
+    #expect(try ProToolsUsageLog.parse(ptTrace(failed + "\n")).map(\.eventSourceID) == [ProToolsPluginUse.attemptedSourceID])
     let reset = beginning.replacingOccurrences(of: "101.000000,00103,0e0c",
         with: "100.500000,00103,0b09: Opening session: disposable\n101.000000,00103,0e0c")
-    #expect(try ProToolsUsageLog.parse(ptTrace(reset + "\n")).isEmpty)
+    #expect(try ProToolsUsageLog.parse(ptTrace(reset + "\n")).map(\.eventSourceID) == [ProToolsPluginUse.attemptedSourceID])
     let unsupported = beginning.replacingOccurrences(of: "session was last saved with app version: 2024.10.2",
         with: "unsupported completion")
-    #expect(try ProToolsUsageLog.parse(ptTrace(unsupported + "\n")).isEmpty)
-    #expect(try ProToolsUsageLog.parse(ptTrace(beginning.trimmingCharacters(in: .newlines))).isEmpty)
+    #expect(try ProToolsUsageLog.parse(ptTrace(unsupported + "\n")).map(\.eventSourceID) == [ProToolsPluginUse.attemptedSourceID])
+    #expect(try ProToolsUsageLog.parse(ptTrace(beginning.trimmingCharacters(in: .newlines))).map(\.eventSourceID) == [ProToolsPluginUse.attemptedSourceID])
 }
 
 @Test func nativeProToolsStartupSnapshotDoesNotBecomeUseWithoutSession() throws {

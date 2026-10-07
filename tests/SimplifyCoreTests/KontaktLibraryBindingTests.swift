@@ -64,7 +64,7 @@ private func manifestXML(_ snpid: String, product: String = "Fixture") -> String
 
     let noCatalogID = fixture.asset(freshURL, catalogID: nil)
     let pathIdentity = KontaktLibraryBinding.resolve(libraryIDs: ["P44"], assets: [noCatalogID])
-    #expect(pathIdentity.bindings["P44"]?.selectionKey == "existing-product-id")
+    #expect(pathIdentity.bindings["P44"]?.selectionKey == noCatalogID.selectionKey)
     #expect(pathIdentity.bindings["P44"]?.catalogID == nil)
 
     let missing = KontaktLibraryBinding.resolve(
@@ -107,6 +107,21 @@ private func manifestXML(_ snpid: String, product: String = "Fixture") -> String
     let candidateBudget = KontaktLibraryBinding.resolve(
         libraryIDs: Array(repeating: "P44", count: KontaktLibraryBinding.maximumCandidates + 1), assets: [])
     #expect(!candidateBudget.complete && candidateBudget.bindings.isEmpty)
+}
+
+@Test func kontaktBindingStreamsEmbeddedXMLAcrossLargeBinaryManifests() throws {
+    let fixture = try KontaktBindingFixture(); defer { fixture.clean() }
+    var assets: [Asset] = []
+    for index in 0..<20 {
+        let url = fixture.root.appendingPathComponent("Large-\(index).nicnt")
+        let padding = index == 0 ? String(repeating: " ", count: 175_000) : ""
+        let xml = "<ProductHints><!--\(padding)--><Product><Name>Fixture</Name><Company>Example</Company><SNPID>P\(index)</SNPID></Product></ProductHints>"
+        try (Data(xml.utf8) + Data(repeating: 0, count: 1_048_576)).write(to: url)
+        assets.append(fixture.asset(url))
+    }
+    let result = KontaktLibraryBinding.resolve(libraryIDs: ["P0"], assets: assets)
+    #expect(result.complete)
+    #expect(result.bindings["P0"]?.manifestPath == assets[0].path)
 }
 
 @Test func nativeKontaktAccordionSNPIDBindsOnlyToCurrentManifestWhenEnabled() throws {

@@ -1,44 +1,113 @@
 import Foundation
 
-/// Initial reviewed coverage, verified 2026-09-26. A matching product page never proves installation or use.
+/// Reviewed offline starter coverage; a matching product page never proves installation or use.
 /// See docs/research/product-tag-sources.md for extraction and review constraints.
 public enum ProductTagSources {
-    public static let all: [ProductTagSource] = [
-        ProductTagSource(id: "spitfire-symphony-orchestra", kind: .library,
-            names: ["Spitfire Symphony Orchestra"], makers: ["Spitfire Audio", "Spitfire"], bundlePrefix: nil,
-            endpoint: URL(string: "https://www.spitfireaudio.com/products/spitfire-symphony-orchestra.json")!,
-            page: URL(string: "https://www.spitfireaudio.com/products/spitfire-symphony-orchestra")!, format: .shopify,
-            remoteName: "Spitfire Symphony Orchestra", descriptionDigest: "da668563981f10ffe91c65d72d4b5d5bc6b73179ec0bd45270de8841bc1208dc",
-            metadata: MusicalMetadata(fields: ["instrument": ["strings", "brass", "woodwinds", "harp", "piano", "percussion"], "ensemble": ["ensemble"]])),
-        ProductTagSource(id: "bbc-symphony-orchestra-core", kind: .library,
-            names: ["BBC Symphony Orchestra Core"], makers: ["Spitfire Audio", "Spitfire"], bundlePrefix: nil,
-            endpoint: URL(string: "https://www.spitfireaudio.com/products/bbc-symphony-orchestra-core.json")!,
-            page: URL(string: "https://www.spitfireaudio.com/products/bbc-symphony-orchestra-core")!, format: .shopify,
-            remoteName: "BBC Symphony Orchestra Core", descriptionDigest: "1f109582d7a2bb4afb09ab21690f42bce4d09365a62d9b696c3ca6b3ae4f2cef",
-            metadata: MusicalMetadata(fields: ["instrument": ["strings", "brass", "woodwinds", "percussion"]])),
-        ProductTagSource(id: "berlin-strings", kind: .library,
-            names: ["Berlin Strings"], makers: ["Orchestral Tools"], bundlePrefix: nil,
-            endpoint: URL(string: "https://www.orchestraltools.com/berlin-strings")!,
-            page: URL(string: "https://www.orchestraltools.com/berlin-strings")!, format: .productJSONLD,
-            remoteName: "Berlin Strings - Flagship string ensembles", descriptionDigest: "6bbca8f456ef66919aca49e99bf1f2a8f6285e1dc9831460f34a388785d11666",
-            metadata: MusicalMetadata(fields: ["instrument": ["strings"], "ensemble": ["ensemble"], "technique": ["legato"]])),
-        ProductTagSource(id: "cinematic-studio-strings", kind: .library,
-            names: ["Cinematic Studio Strings"], makers: ["Cinematic Studio Series", "Cinematic Strings"], bundlePrefix: nil,
-            endpoint: URL(string: "https://cinematicstudioseries.com/wp-json/wp/v2/pages/68?_fields=id,slug,link,title,excerpt")!,
-            page: URL(string: "https://cinematicstudioseries.com/strings/")!, format: .wordpress,
-            remoteName: "Cinematic Studio Strings", descriptionDigest: "62908892e9b97ad9c1f7a619c81be33ec42809bef670975e19124e8e46249e40",
-            metadata: MusicalMetadata(fields: ["instrument": ["strings"]])),
-        ProductTagSource(id: "cinematic-strings-2", kind: .library,
-            names: ["Cinematic Strings 2"], makers: ["Cinematic Strings", "Cinematic Studio Series"], bundlePrefix: nil,
-            endpoint: URL(string: "https://cinematicstudioseries.com/wp-json/wp/v2/pages/900?_fields=id,slug,link,title,excerpt")!,
-            page: URL(string: "https://cinematicstudioseries.com/cs2/")!, format: .wordpress,
-            remoteName: "Cinematic Strings 2", descriptionDigest: "d2821fd05a9a4a8e991fe630035490e5e79aea6a70b8dbde3b734f613153c289",
-            metadata: MusicalMetadata(fields: ["instrument": ["strings"], "character": ["warm"]])),
-        ProductTagSource(id: "fabfilter-pro-q-4", kind: .plugin,
-            names: ["FabFilter Pro-Q 4", "Pro-Q 4"], makers: [], bundlePrefix: "com.fabfilter",
-            endpoint: URL(string: "https://www.fabfilter.com/products/pro-q-4-equalizer-plug-in")!,
-            page: URL(string: "https://www.fabfilter.com/products/pro-q-4-equalizer-plug-in")!, format: .metaDescription,
-            remoteName: "FabFilter Pro-Q 4 - Equalizer Plug-In", descriptionDigest: "bb10fee1812b2adb95439d7f16f1b2f8db59f36be5145164043370aed38ebf53",
-            metadata: MusicalMetadata(fields: ["function": ["equalizer", "eq"]])),
-    ]
+    public static let maximumSources = 4_096
+    /// Version of the bundled, reviewed identity/taxonomy records. Cache envelopes
+    /// remain independently versioned and are invalidated by source digests.
+    public static let catalogVersion = 2
+    public static let all: [ProductTagSource] = {
+        let records = try! importReviewedCatalog(bundledCatalogData())
+        precondition(records.count <= maximumSources, "Reviewed product tag catalog exceeds its bounded capacity")
+        precondition(Set(records.map(\.id)).count == records.count, "Duplicate reviewed product tag source IDs")
+        return records
+    }()
+
+    /// The versioned structured catalog is the only path for admitting new bundled
+    /// taxonomy. It is bounded, exact-identity and schema validated; refreshable vendor
+    /// descriptions continue to use ProductTagStore's existing cache and TTL.
+    static func importReviewedCatalog(_ data: Data) throws -> [ProductTagSource] {
+        try importCatalog(data, allowAutomatic: false)
+    }
+
+    public static func importSharedCatalog(_ data: Data) throws -> [ProductTagSource] {
+        try importCatalog(data, allowAutomatic: true)
+    }
+
+    private static func importCatalog(_ data: Data, allowAutomatic: Bool) throws -> [ProductTagSource] {
+        guard data.count <= 4 * 1_024 * 1_024 else { throw ProductTagError.tooLarge }
+        let catalog = try JSONDecoder().decode(ReviewedCatalog.self, from: data)
+        let automatic = catalog.automaticRecords ?? []
+        guard catalog.version == catalogVersion, (1...maximumSources).contains(catalog.records.count + automatic.count),
+              allowAutomatic || automatic.isEmpty else { throw ProductTagError.invalidCache }
+        var seen = Set<String>()
+        let automaticIDs = Set(automatic.map(\.id))
+        let sources = try (catalog.records + automatic).map { record in
+            guard seen.insert(record.id).inserted, let kind = AssetKind(rawValue: record.kind),
+                  let endpoint = URL(string: record.endpoint), let page = URL(string: record.page),
+                  let format = ProductTagSource.Format(rawValue: record.format) else { throw ProductTagError.invalidCache }
+            let isAutomatic = automaticIDs.contains(record.id)
+            let provenance = record.provenance ?? .curated
+            guard provenance == (isAutomatic ? .automatic : .curated) else { throw ProductTagError.invalidCache }
+            let source = ProductTagSource(id: record.id, kind: kind, names: record.names, makers: record.makers,
+                bundlePrefix: record.bundlePrefix, endpoint: endpoint, page: page, format: format,
+                remoteName: record.remoteName, descriptionDigest: record.descriptionDigest,
+                metadata: try MusicalMetadata(fields: record.metadata).validated(), networkEnabled: record.networkEnabled,
+                reviewRecordID: record.reviewRecordID, reviewedAt: record.reviewedAt,
+                taxonomyVersion: record.taxonomyVersion, sourceFact: record.sourceFact,
+                provenance: provenance)
+            try source.validateReviewRecord()
+            guard (record.networkEnabled || record.descriptionDigest.isEmpty),
+                  [AssetKind.library, .plugin].contains(kind), !record.names.isEmpty,
+                  (kind != .plugin || record.bundlePrefix != nil || !record.makers.isEmpty),
+                  (kind != .library || !record.makers.isEmpty),
+                  record.names.count <= 8, record.makers.count <= 8,
+                  record.names.allSatisfy({ !$0.isEmpty && $0.utf8.count <= 128 }),
+                  record.makers.allSatisfy({ !$0.isEmpty && $0.utf8.count <= 128 }) else { throw ProductTagError.invalidCache }
+            return source
+        }
+        if !allowAutomatic {
+            // Validate generated bundled records within kind and maker. A spaceless
+            // format alias must join its existing product, not create a second source.
+            func compact(_ text: String) -> String {
+                ProductTagSource.identity(text).replacingOccurrences(of: " ", with: "")
+            }
+            var identities: [String: String] = [:]
+            for source in sources {
+                for maker in source.makers {
+                    for name in source.names {
+                        let key = source.kind.rawValue + "|" + compact(maker) + "|" + compact(name)
+                        guard identities[key] == nil || identities[key] == source.id else { throw ProductTagError.invalidCache }
+                        identities[key] = source.id
+                    }
+                }
+            }
+        }
+        if !automatic.isEmpty {
+            let trusted = sources.filter { $0.provenance == .curated } + ProductTagSources.all
+            for source in sources where source.provenance == .automatic {
+                guard source.endpoint == source.page, let host = source.page.host?.lowercased(),
+                      trusted.contains(where: { known in
+                          known.makers.map(ProductTagSource.identity).contains {
+                              source.makers.map(ProductTagSource.identity).contains($0)
+                          } && known.page.host.map { official in
+                              host == official.lowercased() || host.hasSuffix("." + official.lowercased())
+                          } == true
+                      }) else { throw ProductTagError.invalidCache }
+            }
+        }
+        return sources
+    }
+
+    private struct ReviewedCatalog: Decodable {
+        let version: Int
+        let records: [ReviewedRecord]
+        let automaticRecords: [ReviewedRecord]?
+    }
+    private struct ReviewedRecord: Decodable {
+        let id: String; let kind: String; let names: [String]; let makers: [String]; let bundlePrefix: String?
+        let endpoint: String; let page: String; let format: String; let remoteName: String
+        let descriptionDigest: String; let metadata: [String: [String]]; let networkEnabled: Bool
+        let reviewRecordID: String; let reviewedAt: String; let taxonomyVersion: Int
+        let sourceFact: String?
+        let provenance: ProductTagSource.Provenance?
+    }
+    static func bundledCatalogData() -> Data {
+        let packagedBundleURL = Bundle.main.resourceURL?.appendingPathComponent("Simplify_SimplifyCore.bundle", isDirectory: true)
+        let resourceBundle = packagedBundleURL.flatMap(Bundle.init(url:)) ?? Bundle.module
+        guard let url = resourceBundle.url(forResource: "product-tag-catalog-v2", withExtension: "json"),
+              let data = try? Data(contentsOf: url), data.count <= 4 * 1_024 * 1_024 else { preconditionFailure("Reviewed product tag catalog resource is missing or invalid") }
+        return data
+    }
 }

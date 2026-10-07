@@ -6,9 +6,54 @@
     "integration-tests",
     "template-integrity",
     "adapter-integrity",
-    "catalog-state"
+    "catalog-state",
+    "catalog-tags"
   ],
   "checks": {
+    "beta-clean-build": {
+      "argv": ["swift", "build", "-c", "release", "--scratch-path", "release-build/clean-scratch"],
+      "timeout_seconds": 600
+    },
+    "beta-package-rebuild": {
+      "argv": ["python3", "scripts/test_beta_package_rebuild.py"],
+      "timeout_seconds": 90
+    },
+    "beta-package-local": {
+      "argv": ["python3", "scripts/build_app.py", "--output", "release-build/Prism.app", "--version", "2026.10.07", "--build-number", "20261007.1", "--bundle-id", "llc.sopitted.Prism", "--scratch-path", "release-build/clean-scratch"],
+      "timeout_seconds": 90
+    },
+    "beta-dmg-local": {
+      "argv": ["python3", "scripts/build_beta_dmg.py", "--app", "release-build/Prism.app"],
+      "timeout_seconds": 180
+    },
+    "beta-runtime-local": {
+      "argv": ["release-build/Prism.app/Contents/MacOS/Prism", "--ui-smoke", "captures/beta"],
+      "timeout_seconds": 180
+    },
+    "large-inclusion-runtime": {
+      "argv": ["env", "PRISM_LARGE_INCLUSION_RUNTIME=1", "swift", "test", "--no-parallel", "--filter", "overThirtyTwoMiBSampleEvidenceSavesAndRestores"],
+      "timeout_seconds": 180
+    },
+    "decoded-fact-cache": {
+      "argv": ["swift", "test", "--no-parallel", "--filter", "DecodedFactCache"],
+      "timeout_seconds": 120
+    },
+    "scan-responsiveness-runtime": {
+      "argv": ["env", "PRISM_SCAN_RESPONSIVENESS_RUNTIME=1", "swift", "test", "--no-parallel", "--filter", "ScanResponsiveness"],
+      "timeout_seconds": 360
+    },
+    "project-buffer-memory-runtime": {
+      "argv": ["env", "PRISM_PROJECT_MEMORY_RUNTIME=1", "swift", "test", "--no-parallel", "--filter", "projectScanMemoryReleasesFileBuffersBetweenProjects"],
+      "timeout_seconds": 180
+    },
+    "ableton-preflight-memory-runtime": {
+      "argv": ["env", "PRISM_PROJECT_MEMORY_RUNTIME=1", "swift", "test", "--no-parallel", "--filter", "projectScanMemoryAbletonPreflight"],
+      "timeout_seconds": 180
+    },
+    "ableton-batch-memory-runtime": {
+      "argv": ["env", "PRISM_PROJECT_MEMORY_RUNTIME=1", "swift", "test", "--no-parallel", "--filter", "projectScanMemoryAbletonBatch"],
+      "timeout_seconds": 180
+    },
     "build-debug": {
       "argv": [
         "swift",
@@ -28,7 +73,8 @@
     "unit-tests": {
       "argv": [
         "swift",
-        "test"
+        "test",
+        "--no-parallel"
       ],
       "timeout_seconds": 600
     },
@@ -144,6 +190,13 @@
         "nativeCubaseRestoreRuntime"
       ],
       "timeout_seconds": 300
+    },
+    "catalog-tags": {
+      "argv": [
+        "python3",
+        "scripts/validate_product_tag_catalog.py"
+      ],
+      "timeout_seconds": 60
     }
   }
 }

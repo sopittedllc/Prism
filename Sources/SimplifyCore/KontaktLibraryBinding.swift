@@ -56,11 +56,12 @@ public enum KontaktLibraryBinding {
             guard LibraryMetadataReader.safe(url), let before = snapshot(url) else {
                 return incomplete(validCandidates.union(invalid))
             }
-            let expectedRead = min(Int(before.size), 65_536)
-            guard expectedRead >= 0, expectedRead <= maximumManifestReadBytes - bytesRead else {
+            let available = maximumManifestReadBytes - bytesRead
+            guard available > 0 else {
                 return incomplete(validCandidates.union(invalid))
             }
-            guard let data = try? BoundedFile.read(url, limit: 65_536, prefixOnly: true) else {
+            guard let data = try? BoundedFile.readThrough(url, terminator: Data("</ProductHints>".utf8),
+                    limit: min(available, LibraryMetadataReader.maximumManifestPrefixBytes)) else {
                 return incomplete(validCandidates.union(invalid))
             }
             bytesRead += data.count

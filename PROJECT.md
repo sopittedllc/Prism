@@ -25,11 +25,13 @@ source data stays Unknown; broader host and individual-sound usage gates remain 
 1. Discover installed plugins and choose one or more sample and library folders,
    including local Splice downloads and external drives.
 2. Browse Plugins, Individual Samples, and Libraries; search names and tags.
-3. Sort sounds by Tags, Date added, Last used, size, or name. Sample project recency
-   remains a separately labeled reference proxy. Unknown coverage stays visible.
+3. Sort sounds by Tags, Date added, Last used, size, or name. Last used may include
+   an exact item's qualified saved-project/backup membership at that snapshot's
+   modification time, as well as qualified project-open or plugin-instance events.
+   Candidate references remain separately labeled. Unknown coverage stays visible.
 4. Review selected files and dependencies before removing unwanted items.
 5. Routinely detect additions and offer a batched classification queue, with manual
-   tags or optional web-assisted metadata suggestions.
+   tags using the bundled offline catalog and manual edits.
 
 This workflow is the north star for feature and architecture decisions.
 
@@ -45,10 +47,9 @@ This workflow is the north star for feature and architecture decisions.
 ## Non-negotiable constraints
 
 - Reliable Last used and Date added are the two highest-priority capabilities and
-  release gates. Validate usage across all four primary hosts before treating cleanup
-  as delivered; UI polish and metadata breadth cannot substitute for this evidence.
-  Investigate qualified host activity and prospective observation alongside saved
-  projects; project parsing is not the only permitted source of usage evidence.
+  release gates. Validate saved-project references across all four primary hosts
+  before treating cleanup as delivered; UI polish and metadata breadth cannot
+  substitute for this evidence. Live observation is outside this delivery.
 - Date added must distinguish original addition, recorded installation/update, and
   first discovery by Prism. Initial inventory, rescans, updates, moves, and reconnects
   must not make an existing product appear newly acquired. Unknown original dates
@@ -57,16 +58,28 @@ This workflow is the north star for feature and architecture decisions.
   included, as recorded in [ecosystem research](docs/research/audio-ecosystems.md).
 - Logic Pro, Ableton Live, Cubase, and Pro Tools are mandatory primary targets.
   REAPER coverage does not satisfy that requirement. Validate each host separately.
-- Usage evidence must cover individual samples and individual library instruments
-  (Kontakt NKI and player-specific equivalents), not only plugins or whole libraries.
-  Inclusion counts whether or not audio was played. Distinguish saved references,
-  observed loads, failed attempts, and unknown history; see
+- Usage evidence should cover individual samples and player-specific instruments
+  where exact saved-state identity is available. For Kontakt saved projects, the
+  owner chose verified **library-level** membership; exact NKI attribution is
+  outside that delivery scope and must remain Unknown rather than inferred.
+  For supported Cubase Omnisphere, Keyscape, and Trilian states, resolve only
+  exact installed preset-library membership; a player instance or top-level
+  multi label does not establish every loaded library.
+  `Last used` means the latest qualified saved-project or backup reference to
+  the exact installed item, timestamped by that saved snapshot's modification
+  time. Muted or bypassed saved references count. Unsaved activity and removed
+  items without a saved reference do not count. Preserve source and coverage so
+  a saved reference is never presented as playback. For Individual Samples,
+  exact saved paths qualify; Quick Look, Preview, and Splice previews do not.
+  Historical host observations remain stored but are excluded from this Last Used
+  projection; see
   [activity research](docs/research/daw-activity-history.md).
 - Keep scanning incremental and avoid disrupting audio sessions; numerical budgets
   require a measured prototype.
 - Distinguish plugin product, installed format, player, library, preset, and loose sample.
-- Never present installation or scan time as last used. Project modification time may
-  be shown only as an explicitly labeled reference-recency proxy.
+- Never present installation or scan time as last used. A project's modification
+  time qualifies only when that exact item is referenced in that saved snapshot;
+  otherwise it is an explicitly labeled candidate-reference recency proxy.
 - A player reference does not establish inclusion of every library installed for it.
 - Offline volumes are unavailable, not deleted; repeated scans preserve user tags.
 - Proposed removal default: reviewable move to Trash where supported; never silently

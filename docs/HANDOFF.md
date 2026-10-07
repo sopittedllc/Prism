@@ -1,146 +1,92 @@
-# Prism development handoff — 2026-10-04
+# Prism portable checkpoint — 2026-10-05
 
-This is a portable checkpoint for continuing on a Mac without the external
-Samples drive. The project is a native macOS Swift package and AppKit preview,
-not a released or complete cleanup product. Start with [AGENT_GUIDE.md](../AGENT_GUIDE.md),
-[PROJECT.md](../PROJECT.md), [TOOLCHAIN.md](../TOOLCHAIN.md) and
-[.workflow/collaboration.json](../.workflow/collaboration.json). The active
-parent task is `cleanup-essentials`; its four-host, individual-asset Last used
-acceptance criterion remains open.
+## Read first
 
-## What works now
+Read `AGENT_GUIDE.md`, `PROJECT.md`, `.workflow/collaboration.json`, and
+`.work/active/catalog-evidence-coverage.md`. The active parent is
+`libraries-complete-workflow`; its acceptance criteria are still open.
+This is an in-progress development checkpoint, not a completed feature or release.
 
-- Inventory finds installed AU, VST2, VST3, AAX and CLAP bundles without loading
-  them; it discovers individual audio files, Kontakt manifest/instrument-name
-  candidates, SINE catalog entries, Soundpaint parts and recognized STEAM
-  structures. Explicit sample and library roots can overlap. Scans are bounded,
-  show incomplete/unavailable scope, and preserve stale catalog history when a
-  volume is offline.
-- The native browser has Plugins, Samples and Libraries, name/tag search,
-  sortable Tags, Date added and Last used columns, hierarchy, a compact Your Sound
-  inspector, local settings,
-  editable tags/metadata with Undo, and measured size where available. Plugin
-  formats and installations can be reviewed and moved to Trash with identity
-  checks. Sample/library removal is not implemented. Sizes are observations,
-  not guaranteed reclaimable bytes; instrument size can be shared or unknown.
-- The app preview was renamed Prism and packages the supplied logo. Settings
-  persist Light (default), Dark or Match system appearance. Compact setup and
-  inspector tag pills support keyboard interaction; category-scoped scans keep
-  other categories visible. Schema v5 stores one durable plugin product with
-  subordinate formats, one tag owner and retained qualified dates/use. Plugin
-  Date added uses the earliest qualified Finder file-location date, falling back
-  to confirmed addition; it is not an installation claim. The normal inspector
-  has no Show Details history wall. First indexed and observed arrival remain
-  separate evidence in Scan details/model history.
-- Catalog inventory, setup, tags and immutable date evidence persist locally.
-  Recorded package receipts can support a labeled installation/update date;
-  first discovery is separate; original Date added remains unknown without a
-  qualified source. Scans and project mtimes do not become Last used.
-- Partial REAPER/Live/Logic saved-project references and Pro Tools/Cubase
-  diagnostic/export readers exist. A project reference is a candidate or an
-  explicitly labeled recency proxy, not a successful load timestamp. See
-  [usage plan](../.work/active/usage-evidence-delivery.md) for adapter limits.
+The user requires app-wide basics, not fixes specific to one collection:
+- Last Used means a music application's actual load/access attempt, even temporary,
+  with no playback or saved project required. Never substitute scan/install/project
+  modification timestamps. Individual sample Quick Look, Preview, and Splice previews
+  must not count.
+- One plugin product owns multiple formats; preserve major versions/vendor identity.
+- Complete configured-root indexing, meaningful physical sizes, Date Added,
+  actual articulations, searchable durable tags, and responsive sorting.
+- Tags must improve through reviewed catalog updates and exact local vendor metadata;
+  manual edits and deliberately cleared fields win. Classify product purpose rather
+  than source ingredients (Straylight is a granular synth; Una Corda is a piano).
+- Astra leads architecture/review; cheaper models implement bounded work. One writer.
+  Avoid scope creep, repeated research, or declaring selected examples sufficient.
 
-## Last used: exact current coverage
+## Included changes
 
-The user counts even a brief DAW instantiation; playback is unnecessary. The
-adapters below only promote the positive sequences that were actually qualified.
-Unknown does not mean unused. Binding is to the observed plugin product/class
-and current installed-format candidate; it does not prove physical installation
-lineage or that an old event belongs to a copied bundle.
+Earlier library work includes resumable directory indexing, Kontakt group extraction
+with the attributed MIT FastLZ implementation, the qualified Spitfire Core Techniques
+profile, local NI category enrichment, SINE accounting, Finder Date Added, durable
+plugin grouping repairs, reviewed product tags, and complete plugin bundle sizing.
 
-| Host | Admitted plugin evidence | Important limit |
-| --- | --- | --- |
-| Ableton Live 12.4.5/12.4.6 | Completed VST3 document restore; separately, manual create with matching Going-to-create, successful processor load, and Created records, bound by exact VST3 class/cache identity. Native Pro-Q 4 create/delete-before-save control passed. | No arbitrary Live version, player instrument, sample, audible output or universal history claim. Startup load chatter and failed restores are excluded. |
-| Cubase Pro 15.0.5.121 | Native keyed VST3 Add candidates promoted only after matching project activation and successful keyed Project Status: Load in Usage Logger, with exact cache tuple/path binding. The before/after saved Glow reopen capture parsed as zero/one qualified use. Older flattened fixtures remain supported separately. | Native manual Add/Remove occurred on a disposable track, but Add has no proven plugin-instance success token; manual use is not admitted. Logging may be disabled or unavailable. Native grammar is qualified only for this captured version. |
-| Logic Pro | Current mixer accessibility observation of an AU plugin group with bypass/open controls, persisted as an observed-use event. | Polling/AX observation can miss brief use; coverage is limited to exposed mixer controls. There is no guaranteed instantiation event stream or full historical Logic project coverage. Requires Accessibility. |
-| Pro Tools 24.10.2 | AAX Host Instantiate candidates within a completed session restore, source-local clock v2 and exact unique installed-AAX name binding. Full native restore of Pro-Q 4, Kontakt 8 and Diva passed parse, store/reopen and presentation checks. | Name binding is product association, not a stable plugin ID. Startup failure and host-internal AudioInjection remain excluded/unbound. Native manual Pro-Q 4 insert then FreePlugIn on a temporary track was visually confirmed, but had no distinct completion token and is not admitted. Legacy v1 dates remain readable history but cannot set Last used. |
+The browser no longer launches an unconditional whole-collection scan on restore.
+Metadata/search caches and filesystem-free comparisons reduced a saved-catalog release
+benchmark to approximately 0.5 seconds to open Libraries, 0.6–0.9 seconds to search,
+and 1.1 seconds for the first tag sort. Those measurements precede the latest v6 work;
+repeat them before accepting the final implementation.
 
-No adapter yet proves Last used for an **individual WAV** across the required
-four hosts. Kontakt public state exposes candidate library ID `P44` for the
-controlled Accordion state, and exact SNPID can bind that ID to an installed
-manifest. The active instrument name, NKI path, load outcome and event time
-remain unproven. A separate filename table yielded a Wineglass NKI path but
-its association with an active program was not established. Neither a whole
-Kontakt library candidate nor project modification time may be promoted to
-instrument usage. Other player-specific instruments remain open.
+Latest shared-system work:
+- Live cache reading skips well-formed disabled/unsuccessfully scanned rows instead
+  of rejecting the whole cache. Actual cache module scan state 3 exposed this bug.
+- Schema v6 adds usage subjects for existing assets and exact library-scoped
+  instruments, migrating existing evidence with a backup and transactional copy.
+- Typed item access records distinguish outcome, event time and ingestion time,
+  require recognized music-app identities, and preserve replay/history. Old untyped
+  attempts remain readable without being newly promoted to Last Used.
+- Item history projection, library rollups, instrument sorting, and source error
+  separation are implemented but need final full-suite and native acceptance.
+- A versioned offline reviewed JSON tag catalog and validation are included alongside
+  local NI category facts and user override precedence. This is not a universal web
+  lookup service or automatic community learning backend.
+- Eligible unidentified folders can receive measured physical-folder sizes independent
+  of a marketing identity. Shared/overlapping ownership still needs qualified scope.
 
-## Evidence and limits on this checkpoint
+## Evidence and unfinished work
 
-Continuation on the second Mac found that actual Cubase Pro 15.0.5.121 reports use
-keyed children and numeric report IDs, while the old parser expected flattened fields.
-The saved Glow reopen control now parses and survives isolated catalog replay/reopen.
-Cubase/Logic absolute dates use the viewer's local calendar day and later instants win
-same-day ties; Live/Pro Tools civil clocks remain unchanged. The continuation suite
-passed 233 tests; an earlier pre-existing randomized Live test failure passed on rerun.
-See [the repair plan](../.work/active/cubase-native-restore.md) and
-`.workflow/evidence/cubase-native-restore/task.json` for recorded gates, including the
-required user check of the packaged preview. The parent task remains open.
+Before the latest shared-system edits, 296 Swift tests, release build and packaging
+passed. Native UI smoke failed because a window screenshot could not be created.
+After the latest edits, six focused migration/access/tag/folder tests, state validation,
+JSON validation and diff whitespace checks passed. Check the final checkpoint's
+workflow evidence for any later whole-suite result; historical passing evidence is
+not current acceptance.
 
-The last pre-handoff configured run recorded **226 passing generic Swift tests**,
-a release build, app packaging, and a separate opt-in native Pro Tools restore-v2
-test. The native Pro Tools control used complete private logs, an unchanged
-disposable PTX and actual installed AAX products; manual insert/remove produced
-Host Instantiate and FreePlugIn but no restore completion. Other native controls
-for Live/Cubase/Logic and package receipts are described in
-[the active plan](../.work/active/usage-evidence-delivery.md). These historical
-results are not a claim that this later portability edit has the same fingerprint;
-run the generic checks below on the new Mac.
+A real Live collector check on a private copy of the saved catalog saw 741 eligible
+VST3 installations, 799 cache classes, 797 class/path bindings, 24 recorded events,
+three projected product histories, ten unbound coverage failures and two rejected
+incomplete documents. Multiple classes can belong to one installation. No production
+catalog was modified by this check.
 
-Only source, synthetic tests and sanitized summaries belong in Git. Ignored
-`build/` holds private DAW logs, PTX/ALS/CPR controls, screenshots, transient
-catalogs and package outputs. The original offline Samples metadata snapshot
-is also private on the first Mac, outside this repository. No audio, NKI,
-sample payload, private report, log or database should be copied into the
-checkpoint. Some historical `.workflow/evidence/**/*.json` records refer to
-ignored `*.log` files; those paths document local verification and are not
-replayable on a clean clone.
+**No real sample or Kontakt/SINE patch access collector is implemented.** Shared
+storage/projection tests do not establish acquisition. The broad macOS observation
+route researched is Endpoint Security, requiring an Apple-granted entitlement,
+signed deployment and user approval. No privileged observer was installed. Existing
+host adapters remain limited to their documented source/version combinations.
+See `docs/research/daw-activity-history.md` and the unified plan. Do not build a fake
+observer, infer patch use from a player load, or claim universal historical recovery.
 
-A sanitized [Samples structure aggregate](../tests/fixtures/samples-drive-aggregate.json)
-retains scale information from the private metadata-only snapshot: 2,150,069
-files, 162,992 directories, depth histograms, anonymized top-level subtree
-counts and selected extension counts. It contains no names, paths, file dates,
-device IDs, audio or instrument bytes. The full collection exceeds the current
-100,000-entry per-category preview limit; the small synthetic demo below is
-for functional development, not a scale substitute.
+The last collection-wide baseline was 690 library rows, 47,592 instruments,
+307 measured library sizes and 207 libraries with product-level metadata tags.
+These are different from effective UI tags, which merge additional sources. No new
+production-wide size/tag census was performed after the latest fallback/catalog edits.
+Universal articulation extraction and the parent four-host usage matrix remain open.
+The earlier production refresh correctly grouped bx_glue, PA bx_digital V3 including
+mix, and Softube Curve Bender; UAD implementations stayed separate. Rhythmic Aura's
+real owner retained 18 patches and size. Celli Core variants each retained 15 choices.
+Una Corda's effective tag was Piano and Straylight's Synth/Granular Synthesis.
 
-## Fresh clone on a Mac without Samples
+## Continue on the other laptop
 
-After the checkpoint commit, the coordinator creates a local
-`build/Prism-portable.bundle` for transfer; the bundle itself is not committed
-or pushed. Copy that file to the other Mac, then:
-
-```sh
-git clone /path/to/Prism-portable.bundle Prism
-cd Prism
-swift build
-swift test
-```
-
-The clone's `origin` points at the transferred bundle, not a hosted remote.
-If a hosted remote is wanted later, configure it deliberately from the
-existing repository; this handoff does not include a private remote URL or
-perform an automatic push.
-
-For the complete original folder inventory, separately transfer the private
-`build/Prism-Samples-metadata.tar.gz` archive from the first Mac. It contains
-only the read-only inventory database, folder tree, research notes and query
-script; no audio or instrument payloads. It retains real collection names and
-paths, so keep it private and out of Git. It is optional for normal development.
-
-```sh
-mkdir -p build/private-samples
-tar -xzf /path/to/Prism-Samples-metadata.tar.gz -C build/private-samples
-python3 "$PWD/build/private-samples/Samples-research/query.py" accordion
-```
-
-The query reads the transferred metadata database, not the original drive.
-Recorded source paths are historical strings, not mounted-volume requirements.
-
-Use **Swift 6** tools (last verified with Swift 6.3.3/Xcode 26.6). The package's
-macOS 13 deployment floor is a separate target and has not been tested on that
-older OS. No external drive, installed DAW, commercial plugin or network request
-is required for the generic commands:
+Fetch and check out the checkpoint branch supplied with this handoff. Use Swift 6
+on macOS; minimum deployment target is macOS 13, not a tested compatibility claim.
 
 ```sh
 swift build
@@ -149,54 +95,36 @@ python3 scripts/probe_smoke.py
 python3 scripts/template_self_test.py
 python3 scripts/sync_agent_adapters.py --check
 python3 scripts/catalog_state_check.py
-python3 scripts/create_offline_demo.py
-.build/debug/simplify-probe \
-  --plugins build/offline-demo/Plugins \
-  --samples build/offline-demo/Samples \
-  --libraries build/offline-demo/Libraries \
-  --projects build/offline-demo/Projects \
-  --metrics > build/offline-demo/report.json
+swift build -c release
+python3 scripts/build_app.py
 ```
 
-The demo generator refuses to overwrite an existing destination; pass a fresh
-`--output` directory for another run. Its tiny text payloads have audio/plugin
-extensions for inventory tests but are **not playable audio or installed
-plugins**. The CLI report contains local paths and stays in ignored `build/`.
-For the native browser, run `swift build -c release` and
-`python3 scripts/build_app.py`, then open `build/Prism.app` and add the four
-generated roots in Setup. The app also includes standard system plugin roots
-automatically; use the CLI command above for an **isolated** synthetic inventory.
-The isolated
-`build/Prism.app/Contents/MacOS/Prism --ui-smoke captures/catalog` flow is a
-separate automated AppKit check; it creates its own fake catalog and exits.
+Then open `build/Prism.app`. For an isolated synthetic inventory without an external
+drive, use `python3 scripts/create_offline_demo.py` with a fresh output directory.
+These fixtures are not playable content. Native host/real-library tests are opt-in
+and require separately available DAWs, plugins, drives and private fixtures.
 
-Native checks are **opt-in** and intentionally machine-specific. In particular,
-`PRISM_PROTOOLS_RESTORE_V2_RUNTIME=1` requires private full-log captures and
-installed AAX controls; `PRISM_PROTOOLS_RESTORE_FIXTURE_DIR` can point to a
-private capture copy. `PRISM_KONTAKT_TABLE_RUNTIME=1` requires private state
-tables and `PRISM_KONTAKT_MANIFEST_PATH` for the native Accordion manifest.
-Other host checks likewise require the documented local controls. An explicitly
-enabled check with missing prerequisites reports failure; absence from a generic
-run is not native validation. See [TOOLCHAIN.md](../TOOLCHAIN.md).
+The local catalog, setup, audio content, DAW logs, screenshots, private runtime
+fixtures, temporary harnesses and built app are NOT in Git. Configure roots on the
+new laptop; do not assume this machine's paths or private evidence are available.
+Do not copy a live SQLite file casually; use a coherent SQLite backup if transferring
+private catalog state separately. The production app on the original laptop still
+runs the prior packaged build; latest v6 source was not deployed to its catalog.
 
-## Next work, in priority order
+## Next actions
 
-1. Re-run generic checks on the new Mac; inspect coverage and only then create
-   new revision-bound evidence. Do not use historical passing JSON as current
-   signoff. Use the offline demo for browser/discovery work without reconnecting
-   Samples.
-2. Qualify native manual Pro Tools and Cubase success/failure grammar before
-   admitting their brief unsaved insertions. A lone Add or an unrelated save
-   marker is insufficient. Keep private controls out of Git.
-3. Establish exact individual-WAV and active instrument/NKI identity plus
-   source-local load times in each of Live, Logic, Cubase and Pro Tools. Saved
-   project inclusion alone cannot establish historical instantiation time.
-4. Continue resumable indexing and partial-coverage UX for collection scale;
-   test against synthetic bounded structures and the sanitized aggregate until
-   representative content is available. Finish parent cleanup gates, reviews,
-   accessibility/visual/runtime checks and release decisions separately.
-
-Coordination preference: Astra handles product management and final review;
-Sol/Luna take bounded implementation and research tasks, with one source writer
-at a time and independent read-only review. The current handoff is a checkpoint,
-not an assertion that the whole product or four-host usage matrix is complete.
+1. Inspect the current diff/plan and run the portable suite. Resolve any checkpoint
+   failures without weakening assertions. The late-restore MainActor timing test
+   has intermittently failed in parallel runs; investigate its synchronization.
+2. Review v6 migration, exact instrument identity/history, typed process admission,
+   parent rollup and patch sorting together. Preserve event times, old payloads,
+   explicit tags, and no cross-library inheritance. Recheck UI latency after v6.
+3. Verify current plugin source collection in the actual app, then resolve a real
+   sample/patch event source and its required OS authority. This is the critical
+   missing deliverable; more ledger tests do not close it.
+4. Measure effective tags and qualified physical sizes across the whole collection,
+   verify unseen-product behavior and catalog update/import paths, and address actual
+   remaining shared causes. Do not claim improved percentages without a census.
+5. Run final configured gates once the source is frozen, package, perform native UI
+   and host acceptance, and run `python3 scripts/workflow_gate.py check-complete`.
+   Keep failed/pending gates truthful. This checkpoint is not release approval.

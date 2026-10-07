@@ -9,7 +9,7 @@ Usage: simplify-probe [--standard-plugins] [--plugins DIR] [--samples DIR]
 --inspect-plugin-receipt PACKAGE_ID BUNDLE reads an installer record; not original Date added or use.
 --inspect-cubase-archive FILE reads partial exported-track references; no usage timestamps.
 --inspect-cubase-descriptors FILE emits unresolved diagnostic records only; never usage evidence.
---check-product-tags validates reviewed official web sources without reading local inventory.
+--check-product-tags validates bundled records and fetchable reviewed web sources without reading local inventory.
 Repeat folder options for multiple roots. No arguments or --help performs no scan.
 JSON includes local paths. Keep reports private. No files are changed and no plugins run.
 Project readers are experimental and partial. Recency uses project modification time,
@@ -33,13 +33,18 @@ if arguments.first == "--inspect-plugin-receipt" {
         try FileHandle.standardOutput.write(contentsOf: encoder.encode(report) + Data([10])); exit(0)
     } catch { exit(1) }
 }
-// Explicit network-only provider validation; no local inventory is read or transmitted.
+// Reviewed source validation; only explicitly network-enabled descriptors are fetched.
 if arguments == ["--check-product-tags"] {
     var failures = 0
     for source in ProductTagSources.all {
         do {
-            _ = try await ProductTagClient.fetch(source)
-            print("PASS \(source.id): \(source.metadata.searchText)")
+            try source.validateReviewRecord()
+            if source.networkEnabled {
+                _ = try await ProductTagClient.fetch(source)
+                print("PASS \(source.id): \(source.metadata.searchText)")
+            } else {
+                print("BUNDLED \(source.id): \(source.metadata.searchText)")
+            }
         } catch { failures += 1; print("FAIL \(source.id): \(error.localizedDescription)") }
     }
     exit(failures == 0 ? 0 : 2)

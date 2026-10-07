@@ -14,15 +14,18 @@ public struct Asset: Codable, Sendable {
     public var finderDateAdded: Date? = nil
     public let classification: String
     public var libraryMetadata: LibraryMetadata? = nil
+    /// Exact vendor VST3 subcategories shared by Audio Module classes in this bundle.
+    public var vst3Categories: VST3CategoryMetadata? = nil
     public var fileIdentity: PluginFileIdentity? = nil
     public var catalogID: String? = nil
     /// Durable catalog item owning this physical plugin installation.
     public var pluginProductID: String? = nil
     public var catalogStale: Bool? = nil
-    /// Session catalog key. Vendor-backed libraries use product identity even when
-    /// their physical content is shared or moves. Other assets retain path identity.
+    /// Session catalog key. A persisted catalog ID remains stable across moves.
+    /// Before persistence, product plus path keeps physical installations distinct.
     public var selectionKey: String {
-        kind == .library ? (catalogID ?? libraryMetadata?.identity?.productID ?? path) : path
+        guard kind == .library else { return path }
+        return catalogID ?? libraryMetadata?.identity?.productID.map { $0 + "\0" + path } ?? path
     }
 }
 
@@ -51,9 +54,66 @@ public struct ProjectReport: Codable, Sendable {
     public let projectModifiedAt: Date?
     public let references: [ProjectReference]
     public let limitations: [String]
+    /// Structurally owned Kontakt states only. Nil decodes legacy reports.
+    public var kontaktStates: [KontaktSavedState]? = nil
+    /// Hash of the bounded project bytes used by the state adapter.
+    public var sourceSHA256: String? = nil
+    /// Per-ID binding result; unknown IDs remain visible beside known siblings.
+    public var kontaktOutcomes: [KontaktLibraryOutcome]? = nil
+    /// Version-gated, typed Cubase Spectrasonics states; nil in older reports.
+    public var spectrasonicsStates: [SpectrasonicsSavedState]? = nil
+    public var spectrasonicsOutcomes: [SpectrasonicsLibraryOutcome]? = nil
+    /// Structurally owned VST3 class declarations in a saved host snapshot.
+    public var pluginClasses: [ProjectPluginClass]? = nil
+    public var sineInstrumentIDs: [String]? = nil
+    public var aaxPlugins: [ProToolsSavedPluginReader.Entry]? = nil
+    public var logicAUReferences: [LogicSavedAUReader.Reference]? = nil
+    /// Exact file whose bytes and modification time define this package snapshot.
+    public var sourcePath: String? = nil
+    /// Reuse only while the exact source file and this reader policy are unchanged.
+    public var sourceSignature: String? = nil
+    public var readerPolicyVersion: Int? = nil
 }
 
-public struct SampleInclusion: Codable, Sendable {
+public struct ProjectPluginClass: Codable, Sendable, Equatable {
+    public let instanceOrdinal: Int
+    public let classID: String
+    public let name: String
+}
+
+public struct SpectrasonicsSavedState: Codable, Sendable, Equatable {
+    public let instanceOrdinal: Int
+    public let state: SpectrasonicsStateReader.Result
+}
+
+public struct SpectrasonicsLibraryOutcome: Codable, Sendable, Equatable {
+    public let instanceOrdinal: Int
+    public let partSlot: Int
+    public let libraryName: String
+    public let presetName: String
+    public let catalogID: String?
+    public let status: String
+}
+
+public struct KontaktSavedState: Codable, Sendable, Equatable {
+    public let instanceOrdinal: Int
+    public let libraryIDs: [String]
+    public let opaquePayloads: Int
+    public let emptyRack: Bool
+    public var classification: String {
+        if !libraryIDs.isEmpty { return "libraryIDs" }
+        return emptyRack ? "emptyKontakt" : "unidentifiedContent"
+    }
+}
+
+public struct KontaktLibraryOutcome: Codable, Sendable, Equatable {
+    public let instanceOrdinal: Int
+    public let libraryID: String
+    public let catalogID: String?
+    public let status: String
+}
+
+public struct SampleInclusion: Codable, Sendable, Equatable {
     public let samplePath: String
     public let projectPaths: [String]
     public let latestReferencingProjectModifiedAt: Date?
@@ -63,15 +123,18 @@ public struct SampleInclusion: Codable, Sendable {
 public struct ScanReport: Codable, Sendable {
     /// An incomplete inventory has no reference conclusions until the scan finishes.
     public init(inventory: InventorySnapshot) {
-        schemaVersion = 1; assets = inventory.assets; projects = []; sampleInclusions = []
+        schemaVersion = 1; assets = inventory.assets; projects = []; sampleInclusions = []; sampleInclusionsDerived = nil
         issues = []; durationSeconds = inventory.elapsedSeconds
     }
-    internal init(schemaVersion: Int, assets: [Asset], projects: [ProjectReport], sampleInclusions: [SampleInclusion], issues: [ScanIssue], durationSeconds: Double) {
+    internal init(schemaVersion: Int, assets: [Asset], projects: [ProjectReport], sampleInclusions: [SampleInclusion], issues: [ScanIssue], durationSeconds: Double,
+                  sampleInclusionsDerived: Bool? = nil) {
         self.schemaVersion = schemaVersion; self.assets = assets; self.projects = projects
         self.sampleInclusions = sampleInclusions; self.issues = issues; self.durationSeconds = durationSeconds
+        self.sampleInclusionsDerived = sampleInclusionsDerived
     }
     public func replacingAssets(_ assets: [Asset]) -> ScanReport {
-        ScanReport(schemaVersion: schemaVersion, assets: assets, projects: projects, sampleInclusions: sampleInclusions, issues: issues, durationSeconds: durationSeconds)
+        ScanReport(schemaVersion: schemaVersion, assets: assets, projects: projects, sampleInclusions: sampleInclusions, issues: issues, durationSeconds: durationSeconds,
+                   sampleInclusionsDerived: sampleInclusionsDerived)
     }
     /// Replace only executed sections; legacy unowned issues remain until a full scan.
     public func merging(previous: ScanReport?, scannedKinds: Set<AssetKind>) -> ScanReport {
@@ -85,20 +148,41 @@ public struct ScanReport: Codable, Sendable {
             projects: scannedKinds.contains(.sample) ? projects : previous.projects,
             sampleInclusions: scannedKinds.contains(.sample) ? sampleInclusions : previous.sampleInclusions,
             issues: mergedIssues,
-            durationSeconds: durationSeconds)
+            durationSeconds: durationSeconds,
+            sampleInclusionsDerived: scannedKinds.contains(.sample) ? sampleInclusionsDerived : previous.sampleInclusionsDerived)
     }
     public func removingPluginPaths(_ paths: Set<String>) -> ScanReport {
-        ScanReport(schemaVersion: schemaVersion, assets: assets.filter { $0.kind != .plugin || !paths.contains($0.path) }, projects: projects, sampleInclusions: sampleInclusions, issues: issues, durationSeconds: durationSeconds)
+        ScanReport(schemaVersion: schemaVersion, assets: assets.filter { $0.kind != .plugin || !paths.contains($0.path) }, projects: projects, sampleInclusions: sampleInclusions, issues: issues, durationSeconds: durationSeconds,
+                   sampleInclusionsDerived: sampleInclusionsDerived)
     }
     public let schemaVersion: Int
     public let assets: [Asset]
     public let projects: [ProjectReport]
     public let sampleInclusions: [SampleInclusion]
+    /// New scope evidence can derive these rows from committed sample nodes and
+    /// project references. Nil means an older scope contains explicit rows.
+    public let sampleInclusionsDerived: Bool?
     public let issues: [ScanIssue]
     public let durationSeconds: Double
+
+    public static func deriveSampleInclusions(assets: [Asset], projects: [ProjectReport]) -> [SampleInclusion] {
+        let orderedProjects = projects.sorted { $0.path < $1.path }
+        var referencesByPath: [String: [ProjectReport]] = [:]
+        for project in orderedProjects {
+            let paths = Set(project.references.filter { $0.kind == .sample }.compactMap(\.resolvedPath))
+            for path in paths { referencesByPath[path, default: []].append(project) }
+        }
+        return assets.filter { $0.kind == .sample }.sorted { $0.path < $1.path }.map { asset in
+            let matches = referencesByPath[asset.path] ?? []
+            return SampleInclusion(samplePath: asset.path, projectPaths: matches.map(\.path),
+                latestReferencingProjectModifiedAt: matches.compactMap(\.projectModifiedAt).max(),
+                status: matches.isEmpty ? "noReferencesFoundInScannedProjects" : "referenced")
+        }
+    }
 }
 
 public struct ScanRequest: Sendable {
+    public enum LibraryScanMode: Sendable { case complete, boundedDiagnostic }
     public var plugins: [URL] = []
     /// Default discovery locations whose absence is expected, unlike user roots.
     public var optionalPluginRoots: [URL] = []
@@ -108,6 +192,15 @@ public struct ScanRequest: Sendable {
     /// Per collection category; a large sample tree must not starve project discovery.
     public var maximumEntries = 100_000
     public var maximumDepth = 64
+    /// Normal refresh traverses every reachable supported candidate. Disable
+    /// only for a deliberately bounded diagnostic probe.
+    public var completeFileScan = true
+    /// Normal project refresh must reach later projects in large configured roots.
+    /// Set false only for an explicitly bounded diagnostic traversal.
+    public var completeProjectScan = true
+    /// Complete collection scans continue across work batches. The explicit
+    /// diagnostic mode retains entry/depth limits for small boundary probes.
+    public var libraryScanMode: LibraryScanMode = .complete
     public init() {}
 
     public static var standardPluginRoots: [URL] {

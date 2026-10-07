@@ -36,7 +36,7 @@ private func sample(_ path: String, bytes: Int = 1) -> Asset {
     #expect(Set(tree.nodes.map(\.id)).count == tree.nodes.count)
     let instrument = try #require(tree.nodes.first { $0.title == "Low Winds" })
     #expect(instrument.breadcrumb == ["8Dio", "CAGE Winds", "Low Winds"])
-    #expect(instrument.sizeText == "Shared with library")
+    #expect(instrument.sizeText == "—")
     #expect(tree.nodes.filter { $0.kind == .library }.allSatisfy { $0.sizeText == "17 bytes" })
     #expect(tree.roots.allSatisfy { $0.location == nil })
 }
@@ -58,6 +58,52 @@ private func sample(_ path: String, bytes: Int = 1) -> Asset {
     let parent = full.filtered(query: "Folk")
     #expect(parent.nodes.filter { $0.kind == .instrument }.isEmpty)
     #expect(parent.nodes.first { $0.kind == .library }?.metadataOnlyMatch == true)
+}
+
+@Test @MainActor func flatLibrarySortKeepsArticulationsAttachedToPhysicalPatch() throws {
+    let art = LibraryArticulation(id: "tremolo", name: "Tremolo", source: "Synthetic SINE fixture")
+    let patch = LibraryInstrument(name: "Low Strings", path: "/ark/spot.otmeta", tags: ["Strings"],
+                                  vendorID: "sine:collection:39:instrument:361", articulations: [art, LibraryArticulation(id: "pizz", name: "Pizzicato", source: "Fixture")],
+                                  articulationCoverage: LibraryArticulationCoverage(status: .indexed, adapter: "fixture", adapterVersion: 1, sourceVersion: nil, sourceSignature: nil))
+    let asset = library("Metropolis Ark 1", path: "/ark/spot.otmeta", maker: "Orchestral Tools",
+                        product: "sine:collection:39", instruments: [patch])
+    for sort in [CatalogSort.tags, .installed] {
+        let tree = CatalogOutline.build(assets: [asset], category: .library, sort: sort)
+        #expect(tree.roots.count == 1 && tree.roots[0].kind == .instrument)
+        #expect(tree.roots[0].children.map(\.title) == ["Tremolo", "Pizzicato"])
+        #expect(tree.roots[0].children[0].breadcrumb == ["Orchestral Tools", "Metropolis Ark 1", "Low Strings", "Tremolo"])
+    }
+}
+
+@Test @MainActor func singletonTechniqueIsOneSearchablePatchAndSizeSortIsGlobal() throws {
+    let solo = LibraryInstrument(name: "Celli", path: "/small/Celli.nki", tags: [],
+        articulations: [LibraryArticulation(id: "long", name: "Long", source: "Fixture")],
+        articulationCoverage: LibraryArticulationCoverage(status: .indexed, adapter: "fixture", adapterVersion: 1, sourceVersion: nil, sourceSignature: nil))
+    var small = library("Small", path: "/small", maker: "A maker", instruments: [solo])
+    small.logicalBytes = 10
+    var large = library("Large", path: "/large", maker: "Z maker")
+    large.logicalBytes = 100
+    let tree = CatalogOutline.build(assets: [small, large], category: .library)
+    #expect(tree.nodes.filter { $0.kind == .instrument }.count == 1)
+    #expect(tree.nodes.filter { $0.kind == .articulation }.isEmpty)
+    #expect(tree.filtered(query: "long").nodes.contains { $0.kind == .instrument && $0.title == "Celli" })
+    let sized = CatalogOutline.build(assets: [small, large], category: .library, sort: .size)
+    #expect(sized.roots.map(\.title) == ["Large", "Small"])
+    #expect(sized.roots.allSatisfy { $0.kind == .library })
+    #expect(sized.roots[1].children.map(\.title) == ["Celli"])
+    #expect(sized.roots[1].breadcrumb == ["A maker", "Small"])
+}
+
+@Test @MainActor func oldTechniquePayloadHasUnknownCoverageAndNoAssertedChoices() throws {
+    let legacy = LibraryInstrument(name: "Celli", path: "/legacy/Celli.nki", tags: [],
+        articulations: [LibraryArticulation(id: "old", name: "Guessed", source: "legacy")])
+    let data = try JSONEncoder().encode(legacy)
+    var old = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+    old.removeValue(forKey: "articulationCoverage")
+    let decoded = try JSONDecoder().decode(LibraryInstrument.self, from: JSONSerialization.data(withJSONObject: old))
+    #expect(decoded.articulationCoverage.status == .unknown)
+    let tree = CatalogOutline.build(assets: [library("Legacy", path: "/legacy", instruments: [decoded])], category: .library)
+    #expect(tree.nodes.filter { $0.kind == .articulation }.isEmpty)
 }
 
 @Test @MainActor func sampleTreeUsesMostSpecificRootAndFlatSearchKeepsBreadcrumbAndSort() throws {
@@ -107,10 +153,15 @@ private func sample(_ path: String, bytes: Int = 1) -> Asset {
 }
 
 @Test @MainActor func stalePatchAndPluginProductStateStayDistinct() throws {
-    var patch = LibraryInstrument(name: "Accordion", path: "/folk/Accordion.nki", tags: [])
+    var patch = LibraryInstrument(name: "Accordion", path: "/folk/Accordion.nki", tags: [],
+        articulations: [LibraryArticulation(id: "sustain", name: "Sustain", source: "Synthetic fixture"),
+                        LibraryArticulation(id: "short", name: "Short", source: "Synthetic fixture")],
+        articulationCoverage: LibraryArticulationCoverage(status: .indexed, adapter: "fixture", adapterVersion: 1, sourceVersion: nil, sourceSignature: nil))
     patch.catalogStale = true
     let tree = CatalogOutline.build(assets: [library("Folk", path: "/folk", instruments: [patch])], category: .library)
     #expect(tree.nodes.first { $0.kind == .instrument }?.stale == true)
+    #expect(tree.nodes.first { $0.kind == .articulation }?.stale == true)
+    #expect(tree.nodes.first { $0.kind == .articulation }?.location == patch.path)
     #expect(tree.nodes.first { $0.kind == .library }?.stale == false)
     let au = Asset(kind: .plugin, path: "/Echo.component", name: "Echo", format: "component", bundleIdentifier: "example.echo.au", logicalBytes: nil, classification: "fixture")
     let vst = Asset(kind: .plugin, path: "/Echo.vst3", name: "Echo", format: "vst3", bundleIdentifier: "example.echo.vst3", logicalBytes: nil, classification: "fixture")

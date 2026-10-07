@@ -1,5 +1,27 @@
 # Toolchain
 
+Project-scan memory checks use synthetic files only. Run the configured
+`project-buffer-memory-runtime`, `ableton-preflight-memory-runtime`, and
+`ableton-batch-memory-runtime` checks with `scripts/run_check.py`. Each starts a
+separate test process with `PRISM_PROJECT_MEMORY_RUNTIME=1`, so prior tests cannot
+mask memory growth through the process high-water mark. Fixtures use at most
+192 MiB of disk and are deleted afterward; no user projects are scanned.
+The peak-growth limits are 96 MiB for malformed CPR files, 32 MiB for
+one 4 MiB ALS document, and 64 MiB for 24 valid ALS documents. Generic tests do
+not enable these memory measurements.
+
+`large-inclusion-runtime` creates a synthetic report whose original per-sample
+reference evidence exceeds the 32 MiB SQLite cell bound. It verifies exact
+referenced and no-reference rows through durable save/restore and cancelled retry,
+while keeping the existing SQLite bounds. The fixture contains no user audio files.
+
+`decoded-fact-cache` runs focused synthetic cache and reader tests. The separate
+`scan-responsiveness-runtime` check creates 99,000 empty sample files in an
+isolated disposable catalog and prepares a 100,000-path hierarchy. It measures
+main-actor heartbeat during durable scan, saved-catalog restore, and projection;
+run the runtime check alone
+so other test processes do not distort the 250 ms threshold.
+
 Native Swift package, no third-party downloads. Verified on Apple Silicon with
 Swift 6.3.3 / Xcode 26.6. Package deployment floor is macOS 13; that older OS and Intel
 have not been runtime-tested. `.workflow/toolchain.json` contains executable argv.
@@ -13,6 +35,7 @@ have not been runtime-tested. `.workflow/toolchain.json` contains executable arg
 | Local runtime probe | `python3 scripts/probe_runtime.py` (installed plugins and factory Ableton demo only) |
 | Template controls | `python3 scripts/template_self_test.py` |
 | Adapter consistency | `python3 scripts/sync_agent_adapters.py --check` |
+| Offline tag catalog | `python3 scripts/validate_product_tag_catalog.py` |
 
 Run `.build/debug/simplify-probe --help` for read-only scan options. JSON contains
 local paths and should stay private. No arguments performs no scan. SwiftPM uses its
@@ -24,8 +47,16 @@ A native AppKit preview is packaged by `python3 scripts/build_app.py` into
 `build/Prism.app`. Icon conversion requires the approved packaging escalation
 in this environment. Run `build/Prism.app/Contents/MacOS/Prism --ui-smoke captures/catalog`
 for synthetic native interaction/capture tests (GUI escalation required).
+For a beta without touching the existing packaged preview, run configured
+`beta-clean-build` in a separate ignored SwiftPM scratch path, then
+`beta-package-rebuild`, `beta-package-local`, `beta-dmg-local` and
+`beta-runtime-local`. These create an ad-hoc signed app and unnotarized DMG under
+ignored `release-build/` and use isolated synthetic runtime fixtures. They do not
+use credentials, upload, install, or publish. The release owner follows
+`docs/release/PRISM_BETA.md` to produce and validate the separately Developer ID
+signed, notarized, stapled final artifact.
 `python3 scripts/catalog_state_check.py` checks the native state registry and setup persistence IDs.
-There is no distribution signing, sample/library deletion, or background service yet. Accepted folder setup and final inventory catalog are stored locally; filters remain session-only. The catalog restores asynchronously and marks retained unobserved entries stale. Full DAW compatibility and host-generated REAPER fixture checks remain unverified.
+The ordinary preview is ad-hoc signed; Developer ID distribution is a separate release-owner workflow. There is no sample/library deletion or background service. Accepted folder setup and final inventory catalog are stored locally; filters remain session-only. The catalog restores asynchronously and marks retained unobserved entries stale. Full DAW compatibility and host-generated REAPER fixture checks remain unverified.
 The runtime probe is machine-specific and excluded from generic CI. CI requires macOS.
 Set `PRISM_ABLETON_FACTORY_DEMOS` to override its optional Ableton demo location;
 an invalid explicit directory fails rather than silently dropping project coverage.
@@ -74,3 +105,6 @@ check when the environment variable is absent.
 controls. The Accordion manifest-binding check additionally requires
 `PRISM_KONTAKT_MANIFEST_PATH` set to a local `Accordion.nicnt`; without it the
 opt-in test records an explicit failure. Generic tests do not require the drive.
+The separate opt-in `PRISM_SAVED_PROJECT_RUNTIME=1` controls require
+`PRISM_SINE_CONTROL_PROJECTS` to point to a local directory containing
+`sinetest.cpr` and `sinetest-empty.cpr`; no user-specific path is committed.

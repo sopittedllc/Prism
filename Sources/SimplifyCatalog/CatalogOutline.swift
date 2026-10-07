@@ -2,8 +2,9 @@ import Foundation
 import SimplifyCore
 
 /// A presentation identity, never a deletion target. Payloads come only from the catalog.
-@MainActor public final class CatalogOutlineNode: NSObject {
-    public enum Kind: String { case maker, unidentified, library, instrument, root, folder, sample, plugin }
+/// Immutable presentation node; safe to construct on a background executor before publication.
+public final class CatalogOutlineNode: NSObject, Sendable {
+    public enum Kind: String, Sendable { case maker, unidentified, library, instrument, articulation, root, folder, sample, plugin }
     public let id: String
     public let locatorKey: String
     public let kind: Kind
@@ -12,6 +13,7 @@ import SimplifyCore
     public let location: String?
     public let asset: Asset?
     public let instrument: LibraryInstrument?
+    public let articulation: LibraryArticulation?
     public let children: [CatalogOutlineNode]
     public let searchText: String
     public let metadataOnlyMatch: Bool
@@ -22,31 +24,55 @@ import SimplifyCore
     public var isGroup: Bool { kind == .maker || kind == .unidentified || kind == .root || kind == .folder }
     public var displayName: String { title + (stale ? " · Not observed" : "") }
     public var sizeText: String {
-        if kind == .instrument { return "Shared with library" }
-        if kind == .library { return asset?.logicalBytes.map { ByteCountFormatter.string(fromByteCount: Int64($0), countStyle: .file) } ?? "Not measured" }
+        if kind == .articulation { return "—" }
+        if kind == .instrument { return "—" }
+        if kind == .library {
+            guard let bytes = asset?.logicalBytes else { return "Size unavailable" }
+            return ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
+        }
         if kind == .plugin { return pluginSizeLabel ?? "Unknown" }
-        return asset?.logicalBytes.map { ByteCountFormatter.string(fromByteCount: Int64($0), countStyle: .file) } ?? "—"
+        return asset?.logicalBytes.map { ByteCountFormatter.string(fromByteCount: Int64($0), countStyle: .file) } ?? "Size unavailable"
     }
     init(id: String, locatorKey: String? = nil, kind: Kind, title: String, breadcrumb: [String],
          location: String? = nil, asset: Asset? = nil, instrument: LibraryInstrument? = nil,
+         articulation: LibraryArticulation? = nil,
          children: [CatalogOutlineNode] = [], searchText: String = "", metadataOnlyMatch: Bool = false,
          pluginSizeBytes: Int? = nil, pluginSizeLabel: String? = nil) {
         self.id = id; self.locatorKey = locatorKey ?? id; self.kind = kind; self.title = title
         self.breadcrumb = breadcrumb; self.location = location; self.asset = asset
-        self.instrument = instrument; self.children = children; self.searchText = searchText
+        self.instrument = instrument; self.articulation = articulation
+        self.children = children; self.searchText = searchText
         self.metadataOnlyMatch = metadataOnlyMatch
         self.pluginSizeBytes = pluginSizeBytes; self.pluginSizeLabel = pluginSizeLabel
     }
     func replacingChildren(_ children: [CatalogOutlineNode], metadataOnly: Bool = false) -> CatalogOutlineNode {
         CatalogOutlineNode(id: id, locatorKey: locatorKey, kind: kind, title: title, breadcrumb: breadcrumb,
-                           location: location, asset: asset, instrument: instrument, children: children,
+                           location: location, asset: asset, instrument: instrument, articulation: articulation, children: children,
                            searchText: searchText, metadataOnlyMatch: metadataOnly,
                            pluginSizeBytes: pluginSizeBytes, pluginSizeLabel: pluginSizeLabel)
     }
 }
 
 /// Immutable, in-memory projection. Building and filtering never read the filesystem.
-@MainActor public final class CatalogOutline {
+/// Immutable tree and lookup index; mutable navigation remains MainActor-owned below.
+public final class CatalogOutline: Sendable {
+    /// Prepare an immutable projection away from AppKit, propagating cancellation.
+    /// Callers must recheck their generation before publishing the returned tree.
+    static func prepare(assets: [Asset], category: AssetKind, sampleRoots: [URL], sort: CatalogSort,
+                        reversed: Bool, recency: [String: Date], additions: [String: AdditionDateEvidence],
+                        usageDays: [String: String], tags: [String: String]) async -> CatalogOutline {
+        let worker = Task.detached(priority: .utility) {
+            autoreleasepool {
+                build(assets: assets, category: category, sampleRoots: sampleRoots, sort: sort,
+                    reversed: reversed, recency: recency, additions: additions, usageDays: usageDays, tags: tags)
+            }
+        }
+        return await withTaskCancellationHandler(operation: {
+            if Task.isCancelled { worker.cancel() }
+            return await worker.value
+        }, onCancel: { worker.cancel() })
+    }
+
     public let roots: [CatalogOutlineNode]
     public let nodes: [CatalogOutlineNode]
     public let byID: [String: CatalogOutlineNode]
@@ -81,6 +107,7 @@ import SimplifyCore
             var groups: [String: [CatalogOutlineNode]] = [:]
             var groupNames: [String: String] = [:]
             for asset in assets {
+                if Task<Never, Never>.isCancelled { return CatalogOutline(roots: []) }
                 let metadata = asset.libraryMetadata
                 let verified = metadata?.identity?.evidence == .manifest || metadata?.identity?.evidence == .vendorCatalog
                 let maker = metadata?.maker.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -89,12 +116,25 @@ import SimplifyCore
                 let locator = key(["library", asset.path, metadata?.identity?.productID ?? ""])
                 let libraryID = asset.catalogID.map { key(["library", $0]) } ?? locator
                 let context = [groupName, asset.name]
-                let instruments = (metadata?.instruments ?? []).map { instrument in
+                let instruments = (metadata?.instruments ?? []).compactMap { instrument -> CatalogOutlineNode? in
+                    guard !Task<Never, Never>.isCancelled else { return nil }
                     let identity = instrument.vendorID.map { ["vendor", $0] } ?? ["path", instrument.path]
-                    return CatalogOutlineNode(id: key([libraryID] + identity), locatorKey: key([locator] + identity),
+                    let patchID = key([libraryID] + identity)
+                    let patchLocator = key([locator] + identity)
+                    let choices = instrument.articulationCoverage.status == .indexed ? instrument.articulations : []
+                    let singleton = choices.count == 1 ? choices.first : nil
+                    let children = (choices.count > 1 ? choices : []).map { articulation in
+                        CatalogOutlineNode(id: key([patchID, "articulation", articulation.id]),
+                            locatorKey: key([patchLocator, "articulation", articulation.id]),
+                            kind: .articulation, title: articulation.name,
+                            breadcrumb: context + [instrument.name, articulation.name],
+                            location: instrument.path, asset: asset, instrument: instrument,
+                            articulation: articulation, searchText: articulation.name)
+                    }
+                    return CatalogOutlineNode(id: patchID, locatorKey: patchLocator,
                         kind: .instrument, title: instrument.name, breadcrumb: context + [instrument.name],
-                        location: instrument.path, asset: asset, instrument: instrument,
-                        searchText: ([instrument.name] + instrument.tags).joined(separator: " "))
+                        location: instrument.path, asset: asset, instrument: instrument, children: children,
+                        searchText: ([instrument.name] + instrument.tags + [singleton?.name].compactMap { $0 }).joined(separator: " "))
                 }
                 let productText = ([asset.name, metadata?.maker ?? "", metadata?.player ?? "", metadata?.summary ?? ""]
                                    + (metadata?.tags ?? [])).joined(separator: " ")
@@ -114,6 +154,9 @@ import SimplifyCore
                     $0.kind == .instrument || ($0.kind == .library && $0.children.isEmpty)
                 }))
             }
+            if sort == .size {
+                return CatalogOutline(roots: ordered(hierarchy.nodes.filter { $0.kind == .library }))
+            }
             return hierarchy
         }
         final class Folder {
@@ -122,18 +165,35 @@ import SimplifyCore
             var files: [Asset] = []
             init(_ path: String) { self.path = path }
         }
-        let configured = Array(Set(sampleRoots.map { $0.standardizedFileURL.path })).sorted { $0.count > $1.count }
+        // These are catalog locators, not filesystem queries. URL's convenience
+        // initializers/appending methods may stat paths to infer directory hints.
+        func normalized(_ path: String) -> String {
+            var parts: [Substring] = []
+            for part in path.split(separator: "/") {
+                if part == "." { continue }
+                if part == ".." { if !parts.isEmpty { parts.removeLast() }; continue }
+                parts.append(part)
+            }
+            return "/" + parts.joined(separator: "/")
+        }
+        func parent(_ path: String) -> String {
+            guard let slash = path.lastIndex(of: "/"), slash != path.startIndex else { return "/" }
+            return String(path[..<slash])
+        }
+        func name(_ path: String) -> String { path.split(separator: "/").last.map(String.init) ?? "/" }
+        let configured = Array(Set(sampleRoots.map { normalized($0.path) })).sorted { $0.count > $1.count }
         var folders: [String: Folder] = [:]
         for asset in assets {
-            let path = URL(fileURLWithPath: asset.path).standardizedFileURL.path
+            if Task<Never, Never>.isCancelled { return CatalogOutline(roots: []) }
+            let path = normalized(asset.path)
             let root = configured.first { path == $0 || path.hasPrefix($0 == "/" ? "/" : $0 + "/") }
-                ?? URL(fileURLWithPath: path).deletingLastPathComponent().path
+                ?? parent(path)
             let folder = folders[root] ?? Folder(root); folders[root] = folder
-            let parent = URL(fileURLWithPath: path).deletingLastPathComponent().path
-            let suffix = parent == root ? "" : String(parent.dropFirst(root == "/" ? 1 : root.count + 1))
+            let directory = parent(path)
+            let suffix = directory == root ? "" : String(directory.dropFirst(root == "/" ? 1 : root.count + 1))
             var current = folder
             for part in suffix.split(separator: "/") {
-                let childPath = URL(fileURLWithPath: current.path).appendingPathComponent(String(part)).path
+                let childPath = (current.path == "/" ? "" : current.path) + "/" + part
                 let child = current.folders[childPath] ?? Folder(childPath)
                 current.folders[childPath] = child; current = child
             }
@@ -142,10 +202,10 @@ import SimplifyCore
         // Distinguish equal root names using the shortest unambiguous parent suffix.
         // These are display labels only; paths and file names stay unchanged.
         var rootTitles: [String: String] = [:]
-        let rootGroups = Dictionary(grouping: Array(folders.keys), by: { URL(fileURLWithPath: $0).lastPathComponent })
+        let rootGroups = Dictionary(grouping: Array(folders.keys), by: name)
         for (name, paths) in rootGroups {
             if paths.count == 1 { rootTitles[paths[0]] = name; continue }
-            let parents = paths.map { URL(fileURLWithPath: $0).deletingLastPathComponent().pathComponents }
+            let parents = paths.map { ["/"] + parent($0).split(separator: "/").map(String.init) }
             var depth = 1
             while depth < (parents.map(\.count).max() ?? 1),
                   Set(parents.map { $0.suffix(depth).joined(separator: "/") }).count < paths.count { depth += 1 }
@@ -154,7 +214,7 @@ import SimplifyCore
             }
         }
         func node(_ folder: Folder, root: String, context: [String], isRoot: Bool) -> CatalogOutlineNode {
-            let title = isRoot ? rootTitles[root]! : URL(fileURLWithPath: folder.path).lastPathComponent
+            let title = isRoot ? rootTitles[root]! : name(folder.path)
             let breadcrumb = context + [title]
             let subfolders = folder.folders.values.map { node($0, root: root, context: breadcrumb, isRoot: false) }
             let files = folder.files.map { asset in
@@ -172,7 +232,7 @@ import SimplifyCore
         }
         return hierarchy
     }
-    public func filtered(query: String, sort: CatalogSort = .name, reversed: Bool = false, recency: [String: Date] = [:], additions: [String: AdditionDateEvidence] = [:], usageDays: [String: String] = [:], tags: [String: String] = [:],
+    @MainActor public func filtered(query: String, sort: CatalogSort = .name, reversed: Bool = false, recency: [String: Date] = [:], additions: [String: AdditionDateEvidence] = [:], usageDays: [String: String] = [:], tags: [String: String] = [:],
                          pluginMatches: (Asset) -> Bool = { _ in true }, isFiltering: Bool = false,
                          nodeMatches: ((CatalogOutlineNode) -> Bool)? = nil) -> CatalogOutline {
         guard !query.isEmpty || isFiltering else { return self }
@@ -237,10 +297,24 @@ import SimplifyCore
     }
     func reconcile(previous: CatalogOutline?, current: CatalogOutline, category: AssetKind) {
         guard let previous else { return }
-        let locators = Dictionary(current.nodes.map { ($0.locatorKey, $0.id) }, uniquingKeysWith: { first, _ in first })
+        var tracked = Set<String>()
+        if let state = browsing[category] {
+            tracked.formUnion(state.expanded); tracked.formUnion(state.collapsed)
+            if let selection = state.selection { tracked.insert(selection) }
+        }
+        if let search = searching[category]?.1 {
+            tracked.formUnion(search.expanded); tracked.formUnion(search.collapsed)
+            if let selection = search.selection { tracked.insert(selection) }
+        }
+        let missing = tracked.filter { current.byID[$0] == nil && previous.byID[$0] != nil }
+        guard !missing.isEmpty else { return }
+        let wanted = Set(missing.compactMap { previous.byID[$0]?.locatorKey })
+        let locators = Dictionary(current.nodes.filter { wanted.contains($0.locatorKey) }
+            .map { ($0.locatorKey, $0.id) }, uniquingKeysWith: { first, _ in first })
         var mapping: [String: String] = [:]
-        for node in previous.nodes where current.byID[node.id] == nil {
-            if let replacement = locators[node.locatorKey] { mapping[node.id] = replacement }
+        for id in missing {
+            if let locator = previous.byID[id]?.locatorKey,
+               let replacement = locators[locator] { mapping[id] = replacement }
         }
         browsing[category]?.remap(mapping)
         if var search = searching[category] { search.1.remap(mapping); searching[category] = search }
@@ -253,7 +327,7 @@ import SimplifyCore
 }
 
 /// Shared ordering for browsing and search. Missing facts always follow known values.
-@MainActor enum CatalogOrdering {
+enum CatalogOrdering {
     static func precedes<T: Comparable>(title: String, id: String, size: T?, date: Date?, format: String,
         otherTitle: String, otherID: String, otherSize: T?, otherDate: Date?, otherFormat: String,
         sort: CatalogSort, reversed: Bool, addition: AdditionDateEvidence? = nil, otherAddition: AdditionDateEvidence? = nil, usageDay: String? = nil, otherUsageDay: String? = nil, tags: String? = nil, otherTags: String? = nil) -> Bool {
@@ -280,20 +354,27 @@ import SimplifyCore
     static func precedes(_ a: CatalogOutlineNode, _ b: CatalogOutlineNode, sort: CatalogSort, reversed: Bool,
                          dates: [String: Date], formats: [String: String] = [:], additions: [String: AdditionDateEvidence] = [:], usageDays: [String: String] = [:], tags: [String: String] = [:]) -> Bool {
         if a.isGroup != b.isGroup { return a.isGroup }
+        func usageDayKey(_ node: CatalogOutlineNode) -> String? {
+            if let instrument = node.instrument, let parentID = node.asset?.catalogID {
+                return AssetUsageSubject.instrumentUsageKey(parentNodeID: parentID, instrument: instrument)
+            }
+            return node.location
+        }
         func format(_ node: CatalogOutlineNode) -> String {
             if let value = formats[node.location ?? ""] { return value }
-            if let instrument = node.instrument { return URL(fileURLWithPath: instrument.path).pathExtension.uppercased() }
+            if let instrument = node.instrument { return (instrument.path as NSString).pathExtension.uppercased() }
             return node.asset?.libraryMetadata?.player ?? node.asset?.format.uppercased() ?? ""
         }
-        return precedes(title: a.title, id: a.id, size: a.kind == .sample ? a.asset?.logicalBytes : a.kind == .plugin ? a.pluginSizeBytes : nil,
-            date: a.isGroup ? nil : dates[a.location ?? ""], format: format(a),
-            otherTitle: b.title, otherID: b.id, otherSize: b.kind == .sample ? b.asset?.logicalBytes : b.kind == .plugin ? b.pluginSizeBytes : nil,
-            otherDate: b.isGroup ? nil : dates[b.location ?? ""], otherFormat: format(b),
+        let comparesFormat = !a.isGroup && sort == .format
+        return precedes(title: a.title, id: a.id, size: [.sample, .library].contains(a.kind) ? a.asset?.logicalBytes : a.kind == .plugin ? a.pluginSizeBytes : nil,
+            date: a.isGroup ? nil : dates[a.location ?? ""], format: comparesFormat ? format(a) : "",
+            otherTitle: b.title, otherID: b.id, otherSize: [.sample, .library].contains(b.kind) ? b.asset?.logicalBytes : b.kind == .plugin ? b.pluginSizeBytes : nil,
+            otherDate: b.isGroup ? nil : dates[b.location ?? ""], otherFormat: comparesFormat ? format(b) : "",
             sort: a.isGroup ? .name : sort, reversed: a.isGroup && sort != .name ? false : reversed,
             addition: a.isGroup ? nil : additions[a.location ?? ""],
             otherAddition: b.isGroup ? nil : additions[b.location ?? ""],
-            usageDay: a.kind == .plugin ? usageDays[a.location ?? ""] : nil,
-            otherUsageDay: b.kind == .plugin ? usageDays[b.location ?? ""] : nil,
+            usageDay: [.plugin, .instrument, .library, .sample].contains(a.kind) ? usageDayKey(a).flatMap { usageDays[$0] } : nil,
+            otherUsageDay: [.plugin, .instrument, .library, .sample].contains(b.kind) ? usageDayKey(b).flatMap { usageDays[$0] } : nil,
             tags: tags[a.location ?? ""], otherTags: tags[b.location ?? ""])
     }
 }

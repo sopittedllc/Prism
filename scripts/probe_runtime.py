@@ -32,6 +32,8 @@ unexpected = [issue for issue in report['issues'] if not (
 assert not unexpected, f'Runtime validation incomplete: {len(unexpected)} unexpected scan issues (paths withheld)'
 assert report['assets'], 'No real plugin candidates observed'
 assert all(a['kind'] == 'plugin' for a in report['assets'])
+unmeasured = sum(asset.get('logicalBytes') is None for asset in report['assets'])
+assert unmeasured == 0, f'{unmeasured} installed plugin candidates lack a measured bundle size'
 assert all(p['coverage'] == 'partial' for p in report['projects'])
 if factory.is_dir():
     assert report['projects'] and any(p['references'] for p in report['projects'])
@@ -41,6 +43,7 @@ print(json.dumps({
     'factory_project_count': len(report['projects']),
     'factory_reference_candidates': sum(len(p['references']) for p in report['projects']),
     'expected_missing_standard_roots': len(report['issues']),
+    'unmeasured_plugin_bundles': unmeasured,
     'seconds': round(report['durationSeconds'], 3),
     'limitations': 'Read-only installed-bundle and factory-project discovery only. No DAW-save roundtrip or full dependency coverage claimed.'
 }, indent=2))

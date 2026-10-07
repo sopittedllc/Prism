@@ -5,6 +5,8 @@ public struct ProToolsPluginUse: Codable, Sendable, Equatable {
     /// Retained so historical catalog payloads remain readable, but not authoritative.
     public static let sourceID = "avid.protools.host-restore.v1"
     public static let restoreV2SourceID = "avid.protools.host-restore.v2"
+    public static let attemptedSourceID = "avid.protools.host-instantiation-attempt.v1"
+    public static let attemptedQualification = "instantiationAttempt"
     public let name: String
     public let eventID: String
     public let reportedDate: Date?
@@ -13,28 +15,33 @@ public struct ProToolsPluginUse: Codable, Sendable, Equatable {
     public let runHash: String?
     public let recordOffset: Int?
     public let recordHash: String?
+    /// Nil in historical restore records; the new value denotes an observed attempt.
+    public let qualification: String?
 
     public var eventSourceID: String {
-        localTime != nil && runHash != nil && recordOffset != nil && recordHash != nil
-            ? Self.restoreV2SourceID : Self.sourceID
+        qualification == Self.attemptedQualification ? Self.attemptedSourceID :
+            localTime != nil && runHash != nil && recordOffset != nil && recordHash != nil
+                ? Self.restoreV2SourceID : Self.sourceID
     }
 
     init(name: String, sourceSeconds: Double, localTime: SourceLocalTime,
-         runHash: String, recordOffset: Int, recordHash: String) {
+         runHash: String, recordOffset: Int, recordHash: String, qualification: String? = nil) {
         self.name = name; self.sourceSeconds = sourceSeconds; self.localTime = localTime
         self.runHash = runHash; self.recordOffset = recordOffset; self.recordHash = recordHash
+        self.qualification = qualification
         self.reportedDate = nil
         self.eventID = Self.digest([runHash, String(recordOffset), recordHash,
                                     localTime.canonical, String(sourceSeconds.bitPattern)])
     }
 
     func subjectEventID(_ subjectID: String) -> String {
-        guard eventSourceID == Self.restoreV2SourceID else { return eventID }
+        guard eventSourceID != Self.sourceID else { return eventID }
         return Self.digest([eventID, subjectID])
     }
 
     func validateV2() throws {
         guard let localTime, let runHash, let recordOffset, let recordHash,
+              qualification == nil || qualification == Self.attemptedQualification,
               reportedDate == nil, sourceSeconds.isFinite, sourceSeconds >= 0,
               (0...ProToolsUsageLog.maximumBytes).contains(recordOffset),
               [runHash, recordHash, eventID].allSatisfy(Self.isDigest),
@@ -61,7 +68,8 @@ public struct ProToolsPluginUse: Codable, Sendable, Equatable {
 
 /// Integer-second civil anchors plus fractional monotonic deltas yield a nominal
 /// civil second, never a timezone-aware instant or subsecond-precise local time.
-/// PutDocumentInfo remains the restore qualification fence; manual use is excluded.
+/// A qualified instantiation is an attempted access even without a saved session.
+/// PutDocumentInfo still distinguishes the historical completed-restore source.
 public enum ProToolsUsageLog {
     public static let maximumBytes = 32 * 1024 * 1024
     private static let prefix = try! NSRegularExpression(pattern: #"^([0-9]+\.[0-9]+),"#)
@@ -82,6 +90,15 @@ public enum ProToolsUsageLog {
         var clockReliable = true
         var lastEvent: (seconds: Double, local: SourceLocalTime)?
         var byteOffset = 0
+        func flushAttempts() {
+            guard let runHash, clockReliable else { pending.removeAll(); return }
+            for item in pending {
+                output.append(ProToolsPluginUse(name: item.name, sourceSeconds: item.seconds,
+                    localTime: item.local, runHash: runHash, recordOffset: item.offset,
+                    recordHash: item.hash, qualification: ProToolsPluginUse.attemptedQualification))
+            }
+            pending.removeAll()
+        }
         // A growing diagnostic log may end mid-record. Ignore its unfinished tail.
         for raw in text.split(separator: "\n", omittingEmptySubsequences: false).dropLast() {
             let line = String(raw).trimmingCharacters(in: .newlines)
@@ -89,9 +106,11 @@ public enum ProToolsUsageLog {
             defer { byteOffset += lineBytes.count + 1 }
             guard lineBytes.count <= 32_768 else { throw AssetDateEvidenceError.tooManyRecords }
             if line.hasPrefix("*** Digidesign Session Trace for:") {
+                flushAttempts()
                 traceHeader = line; runHash = nil; anchor = nil; pending.removeAll()
                 clockReliable = true; awaitingStart = true; lastEvent = nil
             } else if line.hasPrefix("*** Starting Timestamp:") {
+                flushAttempts()
                 pending.removeAll(); anchor = nil; clockReliable = true; lastEvent = nil
                 runHash = awaitingStart ? traceHeader.map { ProToolsPluginUse.digest([$0, line]) } : nil
                 awaitingStart = false
@@ -101,7 +120,7 @@ public enum ProToolsUsageLog {
                   let range = Range(match.range(at: 1), in: line),
                   let seconds = Double(line[range]), seconds.isFinite else { continue }
             if line.contains("Closing session:") || line.contains("Opening session:") {
-                pending.removeAll()
+                flushAttempts()
             }
             if let marker = line.range(of: "Local wall clock:") {
                 let next = parseAnchor(String(line[marker.upperBound...]), seconds: seconds)
@@ -119,7 +138,7 @@ public enum ProToolsUsageLog {
             // No plugin-instance token exists here; invalidate the entire pending
             // restore batch on a known native instantiation failure indicator.
             if line.contains("kCantInstantiatePlugIn") || line.contains("Could not instantiate") {
-                pending.removeAll()
+                flushAttempts()
             }
             let completedRestore = line.range(
                 of: #": PtSess_RunTime::PutDocumentInfo - session was last saved with app version: [0-9]+\.[0-9]+(\.[0-9]+)?$"#,
@@ -139,15 +158,20 @@ public enum ProToolsUsageLog {
                   clockReliable else { continue }
             let tail = line[start.upperBound...]
             guard let end = tail.firstIndex(of: "\""), !tail[..<end].isEmpty,
+                  tail[end...].hasPrefix("\", track \""),
+                  let trackEnd = tail[end...].dropFirst("\", track \"".count).firstIndex(of: "\""),
+                  trackEnd > tail.index(end, offsetBy: "\", track \"".count),
                   let local = localSecond(anchor: anchor, eventSeconds: seconds) else { continue }
             if let lastEvent, seconds < lastEvent.seconds || local < lastEvent.local {
                 pending.removeAll(); clockReliable = false
                 continue
             }
             lastEvent = (seconds, local)
+            guard pending.count < 4096 else { throw AssetDateEvidenceError.tooManyRecords }
             pending.append(Pending(name: String(tail[..<end]), seconds: seconds,
                                    offset: byteOffset, hash: ProToolsPluginUse.digest(lineBytes), local: local))
         }
+        flushAttempts()
         return output
     }
 

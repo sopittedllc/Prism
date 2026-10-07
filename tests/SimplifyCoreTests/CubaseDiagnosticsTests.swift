@@ -98,7 +98,7 @@ private func cprDocument(_ body: Data = Data(), rif2: Bool = true) -> Data {
     }
 }
 
-@Test func cubaseFileInspectionIsReadOnlyAndNeverAdmittedToNormalProjectScanning() throws {
+@Test func cubaseFileInspectionIsReadOnlyAndMalformedProjectIsNotAdmitted() throws {
     // Keep fixtures in the workspace; system temporary URLs may traverse /var.
     let root = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
         .appendingPathComponent(".work/scratch/cubase-" + UUID().uuidString)
@@ -112,7 +112,7 @@ private func cprDocument(_ body: Data = Data(), rif2: Bool = true) -> Data {
     #expect(try Data(contentsOf: file) == input)
     #expect(try file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate == modified)
     let normal = ProjectReader.read(file)
-    #expect(normal.coverage == "unsupported" && normal.references.isEmpty)
+    #expect(normal.coverage == "failed" && normal.references.isEmpty && normal.kontaktStates == nil)
     let link = root.appendingPathComponent("link.cpr")
     try FileManager.default.createSymbolicLink(at: link, withDestinationURL: file)
     #expect(throws: (any Error).self) { try CubaseDiagnostics.inspect(link) }

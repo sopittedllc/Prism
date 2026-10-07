@@ -1,6 +1,7 @@
 import AppKit
 import SimplifyCore
 import SimplifyCatalog
+import CSQLite
 
 @MainActor final class AppDelegate: NSObject, NSApplicationDelegate {
     var controller: CatalogWindow?
@@ -17,38 +18,14 @@ import SimplifyCatalog
         let receiptCollector: CatalogModel.ReceiptCollector?
         if isSmoke || isDemo { receiptCollector = nil }
         else { receiptCollector = { assets, store in await PackageReceiptCollector.collect(assets: assets, store: store) } }
-        let usageCollector: CatalogModel.UsageCollector?
-        if isSmoke || isDemo { usageCollector = nil }
-        else {
-            usageCollector = { assets, store in
-                let live = await LiveUsageCollector.collect(assets: assets, store: store)
-                let cubase = await Task.detached(priority: .utility) { CubaseUsageCollector.collect() }.value
-                var recorded = live.recorded, failures = live.failures + cubase.failures
-                for bound in cubase.uses {
-                    guard let asset = assets.first(where: { $0.path == bound.pluginPath }) else { failures += 1; continue }
-                    guard asset.kind == .plugin, asset.format == "vst3", let id = asset.catalogID else { failures += 1; continue }
-                    do { _ = try await store.recordCubaseUsage(bound, for: id, at: Date()); recorded += 1 }
-                    catch { failures += 1 }
-                }
-                let proTools = await Task.detached(priority: .utility) { ProToolsUsageCollector.collect(assets: assets) }.value
-                failures += proTools.failures
-                for bound in proTools.uses {
-                    guard let asset = assets.first(where: { $0.path == bound.pluginPath }), asset.kind == .plugin,
-                          let id = asset.catalogID else { failures += 1; continue }
-                    do { _ = try await store.recordProToolsUsage(bound, for: id, at: Date()); recorded += 1 }
-                    catch { failures += 1 }
-                }
-                let logic = await Task.detached(priority: .utility) { LogicAccessibilityCollector.collect() }.value
-                for use in logic {
-                    let matches = assets.filter { $0.kind == .plugin && $0.format == "component" && $0.name == use.name && $0.catalogID != nil }
-                    guard matches.count == 1, let id = matches[0].catalogID else { failures += 1; continue }
-                    do { _ = try await store.recordLogicUsage(use, for: id, at: Date()); recorded += 1 }
-                    catch { failures += 1 }
-                }
-                return LiveUsageCollection(recorded: recorded, failures: failures, rejectedDocuments: live.rejectedDocuments)
-            }
-        }
-        let model = CatalogModel(store: store, catalogStore: catalog, receiptCollector: receiptCollector, usageCollector: usageCollector, tagStore: ProductTagStore(url: store.url.deletingLastPathComponent().appendingPathComponent("product-tags.json")))
+        // Last Used is saved-project membership only. Keep historical log records
+        // decodable, but do not poll hosts or promote them into this view.
+        let usageCollector: CatalogModel.UsageCollector? = nil
+        let model = CatalogModel(store: store,
+            sineDatabase: isDemo ? demoRoot.appendingPathComponent("Fixtures/synthetic-sine.db") : LibraryMetadataReader.sineDatabase,
+            catalogStore: catalog, receiptCollector: receiptCollector, usageCollector: usageCollector,
+            tagStore: ProductTagStore(url: store.url.deletingLastPathComponent().appendingPathComponent("product-tags.json")),
+            savedProjectUsageOnly: true)
         if isDemo { model.setStandardPlugins(false) }
         else if !isSmoke { model.setStandardPlugins(true) } // Standard roots are automatic; synthetic profiles remain isolated.
         if let iconURL = Bundle.main.url(forResource: "Prism", withExtension: "icns"), let icon = NSImage(contentsOf: iconURL) {
@@ -90,7 +67,6 @@ import SimplifyCatalog
         else if !isSmoke { Task {
             await model.restoreSavedCatalog()
             if !model.onboardingCompleted { controller?.showSetup() }
-            else { model.refreshConfiguredCollectionAfterRestore() }
         } }
         if CommandLine.arguments.count == 3, CommandLine.arguments[1] == "--ui-smoke" {
             let output = URL(fileURLWithPath: CommandLine.arguments[2])
@@ -153,7 +129,60 @@ private func seedDemoFiles(at root: URL) throws {
     try file("Libraries/Folk Colors/Folk.nicnt", "<ProductHints><Product><Name>Folk Colors</Name><Company>Example Audio</Company></Product></ProductHints>")
     try file("Libraries/Folk Colors/Instruments/Accordion.nki")
     try file("Libraries/Folk Colors/Instruments/Piano.nki")
+    try file("Libraries/Spitfire Chamber Strings/Spitfire Chamber Strings.nicnt", "<ProductHints><Product><Name>Spitfire Chamber Strings</Name><Company>Spitfire Audio</Company><SNPID>058</SNPID></Product></ProductHints>")
+    try file("Libraries/Spitfire Chamber Strings/Instruments/d - Celli.nki")
+    try file("Libraries/Spitfire Chamber Strings/Instruments/_Advanced_/Individual articulations/d - Celli/d - Celli - Legato (Fingered).nki")
+    try file("Libraries/Spitfire Chamber Strings/Instruments/_Advanced_/Individual articulations/d - Celli/d - Celli - Long Harmonics.nki")
+    try file("Libraries/Spitfire Chamber Strings/Instruments/_Advanced_/Extended techniques/d - Celli - Core techniques.nki")
+    try seedSyntheticSINE(database: root.appendingPathComponent("synthetic-sine.db"),
+                          contentRoot: root.appendingPathComponent("Libraries/Metropolis Ark 1"))
     try file("Projects/Fixture.rpp", "<REAPER_PROJECT\n<TRACK\n<ITEM\n<SOURCE WAVE\nFILE \"../Samples/Percussion 0.wav\"\n>\n>\n>\n>")
+}
+
+/// Tiny path-scoped catalog fixture: names are reviewed patch relationships, while
+/// files are dummy bytes and cannot play audio. Used only by Demo and native smoke.
+private func seedSyntheticSINE(database: URL, contentRoot: URL) throws {
+    let fm = FileManager.default
+    try fm.createDirectory(at: contentRoot, withIntermediateDirectories: true)
+    for mic in ["SPOT", "TREE"] {
+        for ext in ["otmeta", "otarc"] {
+            let file = contentRoot.appendingPathComponent("Wolfenstein Low Strings-\(mic).\(ext)")
+            if !fm.fileExists(atPath: file.path) { try Data("synthetic fixture".utf8).write(to: file) }
+        }
+    }
+    if fm.fileExists(atPath: database.path) { return }
+    var db: OpaquePointer?
+    guard sqlite3_open(database.path, &db) == SQLITE_OK else {
+        if let db { sqlite3_close(db) }
+        throw SmokeError.failed("Cannot create synthetic SINE catalog")
+    }
+    defer { sqlite3_close(db) }
+    let schema = """
+    CREATE TABLE t_collection(collection_key,collection_id,title,subtitle,developer,keywords);
+    CREATE TABLE t_instrument(instrument_key,instrument_collection,instrument_id,title,keywords);
+    CREATE TABLE t_micPosition(micposition_instrument,filePath);
+    CREATE TABLE t_articulation(articulation_key,articulation_instrument,articulation_id,title,kind,hidden);
+    INSERT INTO t_collection VALUES(39,'39','Metropolis Ark 1','Synthetic demo ensemble','Orchestral Tools','');
+    INSERT INTO t_instrument VALUES(123,39,'361','Wolfenstein Low Strings','low strings');
+    INSERT INTO t_articulation VALUES(1,123,'sustains','Sustains','single',0),
+      (2,123,'spiccato','Spiccato','single',0),(3,123,'tremolo','Tremolo','single',0);
+    """
+    guard sqlite3_exec(db, schema, nil, nil, nil) == SQLITE_OK else {
+        throw SmokeError.failed("Cannot seed synthetic SINE schema")
+    }
+    for mic in ["SPOT", "TREE"] {
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(db, "INSERT INTO t_micPosition VALUES(123,?)", -1, &statement, nil) == SQLITE_OK else {
+            throw SmokeError.failed("Cannot seed synthetic SINE mic")
+        }
+        let path = contentRoot.appendingPathComponent("Wolfenstein Low Strings-\(mic).otmeta").path + "/virtual.otmf"
+        let result = path.withCString { value in
+            sqlite3_bind_text(statement, 1, value, -1, nil)
+            return sqlite3_step(statement)
+        }
+        sqlite3_finalize(statement)
+        guard result == SQLITE_DONE else { throw SmokeError.failed("Cannot write synthetic SINE mic") }
+    }
 }
 
 enum SmokeError: Error { case failed(String) }
@@ -226,7 +255,7 @@ enum SmokeError: Error { case failed(String) }
     try file("Projects/Fixture.rpp", "<REAPER_PROJECT\n<TRACK\n<ITEM\n<SOURCE WAVE\nFILE \"../Samples/Percussion 0.wav\"\n>\n>\n>\n>")
     try file("Projects/Unsupported.ptx")
     let longProject = "<REAPER_PROJECT\n" + String(repeating: "# synthetic metadata\n", count: 100_000) + ">\n"
-    for index in 0..<12 { try file("Projects/Archive \(index).rpp", longProject) }
+    for index in 0..<24 { try file("Projects/Archive \(index).rpp", longProject) }
     let window = controller.window!
     var screenshots: [String] = []
     func capture(_ name: String, target: NSWindow? = nil) async throws {
@@ -251,22 +280,69 @@ enum SmokeError: Error { case failed(String) }
     try await Task.sleep(for: .milliseconds(150))
     try await capture("empty-light")
     let model = controller.model
-    controller.showSetup()
-    var setup = controller.setup!
+    var firstSetupRejection: String?
+    for _ in 0..<20 {
+        controller.showSetup()
+        if controller.setup != nil { break }
+        let reason = "busy=\(model.isBusy), scanning=\(model.isScanning), savingMetadata=\(model.isSavingMetadata), attachedSheet=\(window.attachedSheet?.title ?? "none")"
+        if firstSetupRejection == nil { firstSetupRejection = reason; fputs("UI smoke setup retry: \(reason)\n", stderr) }
+        try require(!model.isBusy, "Fresh setup must not begin behind background work: \(reason)")
+        try await Task.sleep(for: .milliseconds(50))
+    }
+    guard let initialSetup = controller.setup else {
+        throw SmokeError.failed("Fresh setup did not open: \(firstSetupRejection ?? "no observed rejection")")
+    }
+    var setup = initialSetup
     try require(window.attachedSheet === setup.window, "Setup sheet visible")
+    try require(setup.step == .libraries && setup.scanButton.title == "Continue", "Fresh setup begins with Sample Libraries")
+    try require(setup.addButton.accessibilityLabel() == "Add sample library folders…" &&
+                setup.addButton.item(at: 0)?.title == "Add sample library folders…", "Libraries has a named add action")
     try require(setup.draft.standardPlugins, "Standard plugin folders automatic")
+    try require(setup.addButton.menu?.items.contains(where: { $0.title.contains("Custom plugins") }) != true,
+                "Setup has no custom-plugin add choice")
     try await capture("setup-welcome", target: setup.window)
-    try require(setup.window!.contentView!.bounds.width <= 540 && setup.window!.contentView!.bounds.height <= 420, "Setup occupies half the previous area")
-    setup.draft.addRoots([fixture], kind: .samples)
+    try require(setup.window!.contentView!.bounds.width <= 540 && setup.window!.contentView!.bounds.height <= 470, "Setup remains compact")
+    setup.draft.addRoots([fixture], kind: .libraries)
+    activate(setup.scanButton)
+    try require(setup.step == .sounds && setup.scanButton.title == "Continue without sounds" && !model.isScanning,
+                "Individual Sounds has an explicit skip choice without starting work")
+    try require(setup.addButton.accessibilityLabel() == "Add individual sound folders…", "Individual Sounds has a named add action")
+    activate(setup.backButton)
     activate(setup.skipButton)
     try await Task.sleep(for: .milliseconds(250))
     try require(model.roots.isEmpty && !model.isScanning, "Cancel discards draft without scan")
-    controller.showSetup(); setup = controller.setup!
+    controller.showSetup()
+    guard let reopenedSetup = controller.setup else { throw SmokeError.failed("Setup did not reopen after Cancel") }
+    try require(window.attachedSheet === reopenedSetup.window, "Setup reopened as a fresh attached sheet after Cancel")
+    setup = reopenedSetup
     setup.draft.setStandardPlugins(false)
     for kind in RootKind.allCases { setup.draft.addRoots([fixture.appendingPathComponent(kind.rawValue)], kind: kind) }
     setup.reloadFolders()
-    try require(setup.folders.numberOfRows == 4 && !model.isScanning, "All folder kinds visible before Scan")
-    try await capture("setup-mixed", target: setup.window)
+    try require(setup.step == .libraries && setup.folders.numberOfRows == 1 && !model.isScanning,
+                "Libraries step lists only library folders without scanning")
+    try await capture("setup-libraries-light", target: setup.window)
+    activate(setup.scanButton)
+    try require(setup.step == .sounds && setup.folders.numberOfRows == 1 && !model.isScanning,
+                "Individual Sounds step lists only sound folders")
+    try await capture("setup-sounds-light", target: setup.window)
+    activate(setup.scanButton)
+    try require(setup.step == .projects && setup.folders.numberOfRows == 1 && !model.isScanning && model.roots.isEmpty,
+                "Projects step retains draft without accepting or scanning")
+    try require(setup.addButton.accessibilityLabel() == "Add project folders…", "Projects has a named add action")
+    try require(setup.stepDetail.stringValue.contains("Last Used") &&
+                setup.standardPluginsNote.stringValue.contains("without editing, uploading, or sharing"),
+                "Projects explains reference limits and private read-only scanning before selection")
+    try await capture("setup-projects-light", target: setup.window)
+    activate(setup.backButton)
+    try require(setup.step == .sounds && setup.folders.numberOfRows == 1, "Back retains sound folders")
+    activate(setup.scanButton); activate(setup.scanButton)
+    try require(setup.step == .review && setup.folders.numberOfRows == 4 && !model.isScanning && model.roots.isEmpty,
+                "Review shows all roots before final action")
+    try require(setup.stepTitle.stringValue == "4 of 4 · Review & Scan" &&
+                setup.stepDetail.stringValue.contains("without editing, uploading, or sharing") &&
+                setup.standardPluginsNote.stringValue.contains("turned off"),
+                "Review explains local read-only scanning and truthful automatic-plugin state")
+    try await capture("setup-review-light", target: setup.window)
     var capturedProgress = false
     var scheduledProgressCapture = false
     var progressCaptureError: String?
@@ -287,10 +363,17 @@ enum SmokeError: Error { case failed(String) }
                         try await Task.sleep(for: .milliseconds(10))
                     }
                     activate(controller.categoryButtons[1])
-                    try require(model.basicInventoryComplete && visible(controller, kind: .sample).count == 3000,
-                        "Basic inventory is browseable before project analysis finishes: complete=\(model.basicInventoryComplete), rows=\(visible(controller, kind: .sample).count), assets=\(model.report?.assets.filter { $0.kind == .sample }.count ?? -1)")
+                    let outlineDeadline = Date().addingTimeInterval(5)
+                    while visible(controller, kind: .sample).count != 3000 && model.isScanning && Date() < outlineDeadline {
+                        try await Task.sleep(for: .milliseconds(20))
+                    }
+                    try require(model.isScanning && model.scanProgress?.phase != .complete &&
+                                model.basicInventoryComplete && visible(controller, kind: .sample).count == 3000,
+                        "Basic inventory is browseable before project analysis finishes: scanning=\(model.isScanning), phase=\(String(describing: model.scanProgress?.phase)), complete=\(model.basicInventoryComplete), category=\(model.category), tableRows=\(controller.table.numberOfRows), sampleRows=\(visible(controller, kind: .sample).count), outlineSamples=\(model.outline.nodes.filter { $0.kind == .sample }.count), assets=\(model.report?.assets.filter { $0.kind == .sample }.count ?? -1)")
                     try select(controller, kind: .sample)
-                    try require(controller.inspectorSummaryText.contains("Last used   Not recorded"), "No use is invented during analysis")
+                    try require(controller.inspectorSummaryText.contains("Last used   Checking…") ||
+                        controller.inspectorSummaryText.contains("Last used   Not Used Yet"),
+                        "No use is invented during analysis: \(controller.inspectorSummaryText)")
                     try await capture("reading-progress"); capturedProgress = true
                 } catch { progressCaptureError = String(describing: error) }
             }
@@ -298,14 +381,19 @@ enum SmokeError: Error { case failed(String) }
     }
     activate(setup.scanButton)
     try require(!controller.scanProgressLabel.stringValue.isEmpty, "Initial discovery status visible")
-    try require(model.isScanning, "Scan button must start background work")
-    try require(!controller.scanButton.isEnabled, "Duplicate scan disabled")
+    try require(model.isScanning, "Review starts collection refresh")
+    try require(controller.scanButton.isEnabled && controller.scanButton.title == "Stop" &&
+                controller.scanButton.accessibilityLabel() == "Stop collection refresh", "Active refresh offers Stop")
     try await capture("loading-light")
     let deadline = Date().addingTimeInterval(60)
     while (model.isScanning || (scheduledProgressCapture && !capturedProgress && progressCaptureError == nil)) && Date() < deadline { try await Task.sleep(for: .milliseconds(50)) }
     try require(!model.isScanning, "Scan timeout")
     try require(model.catalogNotice == nil && model.savedCatalogDate != nil, "Fixture catalog persisted: \(model.catalogNotice ?? "no save timestamp")")
     try require(capturedProgress && progressCaptureError == nil, "Determinate reading progress shown and captured: \(progressCaptureError ?? "capture incomplete")")
+    activate(controller.categoryButtons[1])
+    try select(controller, kind: .sample)
+    try require(controller.inspectorSummaryText.contains("Last used   Not Used Yet"),
+        "Unobserved sample has no invented use after analysis")
     let setupOnly = CatalogModel(store: store)
     try require(setupOnly.onboardingCompleted && setupOnly.roots == model.roots && setupOnly.report == nil, "Reopen restores setup only")
     activate(controller.categoryButtons[1])
@@ -352,8 +440,14 @@ enum SmokeError: Error { case failed(String) }
     controller.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
     try require(controller.table.numberOfRows == 1, "Search updates table")
     controller.table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
-    try require(controller.table.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("reference"))?.title == "Project recency"
-                && controller.selectedNode?.asset != nil, "Selected sample has a distinctly labeled project-recency column")
+    try require(controller.table.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("reference"))?.title == "Last used"
+                && controller.selectedNode?.asset != nil, "Selected sample has a Last used column")
+    let sampleRow = controller.table.selectedRow
+    let sampleName = controller.table.view(atColumn: try requireColumn(controller.table, id: "name"), row: sampleRow, makeIfNecessary: true) as? NSTableCellView
+    let sampleContext = controller.selectedNode?.breadcrumb.dropLast().joined(separator: " › ") ?? ""
+    try require(controller.table.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("tags"))?.isHidden == true
+                && !controller.librarySort.isHidden && sampleName?.textField?.accessibilityLabel()?.contains(sampleContext) == true,
+                "Samples keep their breadcrumb while showing tags beneath the name")
     let selected = model.selectedPath
     controller.refresh()
     try require(model.selectedPath == selected, "Selection survives refresh")
@@ -373,15 +467,42 @@ enum SmokeError: Error { case failed(String) }
         activate(controller.categoryButtons[segment])
         try require(visible(controller, kind: segment == 0 ? .plugin : .library).count == (segment == 0 ? 1 : 3), "Other category")
         try select(controller, kind: segment == 0 ? .plugin : .library)
-        try require(controller.inspectorSummaryText.contains("Last used   Not recorded"), "No false plugin/library use")
+        try require(controller.inspectorSummaryText.contains("Last used   Not Used Yet"), "No false plugin/library use")
+        try require(controller.table.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("tags"))?.isHidden == true
+                    && !controller.librarySort.isHidden, "Every category retains Tags sorting through Sort")
+        if segment == 0, let product = controller.selectedNode?.asset.flatMap(model.product) {
+            let row = controller.table.selectedRow
+            let name = controller.table.view(atColumn: try requireColumn(controller.table, id: "name"), row: row, makeIfNecessary: true) as? NSTableCellView
+            try require(name?.textField?.accessibilityLabel()?.contains(product.formats) == true,
+                        "Plugin format context remains in the name row")
+        }
         try await capture(segment == 0 ? "plugins-dark" : "libraries-dark")
     }
     let folk = try select(controller, kind: .library, title: "Folk Colors")
+    try require(controller.table.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("tags"))?.isHidden == true
+                && !controller.librarySort.isHidden,
+                "Libraries give the Tags column to the Name row while retaining Sort")
     try require(!controller.table.isItemExpanded(folk), "Libraries start collapsed")
+    let librarySizeColumn = try requireColumn(controller.table, id: "size")
+    let librarySizeRow = controller.table.row(forItem: folk)
+    let librarySizeCell = controller.table.view(atColumn: librarySizeColumn, row: librarySizeRow, makeIfNecessary: true) as? NSTableCellView
+    try require(librarySizeCell?.textField?.stringValue == folk.sizeText
+                && folk.sizeText.range(of: #"^[0-9.,]+ [A-Za-z]+$"#, options: .regularExpression) != nil
+                && librarySizeCell?.textField?.toolTip?.contains("Measured installation-folder logical bytes") == true
+                && librarySizeCell?.textField?.accessibilityLabel()?.contains(folk.sizeText) == true
+                && controller.inspectorSizeDetailText?.contains("Measured installation-folder logical bytes") == true,
+                "Library Size stays numeric while table and inspector expose its full measurement basis")
     try arrow(controller, right: true)
     try require(controller.table.isItemExpanded(folk), "Native right arrow expands library")
     let piano = try select(controller, kind: .instrument, title: "Piano")
-    try require(piano.breadcrumb.contains("Folk Colors") && controller.inspectorSummaryText.contains("Size   Shared with library"), "Instrument retains parent and shared storage context")
+    let patchSizeRow = controller.table.row(forItem: piano)
+    let patchSizeCell = controller.table.view(atColumn: librarySizeColumn, row: patchSizeRow, makeIfNecessary: true) as? NSTableCellView
+    try require(piano.breadcrumb.contains("Folk Colors") && controller.inspectorSummaryText.contains("Size   —")
+                && patchSizeCell?.textField?.stringValue == "—"
+                && patchSizeCell?.textField?.toolTip?.contains("Included in library size") == true
+                && patchSizeCell?.textField?.accessibilityLabel()?.contains("not measured separately") == true
+                && controller.inspectorSizeDetailText?.contains("Included in library size") == true,
+                "Instrument retains parent context and identifies size as included in its library")
     try await capture("library-expanded-dark")
     controller.refresh()
     try require(controller.selectedNode?.id == piano.id && controller.table.isItemExpanded(folk), "Refresh preserves patch and expansion")
@@ -417,9 +538,11 @@ enum SmokeError: Error { case failed(String) }
     controller.table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
     try require(model.selectedPlugin?.installations.count == 2 && controller.table.numberOfRows == 1, "Formats share one plugin row")
     let pluginPaths = Set(model.selectedPlugin!.installations.map(\.path))
-    try require(controller.table.tableColumns.filter { !$0.isHidden }.map { $0.identifier.rawValue } == ["name", "tags", "size", "installed", "reference"], "Tags, size, date and last use remain visible")
+    try require(controller.table.tableColumns.filter { !$0.isHidden }.map { $0.identifier.rawValue } == ["name", "size", "installed", "reference"]
+                && !controller.librarySort.isHidden,
+                "Tags move into the name rows while Sort, size, date and last use remain visible")
     let selectedPluginDate = model.additionDate(model.selectedPlugin!.representative)
-    try require(controller.inspectorSummaryText.contains("Last used   Not recorded")
+    try require(controller.inspectorSummaryText.contains("Last used   Not Used Yet")
                 && controller.inspectorSummaryText.contains("Date added   " + selectedPluginDate.value)
                 && !controller.inspectorSummaryText.contains("Size   Not measured"),
                 "Plugin summary uses measured size and the scanned addition evidence")
@@ -456,8 +579,9 @@ enum SmokeError: Error { case failed(String) }
     try require(model.pluginProducts.isEmpty && !files.fileExists(atPath: originals[1]), "All remaining formats removed from fixture and catalog")
     formats.closeSheet()
     try await Task.sleep(for: .milliseconds(250))
-    try require(model.coverageDetail.contains("unsupported"), "Unsupported project visible")
-    try require(controller.scanButton.accessibilityLabel() == "Scan" || controller.scanButton.title == "Scan", "Named Scan")
+    try require(model.coverageDetail.contains("failed"), "Malformed PTX project remains visibly unresolved")
+    try require(controller.scanButton.accessibilityLabel() == "Check all collection locations for updates" &&
+                controller.scanButton.title == "Check For Updates", "Named global Check For Updates")
     try require(controller.search.accessibilityLabel() == "Search collection", "Named search")
     try require(controller.categoryButtons.allSatisfy { $0.isEnabled }, "Sidebar navigation remains enabled")
     try require(controller.table.accessibilityLabel() == "Audio collection", "Named table")
@@ -469,13 +593,23 @@ enum SmokeError: Error { case failed(String) }
     try require(NSApp.mainMenu?.performKeyEquivalent(with: findEvent) == true, "Command-F menu shortcut")
     try require(window.firstResponder === controller.search.currentEditor(), "Command-F focuses search")
     controller.showSetup()
-    try require(controller.setup?.draft.roots == model.roots, "Revisited setup has accepted locations")
-    try await capture("setup-dark", target: controller.setup?.window)
-    if let button = controller.setup?.skipButton { activate(button) }
+    guard let revisited = controller.setup else { throw SmokeError.failed("Revisited setup did not open") }
+    try require(window.attachedSheet === revisited.window && revisited.draft.roots == model.roots,
+                "Revisited setup has accepted locations in an attached sheet")
+    try await capture("setup-dark", target: revisited.window)
+    activate(revisited.scanButton)
+    try await capture("setup-sounds-dark", target: revisited.window)
+    activate(revisited.scanButton)
+    try await capture("setup-projects-dark", target: revisited.window)
+    activate(revisited.scanButton)
+    try await capture("setup-review-dark", target: revisited.window)
+    activate(revisited.skipButton)
     try await Task.sleep(for: .milliseconds(250))
     // Long folder rows, overflow, and contextual focus after an edit.
     controller.showSetup()
-    let longSetup = controller.setup!
+    guard let longSetup = controller.setup else { throw SmokeError.failed("Long-folder setup did not open") }
+    try require(window.attachedSheet === longSetup.window, "Long-folder setup is attached")
+    activate(longSetup.scanButton)
     for index in 0..<10 {
         longSetup.draft.addRoots([fixture.appendingPathComponent("Long folder \(index) " + String(repeating: "orchestral samples ", count: 7))], kind: .samples)
     }
@@ -493,6 +627,8 @@ enum SmokeError: Error { case failed(String) }
     let failedModel = CatalogModel(store: SetupStore(url: fixture.appendingPathComponent("blocked-store/setup.json")))
     let failedSetup = SetupWindow(model: failedModel)
     window.beginSheet(failedSetup.window!, completionHandler: nil)
+    activate(failedSetup.scanButton); activate(failedSetup.scanButton); activate(failedSetup.scanButton)
+    try require(failedSetup.step == .review, "Failed-save fixture reaches Review")
     activate(failedSetup.scanButton)
     try require(!failedModel.isScanning && window.attachedSheet === failedSetup.window, "Setup save failure keeps recovery controls available")
     try await capture("setup-save-error", target: failedSetup.window)
@@ -532,6 +668,8 @@ enum SmokeError: Error { case failed(String) }
         try files.moveItem(at: stateRoot.appendingPathComponent(kind.rawValue), to: stateRoot.appendingPathComponent("Offline" + kind.rawValue))
     }
     try await finishStateScan(stateModel)
+    let usageDeadline = Date().addingTimeInterval(5)
+    while stateModel.isLoadingItemUsage && Date() < usageDeadline { try await Task.sleep(for: .milliseconds(20)) }
     try require(stateModel.report?.assets.count == 3 && stateModel.report?.assets.allSatisfy { $0.catalogStale == true } == true, "Unavailable sources retain stale inventory")
     let stateWindow = CatalogWindow(model: stateModel); stateWindow.showWindow(nil)
     stateWindow.window?.appearance = NSAppearance(named: .darkAqua)
@@ -539,7 +677,7 @@ enum SmokeError: Error { case failed(String) }
     let staleLibrary = try select(stateWindow, kind: .library)
     stateWindow.table.expandItem(staleLibrary)
     try select(stateWindow, kind: .instrument)
-    try require(stateWindow.inspectorSummaryText.contains("Last used   Not recorded"), "Unobserved library instrument has no invented use")
+    try require(stateWindow.inspectorSummaryText.contains("Last used   Not Used Yet"), "Unobserved library instrument has no invented use: \(stateWindow.inspectorSummaryText)")
     try await capture("stale-library", target: stateWindow.window)
     stateModel.category = .plugin; stateWindow.refresh()
     stateWindow.table.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
@@ -601,14 +739,18 @@ enum SmokeError: Error { case failed(String) }
     try file("Composer/Libraries/Folk/Solo Accordion Legato.nki")
     try file("Composer/Libraries/Folk/Piano.nki")
     try file("Composer/Libraries/Berlin/Product.nicnt", "<ProductHints><Product><Name>Berlin Strings</Name><Company>Orchestral Tools</Company></Product></ProductHints>")
+    try file("Composer/Libraries/Chamber/Spitfire Chamber Strings.nicnt", "<ProductHints><Product><Name>Spitfire Chamber Strings</Name><Company>Spitfire Audio</Company><SNPID>058</SNPID></Product></ProductHints>")
+    try file("Composer/Libraries/Chamber/Instruments/d - Celli.nki")
+    try file("Composer/Libraries/Chamber/Instruments/_Advanced_/Individual articulations/d - Celli/d - Celli - Legato (Fingered).nki")
+    try file("Composer/Libraries/Chamber/Instruments/_Advanced_/Individual articulations/d - Celli/d - Celli - Long Harmonics.nki")
+    try file("Composer/Libraries/Chamber/Instruments/_Advanced_/Extended techniques/d - Celli - Core techniques.nki")
     try file("Composer/Samples/Loop.wav")
     let composerRoot = fixture.appendingPathComponent("Composer")
+    let composerSINE = composerRoot.appendingPathComponent("synthetic-sine.db")
+    try seedSyntheticSINE(database: composerSINE,
+                          contentRoot: composerRoot.appendingPathComponent("Libraries/Metropolis Ark 1"))
     let composerStore = CatalogStore(url: composerRoot.appendingPathComponent("catalog.sqlite"))
-    let composerModel = CatalogModel(catalogStore: composerStore, tagFetcher: { source in
-        // Synthetic transport only; live official sources are checked by the separate network probe.
-        try await Task.sleep(for: .milliseconds(100))
-        return ProductTagRecord(sourceID: source.id, descriptionDigest: source.descriptionDigest, fetchedAt: Date())
-    })
+    let composerModel = CatalogModel(sineDatabase: composerSINE, catalogStore: composerStore)
     composerModel.standardPlugins = false
     composerModel.addRoots([composerRoot.appendingPathComponent("Libraries")], kind: .libraries)
     composerModel.addRoots([composerRoot.appendingPathComponent("Samples")], kind: .samples)
@@ -616,23 +758,6 @@ enum SmokeError: Error { case failed(String) }
     try await finishStateScan(composerModel)
     let composerWindow = CatalogWindow(model: composerModel); composerWindow.showWindow(nil)
     composerWindow.window?.appearance = NSAppearance(named: .aqua)
-    composerWindow.showSettings()
-    let tagPreferences = composerWindow.setup!
-    tagPreferences.onlineTagsButton.state = .on
-    activate(tagPreferences.scanButton)
-    try await Task.sleep(for: .milliseconds(250))
-    let tagsDeadline = Date().addingTimeInterval(5)
-    while composerModel.isFetchingTags && Date() < tagsDeadline { try await Task.sleep(for: .milliseconds(20)) }
-    try require(!composerModel.isFetchingTags && composerModel.tagFetchStatus.contains("1 of 1 verified"), "Native online tags fetch completes")
-    composerWindow.showSettings()
-    let retryPreferences = composerWindow.setup!
-    activate(retryPreferences.retryTagsButton)
-    let retryDeadline = Date().addingTimeInterval(5)
-    while composerModel.isFetchingTags && Date() < retryDeadline { try await Task.sleep(for: .milliseconds(20)) }
-    try require(retryPreferences.retryTagsButton.isEnabled && retryPreferences.retryTagsButton.toolTip == composerModel.tagFetchStatus, "Settings Retry recovers after completion")
-    activate(retryPreferences.skipButton)
-    try await Task.sleep(for: .milliseconds(250))
-
     try select(composerWindow, kind: .library, title: "Berlin Strings")
     try require(composerWindow.tagPills.pills.contains { $0.value == "legato" }, "Vendor tags prominent with provenance")
     try await capture("product-tags-light", target: composerWindow.window)
@@ -644,22 +769,37 @@ enum SmokeError: Error { case failed(String) }
     try require(composerWindow.table.rect(ofColumn: usageColumn).maxX <= composerWindow.table.visibleRect.maxX,
                 "Compact library usage remains visible: last=\(composerWindow.table.rect(ofColumn: usageColumn).maxX), visible=\(composerWindow.table.visibleRect.maxX), widths=\(composerWindow.table.tableColumns.filter { !$0.isHidden }.map { $0.identifier.rawValue + ":" + String(Int($0.width)) }.joined(separator: ","))")
     composerWindow.showSettings()
-    composerWindow.setup!.onlineTagsButton.state = .off
     activate(composerWindow.setup!.scanButton)
     try await Task.sleep(for: .milliseconds(250))
-    try require(!composerModel.tagSummary(composerWindow.selectedNode!).contains("vendor suggestion"), "Disable excludes vendor suggestions")
+    guard let selectedProductAsset = composerWindow.selectedNode?.asset else {
+        throw SmokeError.failed("Reviewed product selection remains available")
+    }
+    try require(composerModel.tagSummary(composerWindow.selectedNode!).contains("Legato") &&
+                composerModel.productTagSource(selectedProductAsset)?.id == "berlin-strings" &&
+                composerModel.productTagProvenance(selectedProductAsset).contains("https://www.orchestraltools.com"),
+                "Disabling network refresh keeps reviewed product metadata and its source")
     composerWindow.window?.appearance = NSAppearance(named: .aqua)
     composerModel.query = "solo accordion legato"; composerWindow.refresh()
     try require(composerWindow.search.searchMenuTemplate == nil, "Search has no dropdown menu")
     try require(composerModel.outline.nodes.filter { $0.kind == .instrument }.count == 1, "Multiword musical query finds exact instrument")
     let instrumentNode = try select(composerWindow, kind: .instrument)
-    try require(composerWindow.inspectorSummaryText.contains("Last used   Not recorded") && composerWindow.inspectorSummaryText.contains("Date added   Unknown"), "Instrument lifecycle facts remain independent of library dates")
+    try require(composerWindow.inspectorSummaryText.contains("Last used   Not Used Yet") &&
+                composerModel.instrumentAdditionDate(instrumentNode.instrument!).evidence?.basis == .exact,
+                "Instrument keeps a qualified native filesystem date separate from library usage")
     try require(!composerWindow.inspectorSummaryText.contains(composerRoot.path), "Default library inspector excludes paths")
     try require(composerModel.tagSummary(instrumentNode).contains("Accordion"), "List metadata summarizes selected instrument")
     try require(composerWindow.revealButton.toolTip == instrumentNode.location && composerWindow.revealButton.isEnabled, "Finder targets selected instrument location")
     composerWindow.window?.setContentSize(NSSize(width: 1220, height: 780))
     try await Task.sleep(for: .milliseconds(100))
-    for key in ["name", "tags", "size", "installed", "reference"] {
+    composerWindow.librarySort.selectItem(at: 1)
+    composerWindow.changeLibrarySort(composerWindow.librarySort)
+    try require(composerModel.sort == .tags && composerWindow.selectedNode?.id == instrumentNode.id,
+                "Library Sort menu reaches Tags without a Tags column")
+    let tagDirection = composerModel.sortReversed
+    composerWindow.changeLibrarySort(composerWindow.librarySort)
+    try require(composerModel.sortReversed != tagDirection && composerWindow.selectedNode?.id == instrumentNode.id,
+                "Library Sort menu reverses Tags while preserving selection")
+    for key in ["name", "size", "installed", "reference"] {
         try clickHeader(composerWindow, key: key)
         let initialDirection = composerModel.sortReversed
         try clickHeader(composerWindow, key: key)
@@ -715,7 +855,7 @@ enum SmokeError: Error { case failed(String) }
     try require(composerModel.outline.nodes.isEmpty && composerWindow.search.stringValue == "warm", "Query stays visible after editing last match")
     try await composerModel.undoMetadata(); composerWindow.refresh()
     try require(composerModel.outline.nodes.filter { $0.kind == .instrument }.count == 1, "Undo restores tag search results")
-    let reopenedComposer = CatalogModel(catalogStore: composerStore); reopenedComposer.standardPlugins = false
+    let reopenedComposer = CatalogModel(sineDatabase: composerSINE, catalogStore: composerStore); reopenedComposer.standardPlugins = false
     reopenedComposer.addRoots([composerRoot.appendingPathComponent("Libraries")], kind: .libraries)
     reopenedComposer.addRoots([composerRoot.appendingPathComponent("Samples")], kind: .samples)
     reopenedComposer.category = .library
@@ -774,7 +914,8 @@ enum SmokeError: Error { case failed(String) }
     try await finishStateScan(composerModel)
     composerWindow.refresh()
     try select(composerWindow, kind: .library, title: "New Colors")
-    try require(composerWindow.inspectorSummaryText.contains("Date added   Unknown") && composerModel.additionDate(composerWindow.selectedNode!.asset!).detail.contains("Observed arrival"), "New library arrival stays separate from qualified Date added")
+    try require(composerModel.additionDate(composerWindow.selectedNode!.asset!).evidence?.basis == .exact,
+                "New library has a qualified native filesystem date")
     composerWindow.window?.appearance = NSAppearance(named: .darkAqua)
     try await capture("simple-browsing-dark", target: composerWindow.window)
     let overflowNode = composerWindow.selectedNode!
@@ -810,6 +951,8 @@ enum SmokeError: Error { case failed(String) }
     try require(NSApp.mainMenu?.performKeyEquivalent(with: settingsEvent) == true, "Command-comma opens Settings")
     let preferences = controller.setup!
     try require(window.attachedSheet === preferences.window && preferences.scanButton.title == "Save", "Settings uses Save without Scan")
+    try require(preferences.addButton.menu?.items.contains(where: { $0.title.contains("Custom plugins") }) != true &&
+                preferences.folders.numberOfRows >= 1, "Settings keeps legacy roots visible without a custom-plugin add choice")
     func chooseAppearance(_ sheet: SetupWindow, _ mode: CatalogAppearance) {
         sheet.appearancePicker.selectItem(at: CatalogAppearance.allCases.firstIndex(of: mode)!)
         _ = sheet.appearancePicker.sendAction(sheet.appearancePicker.action, to: sheet.appearancePicker.target)
@@ -847,7 +990,7 @@ enum SmokeError: Error { case failed(String) }
     chooseAppearance(sessionPreferences, .system); activate(sessionPreferences.scanButton); activate(sessionPreferences.sessionButton)
     try require(sessionModel.appearance == .system && !sessionModel.isScanning && NSApp.appearance == nil, "Session-only preference applies without scan")
     try await Task.sleep(for: .milliseconds(250))
-    // One row per Soundtoys product, section-scoped Scan captured before tab switching.
+    // One row per Soundtoys product; Refresh always checks the whole collection.
     for (name, identity) in [("Devil-Loc", "DevilLoc"), ("Devil-Loc_Deluxe", "DevilLocDeluxe")] {
         for (format, token) in [("component", "audiounit"), ("vst", "vst"), ("vst3", "vst3"), ("aaxplugin", "aax")] {
             try file("Sections/Plugins/\(name).\(format)/Contents/Info.plist", "<plist><dict><key>CFBundleIdentifier</key><string>com.soundtoys.\(token).\(identity)</string></dict></plist>")
@@ -864,14 +1007,35 @@ enum SmokeError: Error { case failed(String) }
     try require(descendants(sectionWindow.table).compactMap { $0 as? NSTextField }.contains { $0.stringValue == "AAX, AU, VST2, VST3" }, "Formats appear under product names")
     try require(!descendants(sectionWindow.window!.contentView!).compactMap { $0 as? NSButton }.contains { $0.title == "Tag settings…" }, "Separate Tag settings removed")
     try file("Sections/Samples/New.wav")
+    try file("Sections/Projects/New.rpp", "<REAPER_PROJECT\n>")
+    sectionModel.addRoots([fixture.appendingPathComponent("Sections/Projects")], kind: .projects)
     activate(sectionWindow.scanButton)
-    try require(sectionModel.scanningKinds == [.plugin], "Scan captures focused Plugins section")
+    try require(sectionModel.scanningKinds == Set(AssetKind.allCases) && sectionWindow.scanButton.title == "Stop",
+                "Refresh from Plugins checks all kinds and offers Stop")
+    activate(sectionWindow.scanButton)
+    let stopDeadline = Date().addingTimeInterval(10)
+    while sectionModel.isScanning && Date() < stopDeadline { try await Task.sleep(for: .milliseconds(20)) }
+    try require(!sectionModel.isScanning && sectionWindow.scanButton.title == "Check For Updates" &&
+                sectionModel.report?.assets.filter { $0.kind == .sample }.count == 1,
+                "Stop retains last collection and returns Check For Updates")
+    try await capture("refresh-stopped", target: sectionWindow.window)
     activate(sectionWindow.categoryButtons[1])
-    while sectionModel.isScanning { try await Task.sleep(for: .milliseconds(20)) }
-    try require(sectionModel.report?.assets.filter { $0.kind == .sample }.count == 1 && sectionModel.report?.assets.contains { $0.kind == .library } == true, "Plugin Scan preserves other sections without scanning them")
     activate(sectionWindow.scanButton)
-    while sectionModel.isScanning { try await Task.sleep(for: .milliseconds(20)) }
-    try require(sectionModel.report?.assets.filter { $0.kind == .sample }.count == 2 && sectionModel.pluginProducts.count == 2, "Samples Scan updates only samples")
+    let samplesRefreshDeadline = Date().addingTimeInterval(20)
+    while sectionModel.isScanning && Date() < samplesRefreshDeadline { try await Task.sleep(for: .milliseconds(20)) }
+    try require(!sectionModel.isScanning, "Refresh from Samples finishes before deadline")
+    try require(sectionModel.report?.assets.filter { $0.kind == .sample }.count == 2 &&
+                sectionModel.report?.projects.count == 1 && sectionModel.report?.assets.contains { $0.kind == .library } == true,
+                "Refresh from Samples checks samples, projects and libraries")
+    activate(sectionWindow.categoryButtons[2])
+    try require(sectionModel.category == .library, "Libraries tab selected for global Refresh")
+    activate(sectionWindow.scanButton)
+    try require(sectionModel.scanningKinds == Set(AssetKind.allCases), "Refresh from Libraries remains global")
+    let repeatedRefreshDeadline = Date().addingTimeInterval(20)
+    while sectionModel.isScanning && Date() < repeatedRefreshDeadline { try await Task.sleep(for: .milliseconds(20)) }
+    try require(!sectionModel.isScanning, "Repeated global Refresh finishes before deadline")
+    try require(sectionModel.report?.assets.filter { $0.kind == .sample }.count == 2 && sectionModel.pluginProducts.count == 2,
+                "Repeated global Refresh preserves grouped plugins")
     sectionWindow.close()
     // Date UI fixtures are isolated from installed plugins and the user's catalog.
     let dateRoot = fixture.appendingPathComponent("DateEvidence")
@@ -928,8 +1092,8 @@ enum SmokeError: Error { case failed(String) }
     let row = dateWindow.table.row(forItem: dateWindow.selectedNode!)
     let dateCell = dateWindow.table.view(atColumn: column, row: row, makeIfNecessary: true) as? NSTableCellView
     try require(dateCell?.textField?.stringValue == dateModel.additionDate(synth).value
-                && dateCell?.textField?.accessibilityLabel()?.contains(dateModel.additionDate(synth).value) == true,
-                "Date cell and accessibility agree with scanned addition evidence")
+                && dateCell?.textField?.accessibilityLabel()?.contains("Finder Date Added") == true,
+                "Date cell and accessibility identify scanned Finder addition evidence")
     try require(dateWindow.table.tableColumns[column].title == "Date added", "Shared addition header uses accurate meaning")
     try await capture("installer-record-light", target: dateWindow.window)
     dateWindow.window?.setContentSize(NSSize(width: 1040, height: 680)); dateWindow.window?.appearance = NSAppearance(named: .darkAqua)
@@ -984,8 +1148,10 @@ enum SmokeError: Error { case failed(String) }
     let arrivalCell = rangeWindow.table.view(atColumn: column, row: arrivalRow, makeIfNecessary: true) as? NSTableCellView
     let rangeAsset = rangeModel.report!.assets.first { $0.name == "Range Synth" }!
     let rangeDate = rangeModel.additionDate(rangeAsset)
+    let spokenArrival = arrivalCell?.textField?.accessibilityLabel() ?? ""
     try require(arrivalCell?.textField?.stringValue == rangeDate.value
-                && arrivalCell?.textField?.accessibilityLabel()?.contains(rangeDate.value) == true
+                && rangeDate.evidence?.basis == .exact
+                && spokenArrival.contains("Finder Date Added")
                 && rangeDate.detail.contains("Observed arrival")
                 && rangeDate.detail.contains(rangeStart.formatted(date: .abbreviated, time: .omitted))
                 && rangeDate.detail.contains(rangeEnd.formatted(date: .abbreviated, time: .omitted)),
@@ -1041,8 +1207,81 @@ enum SmokeError: Error { case failed(String) }
     try require(failedDates.installerDate(synth).detail.contains("Unavailable") && failedDatesWindow.inspectorSummaryText.contains("Date added   "), "Installer read error remains distinct from qualified Date added")
     try await capture("installer-record-unavailable", target: failedDatesWindow.window)
     failedDatesWindow.close()
+    var actualChamberValidated = false
+    if let configured = ProcessInfo.processInfo.environment["PRISM_ACTUAL_CHAMBER_ROOT"], !configured.isEmpty {
+        let actualRoot = URL(fileURLWithPath: configured).standardizedFileURL
+        guard files.fileExists(atPath: actualRoot.path) else {
+            throw SmokeError.failed("Configured actual Chamber library root is unavailable")
+        }
+        let actualStore = CatalogStore(url: fixture.appendingPathComponent("ActualChamber/catalog.sqlite"))
+        let actualModel = CatalogModel(catalogStore: actualStore)
+        actualModel.setStandardPlugins(false)
+        actualModel.addRoots([actualRoot], kind: .libraries)
+        actualModel.category = .library
+        try await finishStateScan(actualModel)
+        let actualInstruments = actualModel.report?.assets
+            .filter { $0.kind == .library }
+            .flatMap { $0.libraryMetadata?.instruments ?? [] } ?? []
+        let coreMatches = actualInstruments.filter { $0.name == "d - Celli - Core techniques" }
+        let singletonMatches = actualInstruments.filter { $0.name == "d - Celli - Long Harmonics" }
+        guard coreMatches.count == 1, let core = coreMatches.first else {
+            throw SmokeError.failed("Actual Chamber Core patch must have one physical catalog row")
+        }
+        try require(core.articulationCoverage.status == .indexed && core.articulations.count == 15,
+                    "Actual Chamber Core exposes the 15 qualified playable techniques")
+        try require(singletonMatches.count == 1 && singletonMatches[0].articulations.isEmpty,
+                    "Actual singleton patch appears once without a duplicate technique row")
+        guard let added = core.finderDateAdded,
+              Calendar(identifier: .gregorian).component(.year, from: added) == 2024 else {
+            throw SmokeError.failed("Actual Chamber Core retains its native 2024 Date Added")
+        }
+
+        let actualWindow = CatalogWindow(model: actualModel); actualWindow.showWindow(nil)
+        actualWindow.window?.setContentSize(NSSize(width: 1040, height: 680))
+        actualWindow.window?.appearance = NSAppearance(named: .aqua)
+        let actualLibrary = try select(actualWindow, kind: .library, title: "Spitfire Chamber Strings")
+        actualWindow.table.expandItem(actualLibrary)
+        let browsedCore = try select(actualWindow, kind: .instrument, title: "d - Celli - Core techniques")
+        actualWindow.search.stringValue = "celli core techniques"
+        actualWindow.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
+        let coreNode = try select(actualWindow, kind: .instrument, title: "d - Celli - Core techniques")
+        try require(coreNode.id == browsedCore.id, "Actual Core query preserves physical patch identity")
+        try require(actualModel.outline.nodes.filter { $0.kind == .instrument && $0.title == coreNode.title }.count == 1,
+                    "Actual Core query returns one physical patch")
+        let actualDateColumn = try requireColumn(actualWindow.table, id: "installed")
+        let actualDateRow = actualWindow.table.row(forItem: coreNode)
+        let actualDateCell = actualWindow.table.view(atColumn: actualDateColumn, row: actualDateRow, makeIfNecessary: true) as? NSTableCellView
+        try require(actualDateCell?.textField?.stringValue == actualModel.instrumentAdditionDate(core).value
+                    && actualDateCell?.textField?.accessibilityLabel()?.contains("Finder Date Added") == true
+                    && actualDateCell?.textField?.accessibilityLabel()?.contains("2024") == true,
+                    "Actual Core table and accessibility expose its native 2024 Date Added")
+        try await capture("actual-chamber-core-query-light-compact", target: actualWindow.window)
+        actualWindow.search.stringValue = ""
+        actualWindow.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
+        try require(actualWindow.selectedNode?.id == coreNode.id, "Clearing actual Core query restores its patch selection")
+        actualWindow.table.expandItem(actualWindow.selectedNode)
+        try require(visible(actualWindow, kind: .articulation).count == 15,
+                    "Expanded actual Chamber Core shows all 15 qualified techniques")
+        try await capture("actual-chamber-core-light-compact", target: actualWindow.window)
+
+        let browsedSingleton = try select(actualWindow, kind: .instrument, title: "d - Celli - Long Harmonics")
+        actualWindow.search.stringValue = "long harmonics"
+        actualWindow.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
+        let singleton = try select(actualWindow, kind: .instrument, title: "d - Celli - Long Harmonics")
+        try require(singleton.id == browsedSingleton.id
+                    && actualModel.outline.nodes.filter { $0.kind == .instrument && $0.title == singleton.title }.count == 1,
+                    "Actual singleton query preserves its one physical patch")
+        actualWindow.search.stringValue = ""
+        actualWindow.controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
+        try require(actualWindow.selectedNode?.id == singleton.id, "Clearing actual Chamber query restores singleton selection")
+        actualWindow.window?.appearance = NSAppearance(named: .darkAqua)
+        try await capture("actual-chamber-cleared-dark-compact", target: actualWindow.window)
+        actualWindow.close()
+        actualChamberValidated = true
+    }
     let result: [String: Any] = ["status": "passed", "fixture_samples": 3000, "cached_restore_seconds": restoreSeconds, "sample_query_ms": sampleQueryMilliseconds, "sample_outline_ms": sampleOutlineMilliseconds, "subsequent_query_ms": laterQueryMilliseconds, "screenshots": screenshots,
-                                "checks": ["installer-record sorting both ways, partial coverage, live format sheet, accessible source labels, locale widths, cached and read-error states", "section-scoped Scan and Soundtoys product grouping", "Settings appearance preview/cancel/save/session recovery and Command-comma", "single-page setup add/remove/cancel/scan controls", "draft cancellation", "setup reopen restores accepted roots", "explicit first scan", "actual scan/category controls", "async completion", "discovery counts and determinate reading progress", "search", "selection retention", "sample provenance", "unavailable matching", "coverage issues", "accessibility labels", "keyboard search focus", "centered padded cells", "inventory browsing before analysis completes", "long folder removal focus", "save error recovery", "grouped plugin formats", "cancel removal keeps all", "real Trash of synthetic fixtures only", "selective and whole-product removal", "durable catalog reopening", "cached removal disabled", "removed plugins stay absent after reopen", "offline library and instrument labels", "stale removal disabled", "catalog save failure retains live browsing", "corrupt catalog preserved", "native outline accessibility role", "native arrow expand and collapse", "library maker and instrument hierarchy", "search prunes unrelated patches", "search clear and category restoration", "metadata-only matches explicit", "distinct overlapping sample roots", "flat sample search and cross-root sort", "sample rescan selection restoration", "musical metadata cancel/save/undo", "edited metadata survives restart", "multiword musical search", "actual column header clicks toggle every sort and preserve selection", "search has no dropdown", "Finder beside Location targets selected instrument", "compact lifecycle columns visible", "installed date never inferred from scan", "plain tag search updates after edits and Undo", "Settings opt-in tag fetch and source tooltip", "compact single-page setup", "standard folders automatic", "pill add/delete/Undo and keyboard focus", "pill failed save preserves draft", "hover and native button action tag removal", "saving popover cannot dismiss", "long tag list plus reachable", "invalid BPM retains draft", "failed metadata save retains draft and retry"],
+                                "actual_chamber_validated": actualChamberValidated,
+                                "checks": ["installer-record sorting both ways, partial coverage, live format sheet, accessible source labels, locale widths, cached and read-error states", "global Check For Updates/Stop/retry from each tab and Soundtoys product grouping", "Settings appearance preview/cancel/save/session recovery and Command-comma", "four-step setup Libraries/Individual Sounds/Projects/Review & Scan, Back/Cancel and final scan", "local read-only scan privacy purpose and automatic standard plugins", "draft cancellation", "setup reopen restores accepted roots", "explicit first scan", "global collection check and category controls", "async completion", "discovery counts and determinate reading progress", "search", "selection retention", "sample provenance", "unavailable matching", "coverage issues", "accessibility labels", "keyboard search focus", "centered padded cells", "inventory browsing before analysis completes", "long folder removal focus", "save error recovery", "grouped plugin formats", "cancel removal keeps all", "real Trash of synthetic fixtures only", "selective and whole-product removal", "durable catalog reopening", "cached removal disabled", "removed plugins stay absent after reopen", "offline library and instrument labels", "stale removal disabled", "catalog save failure retains live browsing", "corrupt catalog preserved", "native outline accessibility role", "native arrow expand and collapse", "library maker and instrument hierarchy", "search prunes unrelated patches", "search clear and category restoration", "metadata-only matches explicit", "distinct overlapping sample roots", "flat sample search and cross-root sort", "sample rescan selection restoration", "musical metadata cancel/save/undo", "edited metadata survives restart", "multiword musical search", "actual column header clicks toggle every sort and preserve selection", "search has no dropdown", "Finder beside Location targets selected instrument", "compact lifecycle columns visible", "installed date never inferred from scan", "plain tag search updates after edits and Undo", "Settings appearance and source tooltip", "compact first-run setup and explicit project skip", "standard folders automatic", "pill add/delete/Undo and keyboard focus", "pill failed save preserves draft", "hover and native button action tag removal", "saving popover cannot dismiss", "long tag list plus reachable", "invalid BPM retains draft", "failed metadata save retains draft and retry"],
                                 "limits": ["VoiceOver user testing not performed", "native open panel interaction not automated", "current Mac only", "first visual baseline, no previous image diff"]]
     try JSONSerialization.data(withJSONObject: result, options: [.prettyPrinted, .sortedKeys]).write(to: output.appendingPathComponent("runtime.json"))
     print("UI smoke: PASS")

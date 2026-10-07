@@ -33,8 +33,53 @@ private struct LibraryFixture {
     #expect(library.libraryMetadata?.instruments.count == 2)
     #expect(library.libraryMetadata?.identity?.evidence == .proposed)
     #expect(library.classification == "needsIdentification")
-    #expect(library.logicalBytes == nil)
+    #expect(library.logicalBytes == 21)
+    #expect(library.libraryMetadata?.sizeBasis == .candidateFolder)
     #expect(library.libraryMetadata?.identity?.installationRoot == f.root.appendingPathComponent("8Dio/8Dio - CAGE Winds").path)
+}
+
+@Test func numberedPatchAndSampleFoldersUsePackageBoundary() throws {
+    let f = try LibraryFixture(); defer { f.clean() }
+    try f.file("Westwood/Percussion Untamed/01 Instrument/Main.nki")
+    try f.file("Westwood/Percussion Untamed/02 Samples/Payload.wav")
+    try f.file("Karanyi/Polyscape/01 INSTRUMENTS/1 SINGLE MODULES/Lead.nki")
+    try f.file("Karanyi/Polyscape/02 DATA/Samples/Payload.wav")
+    let libraries = f.scan().assets.filter { $0.kind == .library }
+    #expect(Set(libraries.map(\.name)) == ["Percussion Untamed", "Polyscape"])
+    #expect(libraries.allSatisfy { $0.libraryMetadata?.identity?.evidence == .proposed })
+    #expect(libraries.allSatisfy { $0.libraryMetadata?.instruments.count == 1 && $0.logicalBytes != nil })
+}
+
+@Test func directPatchOwnsSnapshotsAndCorePackagingStaysTogether() throws {
+    let f = try LibraryFixture(); defer { f.clean() }
+    try f.file("Envoy/Envoy.nki")
+    try f.file("Envoy/Samples/Payload.wav")
+    try f.file("Envoy/Snapshots/01 OMNI/Preset.nksn")
+    try f.file("8Dio - Mini/1_Click_Core_Library/Timebomb.nkm")
+    try f.file("8Dio - Mini/1_Click_Core_Library/air_hammer/Bang.nki")
+    try f.file("8Dio - Mini/2_Bonus_Ambiences/Ambience.wav")
+    try f.file("Tonehammer - Epic Tom Ensemble/1_Epic_Toms_Core_Library/Toms.nki")
+    try f.file("Tonehammer - Epic Tom Ensemble/2_Epic_Bass_Core_Library/Bass.nki")
+    try f.file("Tonehammer - Epic Tom Ensemble/3_Bonus_Ambiences/Ambience.wav")
+    let libraries = f.scan().assets.filter { $0.kind == .library }
+    #expect(Set(libraries.map(\.name)) == ["Envoy", "8Dio - Mini", "Tonehammer - Epic Tom Ensemble"])
+    #expect(libraries.first { $0.name == "Envoy" }?.libraryMetadata?.instruments.count == 2)
+    #expect(libraries.first { $0.name == "8Dio - Mini" }?.libraryMetadata?.instruments.count == 2)
+    #expect(libraries.first { $0.name == "Tonehammer - Epic Tom Ensemble" }?.libraryMetadata?.instruments.count == 2)
+}
+
+@Test func collectionContainerDoesNotInheritSeparateProductPatches() throws {
+    let f = try LibraryFixture(); defer { f.clean() }
+    for name in ["Product A", "Product B"] {
+        try f.file("Collection/\(name)/01 Instruments/Main.nki")
+        try f.file("Collection/\(name)/02 Samples/Payload.wav")
+    }
+    try f.file("Another Collection/1_First_Core_Library/First.nki")
+    try f.file("Another Collection/2_Second_Core_Library/Second.nki")
+    try f.file("Another Collection/3_Readme/readme.txt")
+    let libraries = f.scan().assets.filter { $0.kind == .library }
+    #expect(libraries.filter { $0.path.contains("Collection/Product") }.map(\.name).sorted() == ["Product A", "Product B"])
+    #expect(!libraries.contains { $0.name == "Collection" || $0.name == "Another Collection" })
 }
 
 @Test func manifestOverridesProposalAndNeighborProductsStaySeparate() throws {
@@ -53,6 +98,40 @@ private struct LibraryFixture {
     #expect(report.assets.allSatisfy { $0.libraryMetadata?.instruments.count == 1 })
 }
 
+@Test func nestedManifestBackupCannotReplaceOwningInstallation() throws {
+    let f = try LibraryFixture(); defer { f.clean() }
+    let manifest = "<ProductHints><Product><Name>Rhythmic Aura Vol 1</Name><Company>8Dio</Company><SNPID>f979</SNPID></Product></ProductHints>"
+    try f.file("Rhythmic Aura/Rhythmic Aura.nicnt", manifest)
+    try f.file("Rhythmic Aura/Instruments/Pulse.nki")
+    try f.file("Rhythmic Aura/Instruments/Texture.nki")
+    try f.file("Rhythmic Aura/Samples/Payload.nkx")
+    try f.file("Rhythmic Aura/Wallpaper & nicnt/Rhythmic Aura.nicnt", manifest)
+
+    let libraries = f.scan().assets.filter { $0.kind == .library }
+    let library = try #require(libraries.first)
+    #expect(libraries.count == 1)
+    #expect(library.path == f.root.appendingPathComponent("Rhythmic Aura/Rhythmic Aura.nicnt").path)
+    #expect(library.libraryMetadata?.instruments.map(\.name).sorted() == ["Pulse", "Texture"])
+    #expect((library.logicalBytes ?? 0) > 0)
+    #expect(library.libraryMetadata?.sizeBasis == .fullInstallation)
+}
+
+@Test func separateInstallationsWithSameVendorProductRemainDistinct() throws {
+    let f = try LibraryFixture(); defer { f.clean() }
+    let manifest = "<ProductHints><Product><Name>Shared Product</Name><Company>Example</Company><SNPID>123</SNPID></Product></ProductHints>"
+    for copy in ["Copy A", "Copy B"] {
+        try f.file("\(copy)/Product.nicnt", manifest)
+        try f.file("\(copy)/Instruments/\(copy).nki")
+        try f.file("\(copy)/Samples/Payload.nkx")
+    }
+    let libraries = f.scan().assets.filter { $0.kind == .library }
+    #expect(libraries.count == 2)
+    #expect(Set(libraries.map(\.path)).count == 2)
+    #expect(Set(libraries.map(\.selectionKey)).count == 2)
+    #expect(Set(libraries.compactMap { $0.libraryMetadata?.identity?.productID }).count == 1)
+    #expect(libraries.allSatisfy { $0.libraryMetadata?.instruments.count == 1 && ($0.logicalBytes ?? 0) > 0 })
+}
+
 @Test func ambiguousManifestsCannotClaimPatchesAndScopeNeverClimbs() throws {
     let f = try LibraryFixture(); defer { f.clean() }
     try f.file("Ambiguous/A.nicnt", "<ProductHints><Product><Name>A</Name></Product></ProductHints>")
@@ -67,6 +146,8 @@ private struct LibraryFixture {
     let narrow = Scanner().scan(request)
     #expect(narrow.assets.first?.libraryMetadata?.identity?.installationRoot == nil)
     #expect(narrow.assets.first?.name == "Instruments")
+    #expect((narrow.assets.first?.logicalBytes ?? 0) > 0)
+    #expect(narrow.assets.first?.libraryMetadata?.sizeBasis == .candidateFolder)
 }
 
 @Test func explicitSampleScopeAndLinkedPayloadDoNotCreateLibraryOwnership() throws {
@@ -112,6 +193,7 @@ private struct LibraryFixture {
     CREATE TABLE t_collection(collection_key,collection_id,title,subtitle,developer,keywords);
     CREATE TABLE t_instrument(instrument_key,instrument_collection,instrument_id,title,keywords);
     CREATE TABLE t_micPosition(micposition_instrument,filePath);
+    CREATE TABLE t_articulation(articulation_key,articulation_instrument,articulation_id,title,kind,hidden);
     INSERT INTO t_collection VALUES(1,'ark2','Metropolis Ark 2','','Orchestral Tools',''),(2,'ark3','Metropolis Ark 3','','Orchestral Tools','');
     INSERT INTO t_instrument VALUES(1,1,'low','Low Strings','strings'),(2,2,'low','Low Strings','strings');
     """

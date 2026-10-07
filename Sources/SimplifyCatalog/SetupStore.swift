@@ -40,6 +40,7 @@ public struct SetupStore: Sendable {
         guard ids.allSatisfy({ snapshot[$0] != nil }) else { throw SetupError.invalid }
         let settings = snapshot.filter { ids.contains($0.key) }
         let data = try JSONSerialization.data(withJSONObject: ["version": 1, "settings": settings], options: [.prettyPrinted, .sortedKeys])
+        guard data.count <= 1_048_576 else { throw SetupError.invalid }
         try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
         try data.write(to: url, options: .atomic)
         try FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)

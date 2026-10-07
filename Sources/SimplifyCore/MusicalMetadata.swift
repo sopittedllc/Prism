@@ -52,13 +52,21 @@ public struct MusicalMetadata: Codable, Sendable, Equatable {
         return result
     }
     /// Suggestions are local label evidence, never claims about a loaded patch.
-    public static func suggested(name: String, tags: [String], kind: AssetKind) -> Self {
+    public static func suggested(name: String, tags: [String], kind: AssetKind,
+                                 suppressInstrumentFamilyGuess: Bool = false) -> Self {
         let text = MusicalSearch.normalized(([name] + tags).joined(separator: " "))
-        let padded = " " + text + " "
+        let words = text.split(separator: " ").map(String.init)
+        var phrases = Set(words)
+        if words.count > 1 {
+            for index in 0..<(words.count - 1) {
+                phrases.insert(words[index] + " " + words[index + 1])
+            }
+        }
         var result = Self()
         for facet in fields(for: kind) {
+            if facet == .instrument && suppressInstrumentFamilyGuess { continue }
             let values = (suggestionVocabulary[facet] ?? []).compactMap { value, needle in
-                padded.contains(" " + needle + " ") || padded.contains(" " + needle + "s ") ? value : nil
+                phrases.contains(needle) || phrases.contains(needle + "s") ? value : nil
             }
             if !values.isEmpty { result[facet] = values }
         }
@@ -80,11 +88,16 @@ public struct MusicalMetadata: Codable, Sendable, Equatable {
 }
 
 public enum MusicalSearch {
+    private static let locale = Locale(identifier: "en_US_POSIX")
+    private static let aliases = ["celli": "cello", "cellos": "cello", "violoncello": "cello", "harmonics": "harmonic"]
+
     public static func normalized(_ text: String) -> String {
-        var value = text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "en_US_POSIX"))
+        var value = text.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: locale)
         value = value.components(separatedBy: CharacterSet.alphanumerics.inverted).filter { !$0.isEmpty }.joined(separator: " ")
         value = value.replacingOccurrences(of: "con sordino", with: "muted")
-        return value.split(separator: " ").map { ["celli": "cello", "cellos": "cello", "violoncello": "cello"][String($0)] ?? String($0) }.joined(separator: " ")
+        return value.split(separator: " ").map {
+            aliases[String($0)] ?? String($0)
+        }.joined(separator: " ")
     }
     public static func matches(_ query: String, in text: String) -> Bool {
         let haystack = normalized(text)

@@ -1,18 +1,26 @@
 import Foundation
 import CZlib
+import CryptoKit
 
 public enum ProjectReadError: Error { case malformed, tooLarge, tooDeep }
 
 /// Bounded readers for experimental project reference extraction, never plugin execution.
 public enum ProjectReader {
-    public static let maximumInputBytes = 32 * 1024 * 1024
+    public static let policyVersion = 3
+    public static let maximumInputBytes = 64 * 1024 * 1024
     public static let maximumDecodedBytes = 64 * 1024 * 1024
     public static let extensions: Set<String> = [
         "rpp", "als", "logicx", "band", "ptx", "ptf", "cpr", "npr", "song",
-        "flp", "bwproject", "reason", "reasonx", "rns", "dpdoc", "perf",
+        "flp", "bwproject", "reason", "reasonx", "rns", "dpdoc", "perf", "bak",
     ]
 
     public static func read(_ url: URL) -> ProjectReport {
+        // A scan runs synchronously inside a long-lived utility task. Foundation
+        // buffers must drain per file, rather than surviving until that task ends.
+        autoreleasepool { readProject(url) }
+    }
+
+    private static func readProject(_ url: URL) -> ProjectReport {
         let ext = url.pathExtension.lowercased()
         let modified = try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
         var ancestor = url
@@ -23,23 +31,138 @@ public enum ProjectReader {
             }
             ancestor.deleteLastPathComponent()
         }
-        if ext == "logicx" { return readLogicMetadata(url, modified: modified) }
-        guard ["rpp", "als"].contains(ext) else {
+        let kind: String
+        if ext == "bak" {
+            // Backup suffixes are admitted only after bounded format identification.
+            let prefix = try? BoundedFile.read(url, limit: 4, prefixOnly: true)
+            if prefix?.starts(with: Array("RIF2".utf8)) == true { kind = "cpr" }
+            else if url.deletingPathExtension().pathExtension.lowercased() == "als",
+                    prefix?.starts(with: [0x1f, 0x8b]) == true { kind = "als" }
+            else { kind = "bak" }
+        } else { kind = ext }
+        if kind == "logicx" { return readLogicMetadata(url, modified: modified) }
+        if kind == "ptx" {
+            do {
+                guard let before = LibraryScanJournal.stamp(url.path) else { throw ProjectReadError.malformed }
+                let data = try BoundedFile.read(url, limit: ProToolsSavedPluginReader.maximumBytes)
+                guard let plugins = ProToolsSavedPluginReader.read(data),
+                      LibraryScanJournal.stamp(url.path) == before else { throw ProjectReadError.malformed }
+                let savedAt = Date(timeIntervalSince1970: Double(before.modifiedSeconds) +
+                    Double(before.modifiedNanoseconds) / 1_000_000_000)
+                var report = ProjectReport(path: url.path, adapter: "protools-ptx-plugin-list",
+                    coverage: "partial", projectModifiedAt: savedAt, references: [],
+                    limitations: ["Only the observed Pro Tools saved AAX insert list is covered; nested player libraries and other session structures are not.",
+                        "Modification time is the saved snapshot time, not playback time."])
+                report.aaxPlugins = plugins
+                report.sourceSHA256 = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+                report.sourceSignature = LibraryScanJournal.signature(before)
+                report.readerPolicyVersion = policyVersion
+                return report
+            } catch {
+                return ProjectReport(path: url.path, adapter: "ptx", coverage: "failed",
+                    projectModifiedAt: modified, references: [], limitations: ["PTX plug-in list unavailable: \(error)"])
+            }
+        }
+        if kind == "cpr" {
+            do {
+                guard let before = LibraryScanJournal.stamp(url.path) else { throw ProjectReadError.malformed }
+                let data = try BoundedFile.read(url, limit: maximumInputBytes)
+                let plugins = try CubaseKontaktStateReader.readPluginStates(data)
+                var states: [KontaktSavedState] = []
+                var unsupportedKontakt = 0
+                for (ordinal, plugin) in plugins.enumerated() where
+                    plugin.uid == "5653544E694B386B6F6E74616B742038" && plugin.name == "Kontakt 8" {
+                    if let state = try? KontaktStateReader.read(plugin.payload) {
+                        states.append(KontaktSavedState(instanceOrdinal: ordinal, libraryIDs: state.libraryIDs,
+                            opaquePayloads: state.opaquePayloads, emptyRack: state.emptyRack))
+                    } else { unsupportedKontakt += 1 }
+                }
+                var spectrasonics: [SpectrasonicsSavedState] = []
+                var unsupportedSpectrasonics = 0
+                var unsupportedSINE = 0
+                var sineIDs: [String] = []
+                for (ordinal, plugin) in plugins.enumerated() {
+                    if plugin.uid == SINESavedStateReader.cubaseUID && plugin.name == "SINE Player" {
+                        if let ids = SINESavedStateReader.instrumentIDs(plugin.payload) { sineIDs.append(contentsOf: ids) }
+                        else { unsupportedSINE += 1 }
+                    }
+                    do {
+                        if let state = try SpectrasonicsStateReader.read(plugin) {
+                            spectrasonics.append(SpectrasonicsSavedState(instanceOrdinal: ordinal, state: state))
+                        }
+                    } catch { unsupportedSpectrasonics += 1 }
+                }
+                guard let after = LibraryScanJournal.stamp(url.path), before == after else { throw ProjectReadError.malformed }
+                let savedAt = Date(timeIntervalSince1970: Double(before.modifiedSeconds) + Double(before.modifiedNanoseconds) / 1_000_000_000)
+                var limitations = [
+                        "Kontakt library IDs and Spectrasonics preset-library metadata only in typed Cubase 15.0.30 processor states; other project content is not covered.",
+                        "Saved modification time is a snapshot proxy, not a load or playback timestamp."]
+                if unsupportedSpectrasonics > 0 {
+                    limitations.append("\(unsupportedSpectrasonics) Spectrasonics processor state(s) had unsupported or malformed metadata; no library absence is inferred.")
+                }
+                if unsupportedKontakt > 0 {
+                    limitations.append("\(unsupportedKontakt) Kontakt processor state(s) had unsupported metadata; no library absence is inferred.")
+                }
+                if unsupportedSINE > 0 {
+                    limitations.append("\(unsupportedSINE) SINE processor state(s) had unsupported metadata; no instrument absence is inferred.")
+                }
+                var report = ProjectReport(path: url.path, adapter: "cubase-kontakt-15.0.30", coverage: "partial",
+                    projectModifiedAt: savedAt, references: [], limitations: limitations)
+                report.kontaktStates = states
+                report.spectrasonicsStates = spectrasonics
+                report.sineInstrumentIDs = unsupportedSINE == 0 ? Array(Set(sineIDs)).sorted() : nil
+                report.pluginClasses = plugins.enumerated().compactMap { ordinal, plugin in
+                    guard plugin.uid.utf8.count == 32, plugin.uid.utf8.allSatisfy({
+                        (48...57).contains($0) || (65...70).contains($0)
+                    }) else { return nil }
+                    return ProjectPluginClass(instanceOrdinal: ordinal, classID: plugin.uid, name: plugin.name)
+                }
+                report.sourceSHA256 = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+                report.sourceSignature = LibraryScanJournal.signature(before)
+                report.readerPolicyVersion = policyVersion
+                return report
+            } catch {
+                return ProjectReport(path: url.path, adapter: "cpr", coverage: "failed",
+                    projectModifiedAt: modified, references: [],
+                    limitations: ["Cubase Kontakt processor state could not be safely parsed: \(error)"])
+            }
+        }
+        guard ["rpp", "als"].contains(kind) else {
             return ProjectReport(path: url.path, adapter: ext, coverage: "unsupported",
                                  projectModifiedAt: modified, references: [],
                                  limitations: ["Native project reader not implemented; no absence inference is possible."])
         }
         do {
+            guard let before = LibraryScanJournal.stamp(url.path) else { throw ProjectReadError.malformed }
             let data = try BoundedFile.read(url, limit: maximumInputBytes)
-            let refs = try ext == "rpp" ? parseReaper(data, project: url) : parseAbleton(data)
-            return ProjectReport(path: url.path, adapter: ext, coverage: "partial",
-                                 projectModifiedAt: modified, references: refs,
+            let refs: [ProjectReference]
+            var states: [KontaktSavedState]? = nil
+            var pluginClasses: [ProjectPluginClass]? = nil
+            if kind == "als" {
+                let parsed = try parseAbletonDetails(data)
+                refs = parsed.0
+                states = parsed.1.enumerated().map { index, state in
+                    KontaktSavedState(instanceOrdinal: index, libraryIDs: state.libraryIDs,
+                                      opaquePayloads: state.opaquePayloads, emptyRack: state.emptyRack)
+                }
+                pluginClasses = parsed.2
+            } else { refs = try parseReaper(data, project: url) }
+            guard LibraryScanJournal.stamp(url.path) == before else { throw ProjectReadError.malformed }
+            let savedAt = Date(timeIntervalSince1970: Double(before.modifiedSeconds) + Double(before.modifiedNanoseconds) / 1_000_000_000)
+            var report = ProjectReport(path: url.path, adapter: kind == "als" ? "ableton-kontakt-live12" : kind, coverage: "partial",
+                                 projectModifiedAt: savedAt, references: refs,
                                  limitations: [
                                     "Experimental reader; complete dependency coverage is not established.",
-                                    "Opaque plugin state and nested library identities are not decoded.",
+                                    kind == "als" ? "Only version-gated direct-track Kontakt processor states are decoded; other plugin states are not covered." : "Opaque plugin state and nested library identities are not decoded.",
                                     "Modification time is a saved-project recency proxy, not exact use time.",
-                                    ext == "als" ? "Ableton paths are candidates; relative roots and relocated media remain unresolved." : "Relative paths use the project directory; project media-path overrides remain unverified.",
+                                    kind == "als" ? "Ableton paths are candidates; relative roots and relocated media remain unresolved." : "Relative paths use the project directory; project media-path overrides remain unverified.",
                                  ])
+            report.kontaktStates = states
+            report.pluginClasses = pluginClasses
+            report.sourceSHA256 = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+            report.sourceSignature = LibraryScanJournal.signature(before)
+            report.readerPolicyVersion = policyVersion
+            return report
         } catch {
             return ProjectReport(path: url.path, adapter: ext, coverage: "failed",
                                  projectModifiedAt: modified, references: [],
@@ -47,34 +170,66 @@ public enum ProjectReader {
         }
     }
 
+    /// The same selected leaf must be used for parsing, cache reuse, and commit.
+    static func selectedLogicProjectData(_ url: URL) throws -> URL {
+        let alternatives = url.appendingPathComponent("Alternatives")
+        let folders = try FileManager.default.contentsOfDirectory(at: alternatives, includingPropertiesForKeys: [.isDirectoryKey])
+            .filter { $0.lastPathComponent.utf8.allSatisfy { (48...57).contains($0) } &&
+                (try? $0.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true }
+        let selected: URL
+        if folders.count == 1 { selected = folders[0] }
+        else {
+            let choice = alternatives.appendingPathComponent("ActiveVariant")
+            let value = String(data: try BoundedFile.read(choice, limit: 64), encoding: .utf8)?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let value, let found = folders.first(where: { $0.lastPathComponent == value }) else {
+                throw ProjectReadError.malformed
+            }
+            selected = found
+        }
+        return selected.appendingPathComponent("ProjectData")
+    }
+
     private static func readLogicMetadata(_ url: URL, modified: Date?) -> ProjectReport {
         do {
-            let metadata = url.appendingPathComponent("Alternatives/000/MetaData.plist")
-            var ancestor = metadata
+            let source = try selectedLogicProjectData(url)
+            let selected = source.deletingLastPathComponent()
+            let metadata = selected.appendingPathComponent("MetaData.plist")
+            var ancestor = source
             while ancestor.path != "/" {
                 if try ancestor.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink == true {
                     throw CocoaError(.fileReadUnsupportedScheme)
                 }
                 ancestor.deleteLastPathComponent()
             }
-            let data = try BoundedFile.read(metadata, limit: maximumInputBytes)
-            guard let plist = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] else {
-                throw ProjectReadError.malformed
-            }
+            guard let before = LibraryScanJournal.stamp(source.path) else { throw ProjectReadError.malformed }
+            let projectData = try BoundedFile.read(source, limit: maximumInputBytes)
+            guard let aus = LogicSavedAUReader.read(projectData),
+                  LibraryScanJournal.stamp(source.path) == before else { throw ProjectReadError.malformed }
             var references: [ProjectReference] = []
-            for key in ["AudioFiles", "PlaybackFiles"] {
-                guard let value = plist[key] else { continue }
-                guard let paths = value as? [String] else { throw ProjectReadError.malformed }
-                references += paths.filter { !$0.isEmpty }.map {
-                    ProjectReference(kind: .sample, value: $0, resolvedPath: nil,
-                                     evidence: "Logic Alternatives/000/MetaData.plist \(key) candidate")
+            if let data = try? BoundedFile.read(metadata, limit: 1_048_576),
+               let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any] {
+                for key in ["AudioFiles", "PlaybackFiles"] {
+                    guard let paths = plist[key] as? [String] else { continue }
+                    references += paths.filter { !$0.isEmpty }.map {
+                        ProjectReference(kind: .sample, value: $0, resolvedPath: nil,
+                            evidence: "Logic selected-alternative metadata \(key) candidate")
+                    }
                 }
             }
-            return ProjectReport(path: url.path, adapter: "logic-metadata", coverage: "partial",
-                                 projectModifiedAt: modified, references: references,
-                                 limitations: ["Metadata candidates only; alternative 000 is not proven active.",
-                                               "UnusedAudioFiles, backups, other alternatives, and plugin state are excluded.",
-                                               "Saved paths may be stale; no automatic asset matching."])
+            let savedAt = Date(timeIntervalSince1970: Double(before.modifiedSeconds) +
+                Double(before.modifiedNanoseconds) / 1_000_000_000)
+            var report = ProjectReport(path: url.path, adapter: "logic-saved-au", coverage: "partial",
+                projectModifiedAt: savedAt, references: references,
+                limitations: ["Saved AU references may include inactive or undo state; they do not prove playback.",
+                    "Selected alternative only; sample metadata paths remain unresolved."])
+            report.logicAUReferences = aus.references
+            report.kontaktStates = aus.kontaktStates
+            report.sourcePath = source.path
+            report.sourceSHA256 = SHA256.hash(data: projectData).map { String(format: "%02x", $0) }.joined()
+            report.sourceSignature = LibraryScanJournal.signature(before)
+            report.readerPolicyVersion = policyVersion
+            return report
         } catch {
             return ProjectReport(path: url.path, adapter: "logic-metadata", coverage: "failed",
                                  projectModifiedAt: modified, references: [],
@@ -180,12 +335,16 @@ public enum ProjectReader {
     }
 
     public static func parseAbleton(_ data: Data) throws -> [ProjectReference] {
+        try parseAbletonDetails(data).0
+    }
+
+    private static func parseAbletonDetails(_ data: Data) throws -> ([ProjectReference], [KontaktStateReader.Result], [ProjectPluginClass]) {
         guard data.count <= maximumInputBytes else { throw ProjectReadError.tooLarge }
         let xml = try data.starts(with: [0x1f, 0x8b]) ? inflateGzip(data) : data
         // Restrict this experimental adapter to UTF-8 XML without any DTD. Foundation
         // may omit entity callbacks when external resolution is disabled.
-        guard let text = String(data: xml, encoding: .utf8),
-              text.range(of: "<!DOCTYPE", options: .caseInsensitive) == nil else {
+        guard String(data: xml, encoding: .utf8) != nil,
+              !containsDocumentType(xml) else {
             throw ProjectReadError.malformed
         }
         let delegate = AbletonDelegate()
@@ -194,7 +353,27 @@ public enum ProjectReader {
         parser.delegate = delegate
         guard parser.parse(), parser.parserError == nil, delegate.validRoot,
               delegate.stack.isEmpty, !delegate.rejected else { throw ProjectReadError.malformed }
-        return delegate.references
+        return (delegate.references, delegate.kontaktStates, delegate.pluginClasses)
+    }
+
+    // XML's declaration token is ASCII. Unicode case folding over the entire
+    // decoded project is unnecessary and expensive for large opaque plug-in states.
+    // Keep the conservative case-insensitive rejection without allocating per character.
+    private static func containsDocumentType(_ data: Data) -> Bool {
+        let marker: [UInt8] = Array("<!DOCTYPE".utf8)
+        return data.withUnsafeBytes { (bytes: UnsafeRawBufferPointer) in
+            guard bytes.count >= marker.count else { return false }
+            for start in 0...(bytes.count - marker.count) where bytes[start] == marker[0] {
+                var matches = true
+                for offset in 1..<marker.count {
+                    let byte = bytes[start + offset]
+                    let upper = (97...122).contains(byte) ? byte - 32 : byte
+                    if upper != marker[offset] { matches = false; break }
+                }
+                if matches { return true }
+            }
+            return false
+        }
     }
 
     private static func inflateGzip(_ data: Data) throws -> Data {
@@ -228,11 +407,22 @@ public enum ProjectReader {
 }
 
 private final class AbletonDelegate: NSObject, XMLParserDelegate {
+    private struct KontaktDevice {
+        var name: String?
+        var uid: [String: String] = [:]
+        var processorHex: String?
+    }
     var stack: [String] = []
     var references: [ProjectReference] = []
+    var kontaktStates: [KontaktStateReader.Result] = []
+    var pluginClasses: [ProjectPluginClass] = []
     var validRoot = false
     var rejected = false
     private var supportsVst3Candidates = false
+    private var kontaktDevice: KontaktDevice?
+    private var processorText: String?
+    private let kontaktUID = ["Fields.0": "1448301646", "Fields.1": "1766537323",
+                              "Fields.2": "1869509729", "Fields.3": "1802772536"]
 
     func parser(_ parser: XMLParser, didStartElement name: String, namespaceURI: String?,
                 qualifiedName: String?, attributes: [String: String]) {
@@ -246,17 +436,35 @@ private final class AbletonDelegate: NSObject, XMLParserDelegate {
         }
         stack.append(name)
         guard stack.count <= 128 else { rejected = true; parser.abortParsing(); return }
+        if supportsVst3Candidates, isDirectTrackVst3Info {
+            kontaktDevice = KontaktDevice()
+        }
+        if kontaktDevice != nil, stack.count == 12,
+           stack.suffix(2).elementsEqual(["Uid", name]), name.hasPrefix("Fields."),
+           let value = attributes["Value"] {
+            guard kontaktDevice?.uid[name] == nil else { rejected = true; parser.abortParsing(); return }
+            kontaktDevice?.uid[name] = value
+        }
+        if kontaktDevice != nil, stack.count == 13,
+           stack.suffix(4).elementsEqual(["Vst3PluginInfo", "Preset", "Vst3Preset", "ProcessorState"]) {
+            processorText = ""
+        }
         guard let value = attributes["Value"], !value.isEmpty else { return }
         if supportsVst3Candidates, isDirectTrackVst3Name,
            !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            kontaktDevice?.name = value
             references.append(ProjectReference(kind: .plugin, value: value, resolvedPath: nil,
                 evidence: "ALS Live 12 direct-track Vst3PluginInfo/Name candidate; saved descriptor only, installed identity and successful load unverified"))
         }
         if stack.suffix(3).elementsEqual(["SampleRef", "FileRef", name]), ["Path", "RelativePath"].contains(name) {
-            // Even absolute ALS paths may be stale after collect-and-save. Report candidates,
-            // but do not auto-match until FileRef path-type semantics are verified.
-            references.append(ProjectReference(kind: .sample, value: value, resolvedPath: nil,
-                                               evidence: "ALS SampleRef/FileRef/\(name) candidate"))
+            let ownedTrack = stack.prefix(3).elementsEqual(["Ableton", "LiveSet", "Tracks"])
+                && stack.contains(where: { ["AudioTrack", "MidiTrack", "ReturnTrack"].contains($0) })
+            let exact = name == "Path" && ownedTrack && value.hasPrefix("/")
+                && !value.contains("\0") && !value.contains("\\")
+            references.append(ProjectReference(kind: .sample, value: value,
+                                               resolvedPath: exact ? URL(fileURLWithPath: value).standardizedFileURL.path : nil,
+                                               evidence: exact ? "ALS Live 12 track SampleRef/FileRef/Path exact current path"
+                                                   : "ALS SampleRef/FileRef/\(name) candidate"))
         }
         if stack.suffix(3).elementsEqual(["SampleRef", "FileRef", "Name"]) {
             // Observed in older user-authorized ALS files. A saved filename alone is
@@ -285,7 +493,69 @@ private final class AbletonDelegate: NSObject, XMLParserDelegate {
         ])
     }
 
+    private var isDirectTrackVst3Info: Bool {
+        stack.count == 10 && stack.prefix(3).elementsEqual(["Ableton", "LiveSet", "Tracks"])
+            && ["AudioTrack", "MidiTrack", "ReturnTrack"].contains(stack[3])
+            && stack.suffix(6).elementsEqual([
+                "DeviceChain", "DeviceChain", "Devices", "PluginDevice", "PluginDesc", "Vst3PluginInfo"])
+    }
+
+    func parser(_ parser: XMLParser, foundCharacters string: String) {
+        guard processorText != nil else { return }
+        guard processorText!.utf8.count + string.utf8.count <= 2 * (KontaktStateReader.maximumBytes + 4) else {
+            rejected = true; parser.abortParsing(); return
+        }
+        processorText! += string
+    }
+
+    private func decodeProcessor(_ text: String) throws -> KontaktStateReader.Result {
+        let hex = text.utf8.filter { ![10, 13, 32, 9].contains($0) }
+        guard hex.count.isMultiple(of: 2), hex.count <= 2 * (KontaktStateReader.maximumBytes + 4) else {
+            throw ProjectReadError.tooLarge
+        }
+        var bytes = [UInt8](); bytes.reserveCapacity(hex.count / 2)
+        for index in stride(from: 0, to: hex.count, by: 2) {
+            func nibble(_ byte: UInt8) -> UInt8? {
+                switch byte { case 48...57: byte - 48; case 65...70: byte - 55; case 97...102: byte - 87; default: nil }
+            }
+            guard let high = nibble(hex[index]), let low = nibble(hex[index + 1]) else { throw ProjectReadError.malformed }
+            bytes.append((high << 4) | low)
+        }
+        guard bytes.count >= 16,
+              bytes[4...7].allSatisfy({ $0 == 0 }),
+              Int(bytes[0]) | Int(bytes[1]) << 8 | Int(bytes[2]) << 16 | Int(bytes[3]) << 24 == bytes.count else {
+            throw ProjectReadError.malformed
+        }
+        return try KontaktStateReader.read(Data(bytes))
+    }
+
     func parser(_ parser: XMLParser, didEndElement: String, namespaceURI: String?, qualifiedName: String?) {
+        if didEndElement == "ProcessorState", let processorText {
+            guard kontaktDevice?.processorHex == nil else { rejected = true; parser.abortParsing(); return }
+            kontaktDevice?.processorHex = processorText
+            self.processorText = nil
+        }
+        if didEndElement == "Vst3PluginInfo", isDirectTrackVst3Info, let device = kontaktDevice {
+            if let name = device.name, !name.isEmpty, pluginClasses.count < 4096, device.uid.count == 4 {
+                let words = ["Fields.0", "Fields.1", "Fields.2", "Fields.3"].map { key -> UInt32? in
+                    guard let value = device.uid[key], let signed = Int32(value) else { return nil }
+                    return UInt32(bitPattern: signed)
+                }
+                if words.allSatisfy({ $0 != nil }) {
+                    let raw = words.compactMap { $0 }.map { String(format: "%08X", $0) }.joined()
+                    let cid = [raw.prefix(8), raw.dropFirst(8).prefix(4), raw.dropFirst(12).prefix(4),
+                               raw.dropFirst(16).prefix(4), raw.dropFirst(20)].map(String.init).joined(separator: "-")
+                    pluginClasses.append(ProjectPluginClass(instanceOrdinal: pluginClasses.count, classID: cid, name: name))
+                }
+            }
+            if device.name == "Kontakt 8", device.uid == kontaktUID {
+                do {
+                    guard let hex = device.processorHex, kontaktStates.count < 4096 else { throw ProjectReadError.malformed }
+                    kontaktStates.append(try decodeProcessor(hex))
+                } catch { rejected = true; parser.abortParsing(); return }
+            }
+            kontaktDevice = nil
+        }
         if !stack.isEmpty { stack.removeLast() }
     }
 

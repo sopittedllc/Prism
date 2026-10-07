@@ -1,4 +1,5 @@
 import Foundation
+import CFastLZ
 
 /// Reads public metadata from Kontakt's NIS processor-state envelope.
 /// IDs are saved-state candidates. They do not identify an individual patch or a
@@ -7,6 +8,8 @@ public enum KontaktStateReader {
     public struct Result: Sendable, Equatable {
         public let libraryIDs: [String]
         public let opaquePayloads: Int
+        /// Proven zero-slot saved rack. Missing IDs alone never establish this.
+        public let emptyRack: Bool
     }
     public enum ReadError: Error { case malformed, unsupported, limit }
     public static let maximumBytes = 16 * 1024 * 1024
@@ -15,12 +18,15 @@ public enum KontaktStateReader {
         guard data.count <= maximumBytes else { throw ReadError.limit }
         var decoder = Decoder()
         try decoder.item(Array(data), depth: 0)
-        return Result(libraryIDs: decoder.ids.sorted(), opaquePayloads: decoder.opaque)
+        return Result(libraryIDs: decoder.ids.sorted(), opaquePayloads: decoder.opaque,
+                      emptyRack: decoder.ids.isEmpty && decoder.opaque == 0 && decoder.racks > 0 && !decoder.nonemptyRack)
     }
 
     private struct Decoder {
         var ids = Set<String>()
         var opaque = 0
+        var racks = 0
+        var nonemptyRack = false
         var nodes = 0
         var totalBytes = 0
 
@@ -51,6 +57,7 @@ public enum KontaktStateReader {
             let payload = try r.take(r.remaining)
             guard domain == Array("DSIN".utf8) else { return }
             if type == 106 { try libraryMetadata(payload) }
+            if type == 109 { try rackMetadata(payload) }
             if type == 115 {
                 var p = Cursor(payload)
                 guard try p.number(4) == 1 else { throw ReadError.unsupported }
@@ -58,10 +65,55 @@ public enum KontaktStateReader {
                 if encoding == 0 {
                     try item(try p.take(p.remaining), depth: depth + 1)
                 } else if encoding == 1 {
-                    // Protected/compressed envelopes are deliberately not guessed.
-                    // Public metadata from surrounding nodes remains available.
-                    opaque += 1
+                    guard p.remaining >= 8 else { opaque += 1; return }
+                    let expanded = try p.number(4), compressed = try p.number(4)
+                    guard compressed > 0, compressed == p.remaining else { opaque += 1; return }
+                    // A large/protected state is still opaque; public IDs in its
+                    // surrounding envelope remain usable. Decode only small racks
+                    // needed to prove the observed zero-slot default.
+                    guard expanded >= 8, expanded <= 1_048_576 else { opaque += 1; return }
+                    let input = try p.take(compressed)
+                    var output = [UInt8](repeating: 0, count: expanded)
+                    let decoded = input.withUnsafeBytes { source in
+                        output.withUnsafeMutableBytes { target in
+                            fastlz_decompress(source.baseAddress, Int32(compressed), target.baseAddress, Int32(expanded))
+                        }
+                    }
+                    guard decoded == expanded else { opaque += 1; return }
+                    try item(output, depth: depth + 1)
                 } else { throw ReadError.unsupported }
+            }
+        }
+
+        mutating func rackMetadata(_ bytes: [UInt8]) throws {
+            var p = Cursor(bytes)
+            guard try p.number(4) == 1 else { return }
+            _ = try p.number(4) // dictionary type
+            guard try p.number(4) == 1 else { return }
+            let size = try p.number(4)
+            _ = try p.number(4) // dictionary reference
+            guard size <= p.remaining - 8 else { return }
+            var chunks = Cursor(try p.take(size))
+            while !chunks.finished {
+                let id = try chunks.number(2), length = try chunks.number(4)
+                let body = try chunks.take(length)
+                guard id == 0x03 else { continue }
+                var bank = Cursor(body)
+                guard try bank.number(1) == 1 else { continue }
+                _ = try bank.number(2)
+                try bank.skip(try bank.number(4)) // private bytes
+                try bank.skip(try bank.number(4)) // public bytes
+                var children = Cursor(try bank.take(try bank.number(4)))
+                guard bank.finished else { continue }
+                while !children.finished {
+                    let childID = try children.number(2), count = try children.number(4)
+                    let child = try children.take(count)
+                    guard childID == 0x37, child.count >= 8 else { continue }
+                    var slots = Cursor(child)
+                    let flags = try slots.number(8)
+                    racks += 1
+                    if flags != 0 || !slots.finished { nonemptyRack = true }
+                }
             }
         }
 
@@ -103,6 +155,7 @@ public enum KontaktStateReader {
             defer { offset += count }
             return Array(bytes[offset..<offset + count])
         }
+        mutating func skip(_ count: Int) throws { _ = try take(count) }
         mutating func number(_ width: Int) throws -> Int {
             let raw = try take(width)
             var value: UInt64 = 0
